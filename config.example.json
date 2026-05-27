@@ -1,0 +1,8 @@
+{
+    "url": "http://10.1.2.3",
+    "operator": "中国电信",
+    "username": "请填写学号",
+    "password": "请填写密码",
+    "max_retries": 3,
+    "retry_interval_seconds": 5
+}

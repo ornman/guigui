@@ -1,0 +1,25 @@
+# Build artifacts
+build/
+dist/
+installer_output/
+
+# Runtime
+*.log
+
+# Config (contains credentials)
+config.json
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Temp
+_notify.ps1
