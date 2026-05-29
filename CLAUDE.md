@@ -19,6 +19,7 @@ auto-login/
 ## 配置
 
 `config.json`（安装在 `%APPDATA%\SchoolAutoLogin\` 下）：
+- `wifi_ssid`: 校园网 WiFi 名称，登录前自动切换到该网络（可选，不填则跳过）
 - `operator`: 运营商（"中国电信"/"中国联通"/"校园用户"），当前 Dr.COM 版本不使用运营商后缀
 - `username`: 学号
 - `password`: 密码
@@ -79,4 +80,5 @@ pyinstaller auto_login.spec
   - `result=1` 表示登录成功，`result=0` 表示失败
 - 使用 `urllib` 标准库，无需第三方依赖
 - Windows 通知通过 PowerShell WinRT API 实现，无需额外安装包
-- 启动时等待网络就绪（最多 120 秒），解决睡眠唤醒后网络延迟问题
+- 启动时自动切换到指定 WiFi（通过 `netsh wlan connect`），解决睡眠唤醒后连接到其他网络的问题
+- 等待网络就绪（最多 120 秒），解决睡眠唤醒后网络延迟问题

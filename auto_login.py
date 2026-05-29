@@ -88,6 +88,62 @@ def load_config() -> dict:
         return json.load(f)
 
 
+def get_current_wifi() -> str | None:
+    """Return the SSID of the currently connected Wi-Fi, or None."""
+    try:
+        result = subprocess.run(
+            ["netsh", "wlan", "show", "interfaces"],
+            capture_output=True, text=True, encoding="utf-8", timeout=10,
+        )
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if line.startswith("SSID") and ":" in line:
+                return line.split(":", 1)[1].strip() or None
+    except Exception as e:
+        log.warning(f"Cannot detect current Wi-Fi: {e}")
+    return None
+
+
+def connect_wifi(target_ssid: str, timeout: int = 30) -> bool:
+    """Ensure the machine is connected to *target_ssid*. Returns True on success."""
+    current = get_current_wifi()
+    if current == target_ssid:
+        log.info(f"Already connected to Wi-Fi '{target_ssid}'")
+        return True
+
+    if current:
+        log.info(f"Current Wi-Fi is '{current}', switching to '{target_ssid}'...")
+    else:
+        log.info(f"Not connected to any Wi-Fi, connecting to '{target_ssid}'...")
+
+    try:
+        result = subprocess.run(
+            [
+                "netsh", "wlan", "connect",
+                f"ssid={target_ssid}",
+                f"name={target_ssid}",
+            ],
+            capture_output=True, text=True, encoding="utf-8", timeout=15,
+        )
+        log.info(f"netsh connect output: {result.stdout.strip()}")
+        if "successfully" not in result.stdout.lower() and result.returncode != 0:
+            log.warning(f"Connect command may have failed: {result.stderr.strip()}")
+    except Exception as e:
+        log.error(f"Failed to run netsh connect: {e}")
+        return False
+
+    # Wait for the connection to stabilise
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        time.sleep(3)
+        if get_current_wifi() == target_ssid:
+            log.info(f"Successfully connected to '{target_ssid}'")
+            return True
+
+    log.warning(f"Timed out waiting for Wi-Fi '{target_ssid}' ({timeout}s)")
+    return False
+
+
 def wait_for_network(timeout: int = 120, interval: int = 5) -> bool:
     """Block until the auth server (10.1.2.3) is reachable."""
     deadline = time.time() + timeout
@@ -160,9 +216,16 @@ def main() -> None:
     cfg = load_config()
     max_retries: int = cfg.get("max_retries", 3)
     retry_interval: int = cfg.get("retry_interval_seconds", 5)
+    target_wifi: str | None = cfg.get("wifi_ssid")
 
     log.info("=== Auto-login started ===")
 
+    # Step 1: Ensure we're on the right Wi-Fi
+    if target_wifi:
+        if not connect_wifi(target_wifi):
+            log.warning("Wi-Fi connect failed, will still try login...")
+
+    # Step 2: Wait for network reachability
     if not wait_for_network(timeout=120, interval=5):
         log.error("Network unavailable after waiting 120s")
         notify("校园网登录失败", "网络不可用，请检查连接")
