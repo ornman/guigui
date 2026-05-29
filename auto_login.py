@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 import time
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from urllib.parse import quote
 from urllib.request import urlopen, Request
@@ -20,13 +21,22 @@ else:
 CONFIG_PATH = SCRIPT_DIR / "config.json"
 LOG_PATH = SCRIPT_DIR / "login.log"
 
-logging.basicConfig(
-    filename=str(LOG_PATH),
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
+_log_fmt = logging.Formatter(
+    "%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
+_file_handler = RotatingFileHandler(
+    str(LOG_PATH),
+    maxBytes=512 * 1024,   # 512 KB per file
+    backupCount=3,          # keep at most 3 rotated copies
+    encoding="utf-8",
+)
+_file_handler.setLevel(logging.INFO)
+_file_handler.setFormatter(_log_fmt)
+
 log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
+log.addHandler(_file_handler)
 
 # exe (交互模式) 显示控制台输出; pythonw (定时任务) 不显示
 if sys.stdout is not None:
@@ -97,14 +107,61 @@ def get_current_wifi() -> str | None:
         )
         for line in result.stdout.splitlines():
             line = line.strip()
-            if line.startswith("SSID") and ":" in line:
+            # Match "SSID                   : xxx" (skip "BSSID" lines)
+            if line.startswith("SSID") and "BSSID" not in line and ":" in line:
                 return line.split(":", 1)[1].strip() or None
     except Exception as e:
         log.warning(f"Cannot detect current Wi-Fi: {e}")
     return None
 
 
-def connect_wifi(target_ssid: str, timeout: int = 30) -> bool:
+def _find_wifi_profile(target_ssid: str) -> str | None:
+    """Find the saved Windows WLAN profile name for *target_ssid*.
+
+    The profile name usually equals the SSID, but they can differ
+    (e.g. when the user manually renamed the profile, or the system
+    appended a suffix).  We look up ``netsh wlan show profiles`` and
+    return the first profile whose name matches the SSID.
+    """
+    try:
+        result = subprocess.run(
+            ["netsh", "wlan", "show", "profiles"],
+            capture_output=True, text=True, encoding="utf-8", timeout=10,
+        )
+        for line in result.stdout.splitlines():
+            if ":" not in line:
+                continue
+            profile_name = line.split(":", 1)[1].strip()
+            if profile_name == target_ssid:
+                return profile_name
+    except Exception as e:
+        log.warning(f"Cannot list WiFi profiles: {e}")
+    return None
+
+
+def _do_netsh_connect(profile_name: str, ssid: str) -> bool:
+    """Run ``netsh wlan connect`` and return True if the command succeeds."""
+    try:
+        result = subprocess.run(
+            [
+                "netsh", "wlan", "connect",
+                f"ssid={ssid}",
+                f"name={profile_name}",
+            ],
+            capture_output=True, text=True, encoding="utf-8", timeout=15,
+        )
+        output = result.stdout.strip()
+        log.info(f"netsh connect output: {output}")
+        ok = "successfully" in output.lower() or result.returncode == 0
+        if not ok:
+            log.warning(f"Connect may have failed: {result.stderr.strip()}")
+        return ok
+    except Exception as e:
+        log.error(f"Failed to run netsh connect: {e}")
+        return False
+
+
+def connect_wifi(target_ssid: str, retries: int = 3, stabilise_timeout: int = 30) -> bool:
     """Ensure the machine is connected to *target_ssid*. Returns True on success."""
     current = get_current_wifi()
     if current == target_ssid:
@@ -116,31 +173,26 @@ def connect_wifi(target_ssid: str, timeout: int = 30) -> bool:
     else:
         log.info(f"Not connected to any Wi-Fi, connecting to '{target_ssid}'...")
 
-    try:
-        result = subprocess.run(
-            [
-                "netsh", "wlan", "connect",
-                f"ssid={target_ssid}",
-                f"name={target_ssid}",
-            ],
-            capture_output=True, text=True, encoding="utf-8", timeout=15,
-        )
-        log.info(f"netsh connect output: {result.stdout.strip()}")
-        if "successfully" not in result.stdout.lower() and result.returncode != 0:
-            log.warning(f"Connect command may have failed: {result.stderr.strip()}")
-    except Exception as e:
-        log.error(f"Failed to run netsh connect: {e}")
-        return False
+    # Resolve the correct profile name (may differ from the SSID)
+    profile = _find_wifi_profile(target_ssid) or target_ssid
+    if profile != target_ssid:
+        log.info(f"Using profile name '{profile}' for SSID '{target_ssid}'")
 
-    # Wait for the connection to stabilise
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        time.sleep(3)
-        if get_current_wifi() == target_ssid:
-            log.info(f"Successfully connected to '{target_ssid}'")
-            return True
+    for attempt in range(1, retries + 1):
+        log.info(f"WiFi connect attempt {attempt}/{retries}")
+        _do_netsh_connect(profile, target_ssid)
 
-    log.warning(f"Timed out waiting for Wi-Fi '{target_ssid}' ({timeout}s)")
+        # Wait for the connection to stabilise
+        deadline = time.time() + stabilise_timeout
+        while time.time() < deadline:
+            time.sleep(3)
+            if get_current_wifi() == target_ssid:
+                log.info(f"Successfully connected to '{target_ssid}'")
+                return True
+
+        log.warning(f"Attempt {attempt}: still not connected to '{target_ssid}'")
+
+    log.warning(f"Failed to connect to '{target_ssid}' after {retries} attempts")
     return False
 
 
