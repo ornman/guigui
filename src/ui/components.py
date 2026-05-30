@@ -22,8 +22,8 @@ class GlassCard(ctk.CTkFrame):
         )
         # Glass refraction line — top edge
         self._hl = ctk.CTkFrame(
-            self, fg_color=self._HL_COLOR, height=1, corner_radius=0)
-        self._hl.place(relx=0, rely=0, relwidth=1.0, height=1)
+            self, fg_color=self._HL_COLOR, height=1, width=10, corner_radius=0)
+        self._hl.place(relx=0, rely=0, relwidth=1.0)
 
 
 class BrutalButton(ctk.CTkFrame):
