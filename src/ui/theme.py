@@ -34,7 +34,7 @@ BTN_H = 44
 BTN_BOX_H = BTN_H + SY_HOVER  # 50
 
 # Fonts
-FF = "Microsoft YaHei"
+FF = "DengXian"
 F_TITLE = (FF, 26, "bold")
 F_SUBTITLE = (FF, 12)
 F_TAB = (FF, 16, "bold")

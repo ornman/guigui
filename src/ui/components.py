@@ -138,7 +138,7 @@ class StatusDot(ctk.CTkFrame):
     def __init__(self, master, state: str = "idle"):
         super().__init__(master, fg_color="transparent")
         self._dot = ctk.CTkLabel(
-            self, text="●", font=(T.FF, 14),
+            self, text="●", font=(T.FF, 12),
             text_color=self._COLORS[state],
         )
         self._dot.pack(side="left")
