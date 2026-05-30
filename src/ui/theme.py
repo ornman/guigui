@@ -33,8 +33,8 @@ BTN_H = 44
 BTN_BOX = BTN_H + SY_HOVER
 
 # ── Fonts ──
-FF_EN = "Segoe UI"
-FF_CN = "DengXian"
+FF_EN = "SF Pro Display"
+FF_CN = "PingFang SC"
 
 F_BRAND = (FF_EN, 28, "bold")       # SCHOOL
 F_SUB = (FF_EN, 13)                  # // AUTOLOGIN
