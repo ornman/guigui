@@ -17,7 +17,8 @@ class App(ctk.CTk):
         self.title("SchoolAutoLogin")
         self.geometry(f"{T.WIN_W}x{T.WIN_H}")
         self.configure(fg_color=T.BG)
-        self.resizable(False, False)
+        self.minsize(460, 680)
+        self.resizable(True, True)
 
         self._cfg = config.load()
         self._build()
