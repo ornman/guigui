@@ -1,4 +1,4 @@
-"""SchoolAutoLogin — main application window."""
+"""SchoolAutoLogin — main window."""
 
 import threading
 
@@ -17,7 +17,7 @@ class App(ctk.CTk):
         self.title("SchoolAutoLogin")
         self.geometry(f"{T.WIN_W}x{T.WIN_H}")
         self.configure(fg_color=T.BG)
-        self.minsize(460, 680)
+        self.minsize(T.WIN_W, T.WIN_H)
         self.resizable(True, True)
 
         self._cfg = config.load()
@@ -27,38 +27,38 @@ class App(ctk.CTk):
     # ── Build ────────────────────────────────────
 
     def _build(self):
-        # Outer wrapper — the accent bar + card
         outer = ctk.CTkFrame(self, fg_color="transparent")
         outer.pack(fill="both", expand=True, padx=20, pady=20)
 
-        # Accent top bar (4px solid purple)
-        ctk.CTkFrame(outer, fg_color=T.ACCENT, height=4).pack(
-            fill="x", side="top")
+        # Brand bar — 3px purple strip
+        ctk.CTkFrame(outer, fg_color=T.ACCENT, height=3).pack(fill="x")
 
-        # Main card
+        # Card
         card = GlassCard(outer)
         card.pack(fill="both", expand=True)
-        self._card = card
 
-        # Inner padding
+        # Inner content
         inner = ctk.CTkFrame(card, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=T.PAD, pady=T.PAD)
         self._inner = inner
 
-        # Title block
+        # ── Title block ──
         ctk.CTkLabel(
-            inner, text="SchoolAutoLogin",
-            font=T.F_TITLE, text_color=T.TEXT, anchor="w",
+            inner, text="SCHOOL", font=T.F_BRAND,
+            text_color=T.TEXT, anchor="w",
         ).pack(fill="x")
         ctk.CTkLabel(
-            inner, text="校园网自动登录",
-            font=T.F_SUBTITLE, text_color=T.TEXT_DIM, anchor="w",
+            inner, text="// AUTOLOGIN", font=T.F_SUB,
+            text_color=T.ACCENT, anchor="w",
         ).pack(fill="x", pady=(0, T.PAD_SM))
 
-        # Tabs
+        # Purple divider
+        ctk.CTkFrame(inner, fg_color=T.ACCENT, height=2).pack(fill="x")
+
+        # ── Tabs ──
         self._build_tabs(inner)
 
-        # Content
+        # ── Content ──
         self._content = ctk.CTkFrame(inner, fg_color="transparent")
         self._content.pack(fill="both", expand=True, pady=(T.PAD_SM, 0))
 
@@ -66,93 +66,82 @@ class App(ctk.CTk):
         self._settings_panel = self._build_settings(self._content)
         self._show_tab("login")
 
-        # Status bar — sits at card bottom
+        # ── Status ──
         self._status = StatusDot(card, state="idle")
-        self._status.pack(
-            side="bottom", anchor="w",
-            padx=T.PAD, pady=(0, T.PAD_SM))
+        self._status.pack(side="bottom", anchor="w",
+                          padx=T.PAD, pady=(0, T.PAD_SM))
 
     def _build_tabs(self, parent):
         bar = ctk.CTkFrame(parent, fg_color="transparent")
-        bar.pack(fill="x", pady=(0, 2))
+        bar.pack(fill="x", pady=(T.PAD_SM, 0))
 
         self._tab_login = ctk.CTkButton(
-            bar, text="登录", font=T.F_TAB, width=100,
-            fg_color="transparent", text_color=T.ACCENT,
-            hover=False, corner_radius=T.R_BTN,
-            command=lambda: self._show_tab("login"),
-        )
-        self._tab_login.pack(side="left", padx=(0, 4))
+            bar, text="01 登录", font=T.F_TAB, width=100,
+            fg_color="transparent", text_color=T.TEXT,
+            hover=False, corner_radius=0,
+            command=lambda: self._show_tab("login"))
+        self._tab_login.pack(side="left")
 
         self._tab_settings = ctk.CTkButton(
-            bar, text="设置", font=T.F_TAB, width=100,
+            bar, text="02 设置", font=T.F_TAB, width=100,
             fg_color="transparent", text_color=T.TEXT_DIM,
-            hover=False, corner_radius=T.R_BTN,
-            command=lambda: self._show_tab("settings"),
-        )
-        self._tab_settings.pack(side="left", padx=(0, 4))
+            hover=False, corner_radius=0,
+            command=lambda: self._show_tab("settings"))
+        self._tab_settings.pack(side="left", padx=(16, 0))
 
-        # Active tab indicator — thick accent underline
-        self._tab_indicator = ctk.CTkFrame(
-            bar, fg_color=T.ACCENT, height=3, width=60)
-        self._tab_indicator.place(
-            in_=self._tab_login, rely=1.0, relx=0.1)
+        # Active indicator
+        self._indicator = ctk.CTkFrame(
+            bar, fg_color=T.ACCENT, height=3, width=50, corner_radius=0)
+        self._indicator.place(in_=self._tab_login, rely=1.0, relx=0.0)
 
-        # Divider
-        ctk.CTkFrame(parent, fg_color=T.BORDER, height=2).pack(fill="x")
+        # Gray divider
+        ctk.CTkFrame(parent, fg_color=T.BORDER, height=1).pack(fill="x")
 
-    def _update_tab_indicator(self, target):
-        self._tab_indicator.place_forget()
-        self._tab_indicator.place(
-            in_=target, rely=1.0, relx=0.1)
+    def _move_indicator(self, target):
+        self._indicator.place_forget()
+        self._indicator.place(in_=target, rely=1.0, relx=0.0)
 
     # ── Login panel ──────────────────────────────
 
     def _build_login(self, parent):
         p = ctk.CTkFrame(parent, fg_color="transparent")
 
-        # Operator
-        self._label(p, "运营商")
+        self._section(p, "// 运营商")
         self._op = ctk.CTkOptionMenu(
             p, values=list(T.OPERATORS),
-            fg_color=T.SURFACE, button_color=T.ACCENT,
-            button_hover_color=T.ACCENT_HOVER,
-            text_color=T.TEXT, font=T.F_BODY, height=40,
-            corner_radius=T.R_INPUT,
-        )
+            fg_color=T.BG, button_color=T.ACCENT,
+            button_hover_color=T.ACCENT_DARK,
+            text_color=T.TEXT, font=T.F_INPUT, height=38,
+            corner_radius=T.R)
         self._op.pack(fill="x", pady=(0, T.PAD_XS))
 
-        # Username
-        self._label(p, "学号")
-        self._user = self._entry(p, placeholder="输入学号")
+        self._section(p, "// 学号")
+        self._user = self._entry(p)
 
-        # Password
-        self._label(p, "密码")
+        self._section(p, "// 密码")
         pw_row = ctk.CTkFrame(p, fg_color="transparent")
-        pw_row.pack(fill="x", pady=(0, T.PAD_SM))
-
+        pw_row.pack(fill="x", pady=(0, T.PAD_XS))
         self._pw = ctk.CTkEntry(
-            pw_row, placeholder_text="输入密码", show="●",
-            **self._entry_style(), height=40,
-        )
+            pw_row, placeholder_text="", show="●",
+            **self._entry_kw(), height=38)
         self._pw.pack(side="left", fill="x", expand=True)
         self._focus_border(self._pw)
-
         self._pw_toggle = ctk.CTkButton(
-            pw_row, text="显示", width=56, height=40,
+            pw_row, text="显示", width=48, height=38,
             fg_color=T.SURFACE, text_color=T.TEXT_DIM,
             font=T.F_SMALL, hover_color=T.BORDER,
-            corner_radius=T.R_INPUT, command=self._toggle_pw,
-        )
+            corner_radius=T.R, command=self._toggle_pw)
         self._pw_toggle.pack(side="right", padx=(8, 0))
 
-        # Buttons
-        self._btn_login = BrutalButton(
-            p, text="立即登录", command=self._do_login)
-        self._btn_login.pack(fill="x", pady=(T.PAD_SM, 8))
+        # Spacer before buttons
+        ctk.CTkFrame(p, fg_color="transparent", height=T.PAD_SECTION).pack()
 
-        self._btn_save = BrutalButton(
-            p, text="保存配置", command=self._save, variant="secondary")
+        self._btn_login = BrutalButton(p, text="立即登录",
+                                        command=self._do_login)
+        self._btn_login.pack(fill="x", pady=(0, T.PAD_XS))
+
+        self._btn_save = BrutalButton(p, text="保存配置",
+                                        command=self._save, variant="secondary")
         self._btn_save.pack(fill="x")
 
         return p
@@ -162,95 +151,83 @@ class App(ctk.CTk):
     def _build_settings(self, parent):
         p = ctk.CTkFrame(parent, fg_color="transparent")
 
-        # WiFi
-        self._label(p, "校园网 WiFi 名称")
-        self._wifi_entry = self._entry(p, placeholder="留空则跳过")
+        self._section(p, "// 网络")
+        self._wifi_entry = self._entry(p, placeholder="校园网 WiFi 名称，留空跳过")
 
-        # Polling
+        self._section(p, "// 重连")
         self._sw_poll = self._switch(p, "断网自动重连")
-        row = ctk.CTkFrame(p, fg_color="transparent")
-        row.pack(fill="x", pady=(0, T.PAD_XS), padx=(T.PAD, 0))
-        ctk.CTkLabel(
-            row, text="检测间隔（秒）",
-            font=T.F_SMALL, text_color=T.TEXT_DIM,
-        ).pack(side="left")
+        r1 = ctk.CTkFrame(p, fg_color="transparent")
+        r1.pack(fill="x", pady=(0, T.PAD_XS), padx=(20, 0))
+        ctk.CTkLabel(r1, text="检测间隔（秒）", font=T.F_SWITCH_VAL,
+                     text_color=T.TEXT_DIM).pack(side="left")
         self._poll_interval = ctk.CTkEntry(
-            row, width=80, height=32,
-            fg_color=T.BG, border_color=T.BORDER,
-            text_color=T.TEXT, font=T.F_SMALL,
-            corner_radius=T.R_INPUT,
-        )
+            r1, width=72, height=28, fg_color=T.BG,
+            border_color=T.BORDER, text_color=T.TEXT,
+            font=T.F_SWITCH_VAL, corner_radius=T.R)
         self._poll_interval.pack(side="right")
 
-        # Scheduled login
+        self._section(p, "// 定时")
         self._sw_sched = self._switch(p, "定时登录")
-        row2 = ctk.CTkFrame(p, fg_color="transparent")
-        row2.pack(fill="x", pady=(0, T.PAD_XS), padx=(T.PAD, 0))
-        ctk.CTkLabel(
-            row2, text="执行时间（HH:MM）",
-            font=T.F_SMALL, text_color=T.TEXT_DIM,
-        ).pack(side="left")
+        r2 = ctk.CTkFrame(p, fg_color="transparent")
+        r2.pack(fill="x", pady=(0, T.PAD_XS), padx=(20, 0))
+        ctk.CTkLabel(r2, text="执行时间 HH:MM", font=T.F_SWITCH_VAL,
+                     text_color=T.TEXT_DIM).pack(side="left")
         self._sched_time = ctk.CTkEntry(
-            row2, width=80, height=32,
-            fg_color=T.BG, border_color=T.BORDER,
-            text_color=T.TEXT, font=T.F_SMALL,
-            corner_radius=T.R_INPUT,
-        )
+            r2, width=72, height=28, fg_color=T.BG,
+            border_color=T.BORDER, text_color=T.TEXT,
+            font=T.F_SWITCH_VAL, corner_radius=T.R)
         self._sched_time.pack(side="right")
 
-        # Auto-start + notifications
+        self._section(p, "// 系统")
         self._sw_autostart = self._switch(p, "开机自启")
         self._sw_notify = self._switch(p, "桌面通知")
 
-        self._btn_apply = BrutalButton(
-            p, text="应用设置", command=self._apply_settings)
-        self._btn_apply.pack(fill="x", pady=(T.PAD_SM, 0))
+        ctk.CTkFrame(p, fg_color="transparent", height=T.PAD_SM).pack()
+        self._btn_apply = BrutalButton(p, text="应用设置",
+                                        command=self._apply_settings)
+        self._btn_apply.pack(fill="x")
 
         return p
 
     # ── Widget helpers ───────────────────────────
 
-    def _label(self, parent, text: str):
-        ctk.CTkLabel(
-            parent, text=text,
-            font=T.F_LABEL, text_color=T.TEXT_DIM, anchor="w",
-        ).pack(fill="x", pady=(T.PAD_XS, 4))
+    def _section(self, parent, text: str):
+        """Section label with // prefix."""
+        ctk.CTkLabel(parent, text=text, font=T.F_LABEL,
+                     text_color=T.TEXT_DIM, anchor="w").pack(
+            fill="x", pady=(T.PAD_XS, 4))
 
-    def _entry_style(self) -> dict:
-        return dict(
-            fg_color=T.BG, border_color=T.BORDER,
-            text_color=T.TEXT, placeholder_text_color=T.TEXT_DIM,
-            font=T.F_BODY, corner_radius=T.R_INPUT,
-        )
+    def _entry_kw(self) -> dict:
+        return dict(fg_color=T.BG, border_color=T.BORDER,
+                    text_color=T.TEXT, placeholder_text_color=T.TEXT_MUTED,
+                    font=T.F_INPUT, corner_radius=T.R)
 
     def _entry(self, parent, placeholder: str = "") -> ctk.CTkEntry:
-        e = ctk.CTkEntry(
-            parent, placeholder_text=placeholder,
-            **self._entry_style(), height=40,
-        )
+        e = ctk.CTkEntry(parent, placeholder_text=placeholder,
+                         **self._entry_kw(), height=38)
         e.pack(fill="x", pady=(0, T.PAD_XS))
         self._focus_border(e)
         return e
 
     def _switch(self, parent, label: str) -> ctk.CTkSwitch:
         row = ctk.CTkFrame(parent, fg_color="transparent")
-        row.pack(fill="x", pady=(4, 0))
-        ctk.CTkLabel(
-            row, text=label, font=T.F_BODY, text_color=T.TEXT,
-        ).pack(side="left")
+        row.pack(fill="x", pady=(2, 0))
+        ctk.CTkLabel(row, text=label, font=T.F_SWITCH_LABEL,
+                     text_color=T.TEXT).pack(side="left")
         sw = ctk.CTkSwitch(
             row, text="",
-            button_color=T.ACCENT, button_hover_color=T.ACCENT_HOVER,
-            progress_color=T.ACCENT, fg_color=T.BORDER,
-        )
+            button_color=T.ACCENT, button_hover_color=T.ACCENT_DARK,
+            progress_color=T.ACCENT, fg_color=T.BORDER)
         sw.pack(side="right")
         return sw
 
     def _focus_border(self, entry: ctk.CTkEntry):
         entry.bind("<FocusIn>",
-                    lambda _: entry.configure(border_color=T.ACCENT))
+                    lambda _: entry.configure(border_color=T.ACCENT,
+                                              border_width=2))
         entry.bind("<FocusOut>",
-                    lambda _: entry.configure(border_color=T.BORDER))
+                    lambda _: entry.configure(border_color=T.BORDER,
+                                              border_width=T.BW_INPUT))
 
     # ── Tab switching ────────────────────────────
 
@@ -260,16 +237,16 @@ class App(ctk.CTk):
 
         if name == "login":
             self._login_panel.pack(fill="both", expand=True)
-            self._tab_login.configure(text_color=T.ACCENT)
+            self._tab_login.configure(text_color=T.TEXT)
             self._tab_settings.configure(text_color=T.TEXT_DIM)
-            self._update_tab_indicator(self._tab_login)
+            self._move_indicator(self._tab_login)
         else:
             self._settings_panel.pack(fill="both", expand=True)
             self._tab_login.configure(text_color=T.TEXT_DIM)
-            self._tab_settings.configure(text_color=T.ACCENT)
-            self._update_tab_indicator(self._tab_settings)
+            self._tab_settings.configure(text_color=T.TEXT)
+            self._move_indicator(self._tab_settings)
 
-    # ── Form data ────────────────────────────────
+    # ── Form ─────────────────────────────────────
 
     def _fill_fields(self):
         c = self._cfg
@@ -332,8 +309,7 @@ class App(ctk.CTk):
         self._read_form()
         config.save(self._cfg)
 
-        cfg = self._cfg
-        if not cfg["username"] or not cfg["password"]:
+        if not self._cfg["username"] or not self._cfg["password"]:
             self._btn_login.show_feedback("请填写学号和密码", "立即登录")
             return
 
@@ -342,30 +318,26 @@ class App(ctk.CTk):
         self._status.set_state("busy")
 
         threading.Thread(
-            target=self._login_worker, args=(cfg.copy(),), daemon=True,
-        ).start()
+            target=self._login_worker,
+            args=(self._cfg.copy(),), daemon=True).start()
 
     def _login_worker(self, cfg: dict):
         try:
             if cfg.get("wifi_ssid"):
                 wifi.connect(cfg["wifi_ssid"])
-
             if login_mod.is_logged_in():
-                self.after(0, lambda: self._login_done(True, "已登录"))
+                self.after(0, lambda: self._done(True, "已登录"))
                 return
-
             for _ in range(cfg.get("max_retries", 3)):
                 if login_mod.do_login(cfg):
-                    self.after(0, lambda: self._login_done(True, "登录成功"))
+                    self.after(0, lambda: self._done(True, "登录成功"))
                     return
-
-            self.after(0, lambda: self._login_done(False, "登录失败"))
+            self.after(0, lambda: self._done(False, "登录失败"))
         except Exception as e:
-            self.after(0, lambda: self._login_done(False, str(e)))
+            self.after(0, lambda: self._done(False, str(e)))
 
-    def _login_done(self, ok: bool, msg: str):
+    def _done(self, ok: bool, msg: str):
         self._btn_login.set_state(True)
-
         if ok:
             self._btn_login.show_feedback(f"✓ {msg}", "立即登录")
             self._status.set_state("connected")
