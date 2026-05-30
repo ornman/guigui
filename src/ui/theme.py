@@ -33,8 +33,8 @@ BTN_H = 44
 BTN_BOX = BTN_H + SY_HOVER
 
 # ── Fonts ──
-FF_EN = "SF Pro Display"
-FF_CN = "PingFang SC"
+FF_EN = "Segoe UI"
+FF_CN = "DengXian"
 
 F_BRAND = (FF_EN, 28, "bold")       # SCHOOL
 F_SUB = (FF_EN, 13)                  # // AUTOLOGIN
@@ -52,3 +52,6 @@ WIN_H = 680
 
 # ── Operators ──
 OPERATORS = ("中国电信", "中国联通", "校园用户")
+
+# ── App meta ──
+VERSION = "1.0.0"

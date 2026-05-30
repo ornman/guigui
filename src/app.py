@@ -37,6 +37,48 @@ class App(ctk.CTk):
         card = GlassCard(outer)
         card.pack(fill="both", expand=True)
 
+        # ── Decorative: corner marks ──
+        corner_color = "#2a2a2a"
+        corner_len = 16
+        for relx, rely, orient in [
+            (0.0, 0.0, "tl"), (1.0, 0.0, "tr"),
+            (0.0, 1.0, "bl"), (1.0, 1.0, "br"),
+        ]:
+            if orient in ("tl", "bl"):
+                ctk.CTkFrame(card, fg_color=corner_color, width=corner_len,
+                             height=1, corner_radius=0).place(
+                    relx=relx, rely=rely, anchor="nw" if orient == "tl" else "sw",
+                    x=6 if relx == 0.0 else -6,
+                    y=6 if rely == 0.0 else -6)
+                ctk.CTkFrame(card, fg_color=corner_color, width=1,
+                             height=corner_len, corner_radius=0).place(
+                    relx=relx, rely=rely, anchor="nw" if orient == "tl" else "sw",
+                    x=6 if relx == 0.0 else -6,
+                    y=6 if rely == 0.0 else -6)
+            else:
+                ctk.CTkFrame(card, fg_color=corner_color, width=corner_len,
+                             height=1, corner_radius=0).place(
+                    relx=relx, rely=rely, anchor="ne" if orient == "tr" else "se",
+                    x=-6 if relx == 1.0 else 6,
+                    y=6 if rely == 0.0 else -6)
+                ctk.CTkFrame(card, fg_color=corner_color, width=1,
+                             height=corner_len, corner_radius=0).place(
+                    relx=relx, rely=rely, anchor="ne" if orient == "tr" else "se",
+                    x=-6 if relx == 1.0 else 6,
+                    y=6 if rely == 0.0 else -6)
+
+        # ── Decorative: version text (bottom-right) ──
+        ctk.CTkLabel(
+            card, text=f"v{T.VERSION}", font=(T.FF_EN, 9),
+            text_color=T.TEXT_MUTED,
+        ).pack(side="bottom", anchor="e", padx=T.PAD, pady=(0, T.PAD_SM))
+
+        # ── Decorative: system readout (top-right) ──
+        ctk.CTkLabel(
+            card, text="SYS:// ACTIVE", font=(T.FF_EN, 9),
+            text_color=T.TEXT_MUTED,
+        ).place(relx=1.0, rely=0.0, anchor="ne", x=-10, y=10)
+
         # Inner content
         inner = ctk.CTkFrame(card, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=T.PAD, pady=T.PAD)
