@@ -6,7 +6,10 @@ from . import theme as T
 
 
 class GlassCard(ctk.CTkFrame):
-    """Raised surface card — simulates frosted glass via color layering."""
+    """Frosted glass card — lighter surface + top highlight for refraction."""
+
+    # Top highlight — simulates light hitting glass edge
+    _HL_COLOR = "#2e2e2e"  # 1px lighter strip, barely visible
 
     def __init__(self, master, **kw):
         super().__init__(
@@ -17,6 +20,10 @@ class GlassCard(ctk.CTkFrame):
             corner_radius=T.R_CARD,
             **kw,
         )
+        # Glass refraction line — top edge
+        self._hl = ctk.CTkFrame(
+            self, fg_color=self._HL_COLOR, height=1, corner_radius=0)
+        self._hl.place(relx=0, rely=0, relwidth=1.0, height=1)
 
 
 class BrutalButton(ctk.CTkFrame):

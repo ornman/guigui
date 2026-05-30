@@ -26,58 +26,84 @@ class App(ctk.CTk):
     # ── Build ────────────────────────────────────
 
     def _build(self):
-        card = GlassCard(self)
-        card.pack(fill="both", expand=True, padx=20, pady=20)
+        # Outer wrapper — the accent bar + card
+        outer = ctk.CTkFrame(self, fg_color="transparent")
+        outer.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Accent top bar (4px solid purple)
+        ctk.CTkFrame(outer, fg_color=T.ACCENT, height=4).pack(
+            fill="x", side="top")
+
+        # Main card
+        card = GlassCard(outer)
+        card.pack(fill="both", expand=True)
         self._card = card
 
-        # Title
+        # Inner padding
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=T.PAD, pady=T.PAD)
+        self._inner = inner
+
+        # Title block
         ctk.CTkLabel(
-            card, text="SchoolAutoLogin",
-            font=T.F_TITLE, text_color=T.TEXT,
-        ).pack(pady=(T.PAD, 2))
+            inner, text="SchoolAutoLogin",
+            font=T.F_TITLE, text_color=T.TEXT, anchor="w",
+        ).pack(fill="x")
         ctk.CTkLabel(
-            card, text="校园网自动登录",
-            font=T.F_SMALL, text_color=T.TEXT_DIM,
-        ).pack(pady=(0, T.PAD_SM))
+            inner, text="校园网自动登录",
+            font=T.F_SUBTITLE, text_color=T.TEXT_DIM, anchor="w",
+        ).pack(fill="x", pady=(0, T.PAD_SM))
 
         # Tabs
-        self._build_tabs(card)
+        self._build_tabs(inner)
 
-        # Content area
-        self._content = ctk.CTkFrame(card, fg_color="transparent")
-        self._content.pack(fill="both", expand=True, padx=T.PAD)
+        # Content
+        self._content = ctk.CTkFrame(inner, fg_color="transparent")
+        self._content.pack(fill="both", expand=True, pady=(T.PAD_SM, 0))
 
         self._login_panel = self._build_login(self._content)
         self._settings_panel = self._build_settings(self._content)
         self._show_tab("login")
 
-        # Status bar
+        # Status bar — sits at card bottom
         self._status = StatusDot(card, state="idle")
-        self._status.pack(side="bottom", anchor="w",
-                          padx=T.PAD, pady=(0, T.PAD))
+        self._status.pack(
+            side="bottom", anchor="w",
+            padx=T.PAD, pady=(0, T.PAD_SM))
 
     def _build_tabs(self, parent):
-        bar = ctk.CTkFrame(parent, fg_color="transparent", height=36)
-        bar.pack(fill="x", padx=T.PAD)
+        bar = ctk.CTkFrame(parent, fg_color="transparent")
+        bar.pack(fill="x", pady=(0, 2))
 
         self._tab_login = ctk.CTkButton(
-            bar, text="登录", font=T.F_SECTION, width=80,
+            bar, text="登录", font=T.F_TAB, width=100,
             fg_color="transparent", text_color=T.ACCENT,
-            hover=False, corner_radius=0,
+            hover=False, corner_radius=T.R_BTN,
             command=lambda: self._show_tab("login"),
         )
-        self._tab_login.pack(side="left", padx=(0, 8))
+        self._tab_login.pack(side="left", padx=(0, 4))
 
         self._tab_settings = ctk.CTkButton(
-            bar, text="设置", font=T.F_SECTION, width=80,
+            bar, text="设置", font=T.F_TAB, width=100,
             fg_color="transparent", text_color=T.TEXT_DIM,
-            hover=False, corner_radius=0,
+            hover=False, corner_radius=T.R_BTN,
             command=lambda: self._show_tab("settings"),
         )
-        self._tab_settings.pack(side="left", padx=(0, 8))
+        self._tab_settings.pack(side="left", padx=(0, 4))
 
-        ctk.CTkFrame(parent, fg_color=T.BORDER, height=1).pack(
-            fill="x", padx=T.PAD)
+        # Active tab indicator — thick accent underline
+        self._tab_indicator = ctk.CTkFrame(
+            bar, fg_color=T.ACCENT, height=3, width=60)
+        self._tab_indicator.place(
+            in_=self._tab_login, rely=1.0, relx=0.1)
+
+        # Divider
+        ctk.CTkFrame(parent, fg_color=T.BORDER, height=2).pack(fill="x")
+
+    def _update_tab_indicator(self, target):
+        self._tab_indicator.place_forget()
+        self._tab_indicator.place(
+            in_=target, rely=1.0, relx=0.1)
 
     # ── Login panel ──────────────────────────────
 
@@ -112,7 +138,7 @@ class App(ctk.CTk):
         self._focus_border(self._pw)
 
         self._pw_toggle = ctk.CTkButton(
-            pw_row, text="显示", width=50, height=40,
+            pw_row, text="显示", width=56, height=40,
             fg_color=T.SURFACE, text_color=T.TEXT_DIM,
             font=T.F_SMALL, hover_color=T.BORDER,
             corner_radius=T.R_INPUT, command=self._toggle_pw,
@@ -122,7 +148,7 @@ class App(ctk.CTk):
         # Buttons
         self._btn_login = BrutalButton(
             p, text="立即登录", command=self._do_login)
-        self._btn_login.pack(fill="x", pady=(T.PAD_XS, 8))
+        self._btn_login.pack(fill="x", pady=(T.PAD_SM, 8))
 
         self._btn_save = BrutalButton(
             p, text="保存配置", command=self._save, variant="secondary")
@@ -142,7 +168,7 @@ class App(ctk.CTk):
         # Polling
         self._sw_poll = self._switch(p, "断网自动重连")
         row = ctk.CTkFrame(p, fg_color="transparent")
-        row.pack(fill="x", pady=(0, T.PAD_SM), padx=(T.PAD, 0))
+        row.pack(fill="x", pady=(0, T.PAD_XS), padx=(T.PAD, 0))
         ctk.CTkLabel(
             row, text="检测间隔（秒）",
             font=T.F_SMALL, text_color=T.TEXT_DIM,
@@ -158,7 +184,7 @@ class App(ctk.CTk):
         # Scheduled login
         self._sw_sched = self._switch(p, "定时登录")
         row2 = ctk.CTkFrame(p, fg_color="transparent")
-        row2.pack(fill="x", pady=(0, T.PAD_SM), padx=(T.PAD, 0))
+        row2.pack(fill="x", pady=(0, T.PAD_XS), padx=(T.PAD, 0))
         ctk.CTkLabel(
             row2, text="执行时间（HH:MM）",
             font=T.F_SMALL, text_color=T.TEXT_DIM,
@@ -186,8 +212,8 @@ class App(ctk.CTk):
     def _label(self, parent, text: str):
         ctk.CTkLabel(
             parent, text=text,
-            font=T.F_LABEL, text_color=T.TEXT_DIM,
-        ).pack(anchor="w", pady=(T.PAD_XS, 4))
+            font=T.F_LABEL, text_color=T.TEXT_DIM, anchor="w",
+        ).pack(fill="x", pady=(T.PAD_XS, 4))
 
     def _entry_style(self) -> dict:
         return dict(
@@ -235,10 +261,12 @@ class App(ctk.CTk):
             self._login_panel.pack(fill="both", expand=True)
             self._tab_login.configure(text_color=T.ACCENT)
             self._tab_settings.configure(text_color=T.TEXT_DIM)
+            self._update_tab_indicator(self._tab_login)
         else:
             self._settings_panel.pack(fill="both", expand=True)
             self._tab_login.configure(text_color=T.TEXT_DIM)
             self._tab_settings.configure(text_color=T.ACCENT)
+            self._update_tab_indicator(self._tab_settings)
 
     # ── Form data ────────────────────────────────
 
