@@ -39,6 +39,20 @@ OPERATOR_SUFFIX: dict[str, str] = {
 }
 
 
+def wait_for_network(timeout: int = 120, interval: int = 5) -> bool:
+    """Block until the auth server (10.1.2.3) is reachable."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            urlopen(Request(CHECK_URL, headers={"User-Agent": UA}), timeout=3)
+            return True
+        except Exception:
+            remaining = int(deadline - time.time())
+            log.info("Network not ready, retrying... (%ds left)", remaining)
+            time.sleep(interval)
+    return False
+
+
 def is_logged_in() -> bool:
     """Check current login status via page title."""
     try:
