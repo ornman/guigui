@@ -23,3 +23,12 @@ Desktop.ini
 
 # Temp
 _notify.ps1
+
+# Screenshots (debug artifacts)
+docs/screenshots/
+
+# Skill artifacts
+.impeccable.md
+
+# Claude session
+.claude/
