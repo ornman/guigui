@@ -13,13 +13,13 @@ ACCENT_DARK = "#5b21b6"
 
 # ── Spacing — varied rhythm (tight within sections, loose between) ──
 SPACE_XL = 28      # card edge padding
-SPACE_LG = 24      # before action buttons
+SPACE_LG = 20      # before action buttons
 SPACE_MD = 14      # between modules (tab bar → content)
 SPACE_SM = 6       # between fields within a section
 SPACE_XS = 4       # label → input gap
 
-# Section rhythm: large gap above labels groups content visually
-SEC_ABOVE = 16     # space above a section label (inter-section break)
+# Section rhythm: gap above labels groups content visually
+SEC_ABOVE = 12     # space above a section label (inter-section break)
 SEC_BELOW = SPACE_XS  # space below a section label (tight to its field)
 
 # Legacy aliases (components.py)
@@ -58,7 +58,7 @@ F_SWITCH_VAL = (FF_CN, 12)           # inline sub-input labels
 
 # ── Window ──
 WIN_W = 460
-WIN_H = 680
+WIN_H = 780
 
 # ── Operators ──
 OPERATORS = ("中国电信", "中国联通", "校园用户")

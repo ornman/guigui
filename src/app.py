@@ -196,7 +196,7 @@ class App(ctk.CTk):
         self._section(p, "// 重连")
         self._sw_poll = self._switch(p, "断网自动重连")
         r1 = ctk.CTkFrame(p, fg_color="transparent")
-        r1.pack(fill="x", pady=(T.SPACE_SM, T.SPACE_SM), padx=(20, 0))
+        r1.pack(fill="x", pady=(T.SPACE_SM, T.SPACE_SM))
         ctk.CTkLabel(r1, text="检测间隔（秒）", font=T.F_SWITCH_VAL,
                      text_color=T.TEXT_DIM).pack(side="left")
         self._poll_interval = ctk.CTkEntry(
@@ -208,7 +208,7 @@ class App(ctk.CTk):
         self._section(p, "// 定时")
         self._sw_sched = self._switch(p, "定时登录")
         r2 = ctk.CTkFrame(p, fg_color="transparent")
-        r2.pack(fill="x", pady=(T.SPACE_SM, T.SPACE_SM), padx=(20, 0))
+        r2.pack(fill="x", pady=(T.SPACE_SM, T.SPACE_SM))
         ctk.CTkLabel(r2, text="执行时间 HH:MM", font=T.F_SWITCH_VAL,
                      text_color=T.TEXT_DIM).pack(side="left")
         self._sched_time = ctk.CTkEntry(
