@@ -149,13 +149,17 @@ class App(ctk.CTk):
         p = ctk.CTkFrame(parent, fg_color="transparent")
 
         self._section(p, "// 运营商")
+        op_border = ctk.CTkFrame(
+            p, fg_color=T.BORDER, height=40, corner_radius=T.R)
+        op_border.pack(fill="x", pady=(0, T.SPACE_SM))
         self._op = ctk.CTkOptionMenu(
-            p, values=list(T.OPERATORS),
+            op_border, values=list(T.OPERATORS),
             fg_color=T.BG, button_color=T.ACCENT,
             button_hover_color=T.ACCENT_DARK,
             text_color=T.TEXT, font=T.F_INPUT, height=38,
             corner_radius=T.R)
-        self._op.pack(fill="x", pady=(0, T.SPACE_SM))
+        self._op.pack(padx=T.BW_INPUT, pady=T.BW_INPUT,
+                       fill="both", expand=True)
 
         self._section(p, "// 学号")
         self._user = self._entry(p)
