@@ -26,7 +26,6 @@ SEC_BELOW = SPACE_XS  # space below a section label (tight to its field)
 PAD = SPACE_XL
 PAD_SM = SPACE_MD
 PAD_XS = 8
-PAD_SECTION = SPACE_LG
 
 # ── Radius — zero, always ──
 R = 0

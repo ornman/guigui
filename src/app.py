@@ -71,7 +71,7 @@ class App(ctk.CTk):
         ctk.CTkLabel(
             card, text=f"v{T.VERSION}", font=(T.FF_EN, 9),
             text_color=T.TEXT_MUTED,
-        ).pack(side="bottom", anchor="e", padx=T.PAD, pady=(0, T.PAD_SM))
+        ).pack(side="bottom", anchor="e", padx=T.SPACE_XL, pady=(0, T.SPACE_MD))
 
         # ── Decorative: system readout (top-right) ──
         ctk.CTkLabel(
@@ -81,7 +81,7 @@ class App(ctk.CTk):
 
         # Inner content
         inner = ctk.CTkFrame(card, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=T.PAD, pady=T.PAD)
+        inner.pack(fill="both", expand=True, padx=T.SPACE_XL, pady=T.SPACE_XL)
         self._inner = inner
 
         # ── Title block ──
@@ -92,7 +92,7 @@ class App(ctk.CTk):
         ctk.CTkLabel(
             inner, text="// AUTOLOGIN", font=T.F_SUB,
             text_color=T.ACCENT, anchor="w",
-        ).pack(fill="x", pady=(0, T.PAD_SM))
+        ).pack(fill="x", pady=(0, T.SPACE_MD))
 
         # Purple divider
         ctk.CTkFrame(inner, fg_color=T.ACCENT, height=2).pack(fill="x")
@@ -111,11 +111,11 @@ class App(ctk.CTk):
         # ── Status ──
         self._status = StatusDot(card, state="idle")
         self._status.pack(side="bottom", anchor="w",
-                          padx=T.PAD, pady=(0, T.PAD_SM))
+                          padx=T.SPACE_XL, pady=(0, T.SPACE_MD))
 
     def _build_tabs(self, parent):
         bar = ctk.CTkFrame(parent, fg_color="transparent")
-        bar.pack(fill="x", pady=(T.PAD_SM, 0))
+        bar.pack(fill="x", pady=(T.SPACE_MD, 0))
 
         self._tab_login = ctk.CTkButton(
             bar, text="01 登录", font=T.F_TAB, width=100,
