@@ -102,7 +102,7 @@ class App(ctk.CTk):
 
         # ── Content ──
         self._content = ctk.CTkFrame(inner, fg_color="transparent")
-        self._content.pack(fill="both", expand=True, pady=(T.PAD_SM, 0))
+        self._content.pack(fill="both", expand=True, pady=(T.SPACE_SM, 0))
 
         self._login_panel = self._build_login(self._content)
         self._settings_panel = self._build_settings(self._content)
@@ -155,14 +155,14 @@ class App(ctk.CTk):
             button_hover_color=T.ACCENT_DARK,
             text_color=T.TEXT, font=T.F_INPUT, height=38,
             corner_radius=T.R)
-        self._op.pack(fill="x", pady=(0, T.PAD_XS))
+        self._op.pack(fill="x", pady=(0, T.SPACE_SM))
 
         self._section(p, "// 学号")
         self._user = self._entry(p)
 
         self._section(p, "// 密码")
         pw_row = ctk.CTkFrame(p, fg_color="transparent")
-        pw_row.pack(fill="x", pady=(0, T.PAD_XS))
+        pw_row.pack(fill="x", pady=(0, T.SPACE_SM))
         self._pw = ctk.CTkEntry(
             pw_row, placeholder_text="", show="●",
             **self._entry_kw(), height=38)
@@ -175,12 +175,9 @@ class App(ctk.CTk):
             corner_radius=T.R, command=self._toggle_pw)
         self._pw_toggle.pack(side="right", padx=(8, 0))
 
-        # Spacer before buttons
-        ctk.CTkFrame(p, fg_color="transparent", height=T.PAD_SECTION).pack()
-
         self._btn_login = BrutalButton(p, text="立即登录",
                                         command=self._do_login)
-        self._btn_login.pack(fill="x", pady=(0, T.PAD_XS))
+        self._btn_login.pack(fill="x", pady=(T.SPACE_LG, T.SPACE_SM))
 
         self._btn_save = BrutalButton(p, text="保存配置",
                                         command=self._save, variant="secondary")
@@ -199,7 +196,7 @@ class App(ctk.CTk):
         self._section(p, "// 重连")
         self._sw_poll = self._switch(p, "断网自动重连")
         r1 = ctk.CTkFrame(p, fg_color="transparent")
-        r1.pack(fill="x", pady=(0, T.PAD_XS), padx=(20, 0))
+        r1.pack(fill="x", pady=(T.SPACE_SM, T.SPACE_SM), padx=(20, 0))
         ctk.CTkLabel(r1, text="检测间隔（秒）", font=T.F_SWITCH_VAL,
                      text_color=T.TEXT_DIM).pack(side="left")
         self._poll_interval = ctk.CTkEntry(
@@ -211,7 +208,7 @@ class App(ctk.CTk):
         self._section(p, "// 定时")
         self._sw_sched = self._switch(p, "定时登录")
         r2 = ctk.CTkFrame(p, fg_color="transparent")
-        r2.pack(fill="x", pady=(0, T.PAD_XS), padx=(20, 0))
+        r2.pack(fill="x", pady=(T.SPACE_SM, T.SPACE_SM), padx=(20, 0))
         ctk.CTkLabel(r2, text="执行时间 HH:MM", font=T.F_SWITCH_VAL,
                      text_color=T.TEXT_DIM).pack(side="left")
         self._sched_time = ctk.CTkEntry(
@@ -224,10 +221,9 @@ class App(ctk.CTk):
         self._sw_autostart = self._switch(p, "开机自启")
         self._sw_notify = self._switch(p, "桌面通知")
 
-        ctk.CTkFrame(p, fg_color="transparent", height=T.PAD_SM).pack()
         self._btn_apply = BrutalButton(p, text="应用设置",
                                         command=self._apply_settings)
-        self._btn_apply.pack(fill="x")
+        self._btn_apply.pack(fill="x", pady=(T.SPACE_LG, 0))
 
         return p
 
@@ -237,7 +233,7 @@ class App(ctk.CTk):
         """Section label with // prefix."""
         ctk.CTkLabel(parent, text=text, font=T.F_LABEL,
                      text_color=T.TEXT_DIM, anchor="w").pack(
-            fill="x", pady=(T.PAD_XS, 4))
+            fill="x", pady=(T.SEC_ABOVE, T.SEC_BELOW))
 
     def _entry_kw(self) -> dict:
         return dict(fg_color=T.BG, border_color=T.BORDER,
@@ -247,13 +243,13 @@ class App(ctk.CTk):
     def _entry(self, parent, placeholder: str = "") -> ctk.CTkEntry:
         e = ctk.CTkEntry(parent, placeholder_text=placeholder,
                          **self._entry_kw(), height=38)
-        e.pack(fill="x", pady=(0, T.PAD_XS))
+        e.pack(fill="x", pady=(0, T.SPACE_SM))
         self._focus_border(e)
         return e
 
     def _switch(self, parent, label: str) -> ctk.CTkSwitch:
         row = ctk.CTkFrame(parent, fg_color="transparent")
-        row.pack(fill="x", pady=(2, 0))
+        row.pack(fill="x", pady=(T.SPACE_SM, 0))
         ctk.CTkLabel(row, text=label, font=T.F_SWITCH_LABEL,
                      text_color=T.TEXT).pack(side="left")
         sw = ctk.CTkSwitch(

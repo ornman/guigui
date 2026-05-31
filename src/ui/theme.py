@@ -11,11 +11,22 @@ TEXT_MUTED = "#444444"
 ACCENT = "#7c3aed"
 ACCENT_DARK = "#5b21b6"
 
-# ── Spacing (8px grid) ──
-PAD = 28
-PAD_SM = 14
+# ── Spacing — varied rhythm (tight within sections, loose between) ──
+SPACE_XL = 28      # card edge padding
+SPACE_LG = 24      # before action buttons
+SPACE_MD = 14      # between modules (tab bar → content)
+SPACE_SM = 6       # between fields within a section
+SPACE_XS = 4       # label → input gap
+
+# Section rhythm: large gap above labels groups content visually
+SEC_ABOVE = 16     # space above a section label (inter-section break)
+SEC_BELOW = SPACE_XS  # space below a section label (tight to its field)
+
+# Legacy aliases (components.py)
+PAD = SPACE_XL
+PAD_SM = SPACE_MD
 PAD_XS = 8
-PAD_SECTION = 20  # breathing room before buttons
+PAD_SECTION = SPACE_LG
 
 # ── Radius — zero, always ──
 R = 0
@@ -32,19 +43,19 @@ SY_ACTIVE = 2
 BTN_H = 44
 BTN_BOX = BTN_H + SY_HOVER
 
-# ── Fonts ──
+# ── Fonts — type scale with clear hierarchy ──
 FF_EN = "Inter"
 FF_CN = "Noto Sans SC"
 
-F_BRAND = (FF_EN, 28, "bold")       # SCHOOL
-F_SUB = (FF_EN, 13)                  # // AUTOLOGIN
-F_TAB = (FF_EN, 14, "bold")         # 01 登录
-F_LABEL = (FF_CN, 10)               # // 运营商
-F_INPUT = (FF_CN, 14)               # input body
-F_BTN = (FF_CN, 15, "bold")         # buttons
-F_SMALL = (FF_CN, 11)               # status
-F_SWITCH_LABEL = (FF_CN, 13)        # switch text
-F_SWITCH_VAL = (FF_CN, 12)          # switch sub-input
+F_BRAND = (FF_EN, 28, "bold")        # app title — identity
+F_SUB = (FF_EN, 13)                   # subtitle — companion
+F_TAB = (FF_EN, 14, "bold")          # tab navigation
+F_LABEL = (FF_CN, 12, "bold")        # section labels — was 10, now readable
+F_INPUT = (FF_CN, 14)                 # body / input text
+F_BTN = (FF_CN, 15, "bold")          # call-to-action buttons
+F_SMALL = (FF_CN, 11)                 # status, meta, captions
+F_SWITCH_LABEL = (FF_CN, 13)         # toggle switch text
+F_SWITCH_VAL = (FF_CN, 12)           # inline sub-input labels
 
 # ── Window ──
 WIN_W = 460
