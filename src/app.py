@@ -1,8 +1,12 @@
 """SchoolAutoLogin — main window."""
 
+import logging
 import threading
+import time as _time
 
 import customtkinter as ctk
+
+log = logging.getLogger(__name__)
 
 from . import config, wifi
 from . import login as login_mod
@@ -370,12 +374,18 @@ class App(ctk.CTk):
             if login_mod.is_logged_in():
                 self.after(0, lambda: self._done(True, "已登录"))
                 return
-            for _ in range(cfg.get("max_retries", 3)):
+            retries = cfg.get("max_retries", 3)
+            interval = cfg.get("retry_interval_seconds", 5)
+            for i in range(retries):
                 if login_mod.do_login(cfg):
                     self.after(0, lambda: self._done(True, "登录成功"))
                     return
+                if i < retries - 1:
+                    log.info("Retry in %ds...", interval)
+                    _time.sleep(interval)
             self.after(0, lambda: self._done(False, "登录失败"))
         except Exception as e:
+            log.error("Login worker error: %s", e)
             self.after(0, lambda: self._done(False, str(e)))
 
     def _done(self, ok: bool, msg: str):
