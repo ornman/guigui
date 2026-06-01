@@ -8,9 +8,9 @@ import customtkinter as ctk
 
 log = logging.getLogger(__name__)
 
-from . import config, wifi
+from . import autostart, config, wifi
 from . import login as login_mod
-from . import notify
+from . import notify, scheduler
 from .ui import theme as T
 from .ui.components import BrutalButton, GlassCard, StatusDot
 
@@ -25,6 +25,8 @@ class App(ctk.CTk):
         self.resizable(True, True)
 
         self._cfg = config.load()
+        self._poll_thread: threading.Thread | None = None
+        self._poll_stop = threading.Event()
         self._build()
         self._fill_fields()
 
@@ -42,34 +44,7 @@ class App(ctk.CTk):
         card.pack(fill="both", expand=True)
 
         # ── Decorative: corner marks ──
-        corner_color = "#2a2a2a"
-        corner_len = 16
-        for relx, rely, orient in [
-            (0.0, 0.0, "tl"), (1.0, 0.0, "tr"),
-            (0.0, 1.0, "bl"), (1.0, 1.0, "br"),
-        ]:
-            if orient in ("tl", "bl"):
-                ctk.CTkFrame(card, fg_color=corner_color, width=corner_len,
-                             height=1, corner_radius=0).place(
-                    relx=relx, rely=rely, anchor="nw" if orient == "tl" else "sw",
-                    x=6 if relx == 0.0 else -6,
-                    y=6 if rely == 0.0 else -6)
-                ctk.CTkFrame(card, fg_color=corner_color, width=1,
-                             height=corner_len, corner_radius=0).place(
-                    relx=relx, rely=rely, anchor="nw" if orient == "tl" else "sw",
-                    x=6 if relx == 0.0 else -6,
-                    y=6 if rely == 0.0 else -6)
-            else:
-                ctk.CTkFrame(card, fg_color=corner_color, width=corner_len,
-                             height=1, corner_radius=0).place(
-                    relx=relx, rely=rely, anchor="ne" if orient == "tr" else "se",
-                    x=-6 if relx == 1.0 else 6,
-                    y=6 if rely == 0.0 else -6)
-                ctk.CTkFrame(card, fg_color=corner_color, width=1,
-                             height=corner_len, corner_radius=0).place(
-                    relx=relx, rely=rely, anchor="ne" if orient == "tr" else "se",
-                    x=-6 if relx == 1.0 else 6,
-                    y=6 if rely == 0.0 else -6)
+        self._place_corner_marks(card)
 
         # ── Decorative: version text (bottom-right) ──
         ctk.CTkLabel(
@@ -116,6 +91,27 @@ class App(ctk.CTk):
         self._status = StatusDot(card, state="idle")
         self._status.pack(side="bottom", anchor="w",
                           padx=T.SPACE_XL, pady=(0, T.SPACE_MD))
+
+    @staticmethod
+    def _place_corner_marks(card: ctk.CTkFrame):
+        """Draw four L-shaped corner marks on *card*."""
+        color = "#2a2a2a"
+        length = 16
+        offset = 6
+        specs = [
+            # (relx, rely, anchor, dx, dy)
+            (0.0, 0.0, "nw",  offset,  offset),
+            (1.0, 0.0, "ne", -offset,  offset),
+            (0.0, 1.0, "sw",  offset, -offset),
+            (1.0, 1.0, "se", -offset, -offset),
+        ]
+        for relx, rely, anchor, dx, dy in specs:
+            ctk.CTkFrame(card, fg_color=color, width=length,
+                         height=1, corner_radius=0).place(
+                relx=relx, rely=rely, anchor=anchor, x=dx, y=dy)
+            ctk.CTkFrame(card, fg_color=color, width=1,
+                         height=length, corner_radius=0).place(
+                relx=relx, rely=rely, anchor=anchor, x=dx, y=dy)
 
     def _build_tabs(self, parent):
         bar = ctk.CTkFrame(parent, fg_color="transparent")
@@ -314,7 +310,8 @@ class App(ctk.CTk):
             self._sw_notify.select()
 
     def _read_form(self) -> dict:
-        c = self._cfg
+        """Read form values into a **new** dict (immutable pattern)."""
+        c = {**self._cfg}
         c["operator"] = self._op.get()
         c["username"] = self._user.get()
         c["password"] = self._pw.get()
@@ -342,17 +339,92 @@ class App(ctk.CTk):
             self._pw_toggle.configure(text="显示")
 
     def _save(self):
-        self._read_form()
+        self._cfg = self._read_form()
         config.save(self._cfg)
         self._btn_save.show_feedback("✓ 已保存", "保存配置")
 
     def _apply_settings(self):
-        self._read_form()
+        new_cfg = self._read_form()
+        self._cfg = new_cfg
         config.save(self._cfg)
-        self._btn_apply.show_feedback("✓ 已应用", "应用设置")
+
+        messages: list[str] = []
+
+        # ── Polling (auto-reconnect) ──
+        if new_cfg.get("polling_enabled"):
+            self._start_polling()
+            messages.append("轮询已开启")
+        else:
+            self._stop_polling()
+
+        # ── Scheduled task ──
+        if new_cfg.get("scheduled_login_enabled"):
+            time_str = new_cfg.get("scheduled_login_time", "06:55")
+            if scheduler.create_scheduled_task(time_str):
+                messages.append(f"定时任务 {time_str}")
+            else:
+                messages.append("定时任务创建失败")
+        else:
+            scheduler.remove_scheduled_task()
+
+        # ── Auto-start ──
+        if new_cfg.get("auto_start"):
+            if autostart.enable():
+                messages.append("自启已开启")
+            else:
+                messages.append("自启设置失败")
+        else:
+            autostart.disable()
+
+        feedback = "✓ " + "、".join(messages) if messages else "✓ 已应用"
+        self._btn_apply.show_feedback(feedback, "应用设置")
+
+    # ── Polling (auto-reconnect) ─────────────────
+
+    def _start_polling(self):
+        """Start or restart the polling daemon thread."""
+        self._stop_polling()
+        self._poll_stop.clear()
+        self._poll_thread = threading.Thread(
+            target=self._poll_worker, daemon=True)
+        self._poll_thread.start()
+        log.info("Polling thread started")
+
+    def _stop_polling(self):
+        """Stop the polling thread if running."""
+        if self._poll_thread and self._poll_thread.is_alive():
+            self._poll_stop.set()
+            self._poll_thread.join(timeout=5)
+            log.info("Polling thread stopped")
+        self._poll_thread = None
+
+    def _poll_worker(self):
+        """Background loop: check login status and reconnect if needed."""
+        interval = self._cfg.get("polling_interval_seconds", 30)
+        while not self._poll_stop.wait(timeout=interval):
+            try:
+                if login_mod.is_logged_in():
+                    continue
+                log.info("Poll: disconnected, attempting reconnect...")
+                if self._cfg.get("wifi_ssid"):
+                    wifi.connect(self._cfg["wifi_ssid"])
+                for _ in range(self._cfg.get("max_retries", 3)):
+                    if login_mod.do_login(self._cfg):
+                        log.info("Poll: reconnected successfully")
+                        self.after(0, lambda: self._status.set_state("connected"))
+                        if self._cfg.get("notification_enabled", True):
+                            notify.send("校园网自动重连", "已重新连接网络")
+                        break
+                else:
+                    log.warning("Poll: reconnect failed")
+                    self.after(0, lambda: self._status.set_state("disconnected"))
+            except Exception as e:
+                log.error("Poll worker error: %s", e)
+
+    # ── Login ────────────────────────────────────
 
     def _do_login(self):
-        self._read_form()
+        self._cfg = self._read_form()
         config.save(self._cfg)
 
         if not self._cfg["username"] or not self._cfg["password"]:
