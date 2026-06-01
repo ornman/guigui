@@ -22,11 +22,6 @@ SPACE_XS = 4       # label → input gap
 SEC_ABOVE = 12     # space above a section label (inter-section break)
 SEC_BELOW = SPACE_XS  # space below a section label (tight to its field)
 
-# Legacy aliases (components.py)
-PAD = SPACE_XL
-PAD_SM = SPACE_MD
-PAD_XS = 8
-
 # ── Radius — zero, always ──
 R = 0
 

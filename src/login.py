@@ -8,7 +8,7 @@ from logging.handlers import RotatingFileHandler
 from urllib.parse import quote
 from urllib.request import urlopen, Request
 
-from .config import LOG_PATH
+from .config import LOG_PATH, load as load_config
 
 # ── Logging ──────────────────────────────────────
 _fmt = logging.Formatter(
@@ -25,8 +25,8 @@ if not _root.handlers:
 
 log = logging.getLogger(__name__)
 
-LOGIN_URL = "http://10.1.2.3/drcom/login"
-CHECK_URL = "http://10.1.2.3/"
+_DEFAULT_BASE = "http://10.1.2.3"
+LOGIN_PATH = "/drcom/login"
 UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
@@ -39,12 +39,21 @@ OPERATOR_SUFFIX: dict[str, str] = {
 }
 
 
+def _base_url() -> str:
+    """Read the auth server URL from config (defaults to 10.1.2.3)."""
+    try:
+        return load_config().get("url", _DEFAULT_BASE) or _DEFAULT_BASE
+    except Exception:
+        return _DEFAULT_BASE
+
+
 def wait_for_network(timeout: int = 120, interval: int = 5) -> bool:
-    """Block until the auth server (10.1.2.3) is reachable."""
+    """Block until the auth server is reachable."""
+    base = _base_url()
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            urlopen(Request(CHECK_URL, headers={"User-Agent": UA}), timeout=3)
+            urlopen(Request(base + "/", headers={"User-Agent": UA}), timeout=3)
             return True
         except Exception:
             remaining = int(deadline - time.time())
@@ -55,8 +64,9 @@ def wait_for_network(timeout: int = 120, interval: int = 5) -> bool:
 
 def is_logged_in() -> bool:
     """Check current login status via page title."""
+    base = _base_url()
     try:
-        req = Request(CHECK_URL, headers={"User-Agent": UA})
+        req = Request(base + "/", headers={"User-Agent": UA})
         with urlopen(req, timeout=5) as resp:
             html = resp.read().decode("gb2312", errors="replace")
         m = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE)
@@ -67,6 +77,7 @@ def is_logged_in() -> bool:
 
 def do_login(cfg: dict) -> bool:
     """Send login request. Returns True on success."""
+    base = cfg.get("url", _DEFAULT_BASE) or _DEFAULT_BASE
     suffix = OPERATOR_SUFFIX.get(cfg.get("operator", ""), "")
     username = cfg["username"] + suffix
 
@@ -79,10 +90,10 @@ def do_login(cfg: dict) -> bool:
         f"&lang=zh-cn&jsVersion=4.2.1"
         f"&v={int(time.time())}&lang=zh"
     )
-    url = f"{LOGIN_URL}?{params}"
+    url = f"{base}{LOGIN_PATH}?{params}"
 
     log.info("Login request (user=%s)", username)
-    req = Request(url, headers={"User-Agent": UA, "Referer": "http://10.1.2.3/"})
+    req = Request(url, headers={"User-Agent": UA, "Referer": f"{base}/"})
     with urlopen(req, timeout=10) as resp:
         body = resp.read().decode("gbk", errors="replace")
 

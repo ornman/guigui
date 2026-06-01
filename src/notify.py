@@ -1,6 +1,9 @@
 """Windows toast notification via PowerShell WinRT."""
 
+import logging
 import subprocess
+
+log = logging.getLogger(__name__)
 
 
 def _xml_escape(text: str) -> str:
@@ -31,7 +34,10 @@ def send(title: str, message: str) -> None:
         '::CreateToastNotifier("Microsoft.Windows.ShellExperienceHost_cw5n1h2txyewy!App")'
         ".Show($toast)"
     )
-    subprocess.run(
+    result = subprocess.run(
         ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps],
-        capture_output=True,
+        capture_output=True, text=True,
     )
+    if result.returncode != 0:
+        log.warning("Notification failed (rc=%d): %s",
+                    result.returncode, result.stderr.strip())
