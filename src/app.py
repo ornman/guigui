@@ -29,6 +29,7 @@ class App(ctk.CTk):
         self._poll_stop = threading.Event()
         self._build()
         self._fill_fields()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     # ── Build ────────────────────────────────────
 
@@ -339,12 +340,12 @@ class App(ctk.CTk):
             self._pw_toggle.configure(text="显示")
 
     def _save(self):
-        self._cfg = self._read_form()
+        self._cfg = config.validate(self._read_form())
         config.save(self._cfg)
         self._btn_save.show_feedback("✓ 已保存", "保存配置")
 
     def _apply_settings(self):
-        new_cfg = self._read_form()
+        new_cfg = config.validate(self._read_form())
         self._cfg = new_cfg
         config.save(self._cfg)
 
@@ -395,7 +396,10 @@ class App(ctk.CTk):
         if self._poll_thread and self._poll_thread.is_alive():
             self._poll_stop.set()
             self._poll_thread.join(timeout=5)
-            log.info("Polling thread stopped")
+            if self._poll_thread.is_alive():
+                log.warning("Polling thread did not stop within timeout")
+            else:
+                log.info("Polling thread stopped")
         self._poll_thread = None
 
     def _poll_worker(self):
@@ -406,9 +410,13 @@ class App(ctk.CTk):
                 if login_mod.is_logged_in():
                     continue
                 log.info("Poll: disconnected, attempting reconnect...")
+                if self._poll_stop.is_set():
+                    return
                 if self._cfg.get("wifi_ssid"):
                     wifi.connect(self._cfg["wifi_ssid"])
                 for _ in range(self._cfg.get("max_retries", 3)):
+                    if self._poll_stop.is_set():
+                        return
                     if login_mod.do_login(self._cfg):
                         log.info("Poll: reconnected successfully")
                         self.after(0, lambda: self._status.set_state("connected"))
@@ -423,8 +431,13 @@ class App(ctk.CTk):
 
     # ── Login ────────────────────────────────────
 
+    def _on_close(self):
+        """Graceful shutdown — stop polling before destroying window."""
+        self._stop_polling()
+        self.destroy()
+
     def _do_login(self):
-        self._cfg = self._read_form()
+        self._cfg = config.validate(self._read_form())
         config.save(self._cfg)
 
         if not self._cfg["username"] or not self._cfg["password"]:

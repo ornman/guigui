@@ -34,10 +34,15 @@ def send(title: str, message: str) -> None:
         '::CreateToastNotifier("Microsoft.Windows.ShellExperienceHost_cw5n1h2txyewy!App")'
         ".Show($toast)"
     )
-    result = subprocess.run(
-        ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        log.warning("Notification failed (rc=%d): %s",
-                    result.returncode, result.stderr.strip())
+    try:
+        result = subprocess.run(
+            ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode != 0:
+            log.warning("Notification failed (rc=%d): %s",
+                        result.returncode, result.stderr.strip())
+    except subprocess.TimeoutExpired:
+        log.warning("Notification timed out")
+    except Exception as e:
+        log.warning("Notification error: %s", e)

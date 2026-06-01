@@ -97,11 +97,9 @@ def do_login(cfg: dict) -> bool:
     with urlopen(req, timeout=10) as resp:
         body = resp.read().decode("gbk", errors="replace")
 
-    log.info("Response: %s", body[:300])
-
     m = re.search(r"\((\{.*\})\)", body)
     if not m:
-        log.error("Unexpected response format")
+        log.error("Unexpected response format: %s", body[:80])
         return False
 
     data = json.loads(m.group(1))
@@ -111,6 +109,8 @@ def do_login(cfg: dict) -> bool:
     if result == 1:
         log.info("Login successful")
         return True
+
+    log.warning("Login rejected: result=%s, msg=%s", result, msga)
 
     log.warning("Login rejected: result=%s, msg=%s", result, msga)
     return False

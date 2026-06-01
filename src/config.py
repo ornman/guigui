@@ -47,20 +47,21 @@ _VALIDATORS = [
 ]
 
 
-def _validate(cfg: dict) -> dict:
-    """Validate and coerce config values, falling back to defaults."""
+def validate(cfg: dict) -> dict:
+    """Validate and coerce config values, returning a **new** dict with fixes."""
+    result = {**cfg}
     for key, expected_type, validator, fallback in _VALIDATORS:
-        value = cfg.get(key, fallback)
+        value = result.get(key, fallback)
         if not isinstance(value, expected_type):
             log.warning("Config '%s': expected %s, got %s — using default %r",
                         key, expected_type.__name__, type(value).__name__, fallback)
-            cfg[key] = fallback
+            result[key] = fallback
             continue
         if not validator(value):
             log.warning("Config '%s': invalid value %r — using default %r",
                         key, value, fallback)
-            cfg[key] = fallback
-    return cfg
+            result[key] = fallback
+    return result
 
 
 def load() -> dict:
@@ -68,7 +69,7 @@ def load() -> dict:
     if CONFIG_PATH.exists():
         with open(CONFIG_PATH, encoding="utf-8") as f:
             saved = json.load(f)
-    return _validate({**_DEFAULTS, **saved})
+    return validate({**_DEFAULTS, **saved})
 
 
 def save(cfg: dict) -> None:

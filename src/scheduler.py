@@ -1,6 +1,7 @@
 """Windows Task Scheduler management for SchoolAutoLogin."""
 
 import logging
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -8,13 +9,19 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 TASK_NAME = "SchoolAutoLogin"
+_TIME_RE = re.compile(r"^\d{2}:\d{2}$")
 
 
-def _exe_path() -> str:
+def exe_path() -> str:
     """Return the current executable path (works in both script and frozen mode)."""
     if getattr(sys, "frozen", False):
         return sys.executable
     return str(Path(sys.argv[0]).resolve())
+
+
+def _ps_escape(s: str) -> str:
+    """Escape a string for safe embedding in a PowerShell single-quoted string."""
+    return "'" + s.replace("'", "''") + "'"
 
 
 def create_scheduled_task(time_str: str) -> bool:
@@ -22,16 +29,21 @@ def create_scheduled_task(time_str: str) -> bool:
 
     Returns True on success.
     """
-    exe = _exe_path()
+    if not _TIME_RE.match(time_str):
+        log.error("Invalid time format (expected HH:MM): %r", time_str)
+        return False
+
+    exe = _ps_escape(exe_path())
+    task = _ps_escape(TASK_NAME)
     ps = (
         "$action = New-ScheduledTaskAction "
-        f"-Execute '{exe}' -Argument '--silent'; "
+        f"-Execute {exe} -Argument '--silent'; "
         f"$trigger = New-ScheduledTaskTrigger -Daily -At '{time_str}:00'; "
         "$settings = New-ScheduledTaskSettingsSet "
         "-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries "
         "-StartWhenAvailable -WakeToRun "
         "-ExecutionTimeLimit (New-TimeSpan -Minutes 5); "
-        f"Register-ScheduledTask -TaskName '{TASK_NAME}' "
+        f"Register-ScheduledTask -TaskName {task} "
         "-Action $action -Trigger $trigger -Settings $settings -Force"
     )
     try:
@@ -78,17 +90,19 @@ def get_scheduled_task_info() -> dict:
     info = {"exists": False, "next_run": "", "enabled": False}
     try:
         r = subprocess.run(
-            ["schtasks", "/query", "/tn", TASK_NAME, "/fo", "csv", "/nh"],
+            ["schtasks", "/query", "/tn", TASK_NAME, "/fo", "LIST"],
             capture_output=True, text=True, timeout=10,
         )
         if r.returncode != 0:
             return info
         info["exists"] = True
-        # Parse CSV output: "TaskName","Next Run Time","Status"
-        parts = r.stdout.strip().split(",")
-        if len(parts) >= 3:
-            info["next_run"] = parts[1].strip('"')
-            info["enabled"] = "Ready" in parts[2] or "正在运行" in parts[2]
+        for line in r.stdout.splitlines():
+            line = line.strip()
+            if line.startswith("Next Run Time:"):
+                info["next_run"] = line.split(":", 1)[1].strip()
+            elif line.startswith("Status:"):
+                status = line.split(":", 1)[1].strip().lower()
+                info["enabled"] = status in ("ready", "running", "正在运行")
     except Exception:
         pass
     return info

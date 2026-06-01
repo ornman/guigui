@@ -1,9 +1,9 @@
 """Windows auto-start management via HKCU Run registry key."""
 
 import logging
-import sys
 import winreg
-from pathlib import Path
+
+from .scheduler import exe_path
 
 log = logging.getLogger(__name__)
 
@@ -11,16 +11,9 @@ _REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 _REG_NAME = "SchoolAutoLogin"
 
 
-def _exe_path() -> str:
-    """Return the current executable path."""
-    if getattr(sys, "frozen", False):
-        return sys.executable
-    return str(Path(sys.argv[0]).resolve())
-
-
 def enable() -> bool:
     """Register the app in HKCU Run key. Returns True on success."""
-    exe = _exe_path()
+    exe = exe_path()
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, _REG_PATH, 0,
                              winreg.KEY_SET_VALUE)
