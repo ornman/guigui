@@ -1,0 +1,1 @@
+"""SchoolAutoLogin UI components."""

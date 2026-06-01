@@ -1,0 +1,1 @@
+"""SchoolAutoLogin core modules."""
