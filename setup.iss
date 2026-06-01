@@ -35,7 +35,7 @@ Name: "createtask"; Description: "创建每日定时登录任务（06:55）"; Gr
 
 [Run]
 Filename: "powershell.exe"; \
-    Parameters: "-ExecutionPolicy Bypass -Command ""$exe = '{app}\{#AppExeName}'; $action = New-ScheduledTaskAction -Execute $exe; $trigger = New-ScheduledTaskTrigger -Daily -At '06:55:00'; $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -WakeToRun -ExecutionTimeLimit (New-TimeSpan -Minutes 5); Register-ScheduledTask -TaskName '{#TaskName}' -Action $action -Trigger $trigger -Settings $settings -Force"""; \
+    Parameters: "-ExecutionPolicy Bypass -Command ""$exe = '{app}\{#AppExeName}'; $action = New-ScheduledTaskAction -Execute $exe -Argument '--silent'; $trigger = New-ScheduledTaskTrigger -Daily -At '06:55:00'; $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -WakeToRun -ExecutionTimeLimit (New-TimeSpan -Minutes 5); Register-ScheduledTask -TaskName '{#TaskName}' -Action $action -Trigger $trigger -Settings $settings -Force"""; \
     Flags: runhidden; \
     Tasks: createtask; \
     StatusMsg: "正在配置定时登录任务..."

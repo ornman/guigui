@@ -60,7 +60,7 @@ if exist installer_output rmdir /s /q installer_output
 
 echo.
 echo [2/4] PyInstaller...
-pyinstaller auto_login.spec
+pyinstaller main.spec
 if errorlevel 1 (
     echo ERROR: PyInstaller failed!
     pause

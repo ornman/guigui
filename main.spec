@@ -1,12 +1,31 @@
 # -*- mode: python ; coding: utf-8 -*-
+import customtkinter as ctk
+from pathlib import Path
 
+# Collect customtkinter data files (themes, assets)
+ctk_data = Path(ctk.__file__).parent
 
 a = Analysis(
-    ['auto_login.py'],
+    ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
-    hiddenimports=[],
+    datas=[
+        (str(ctk_data), 'customtkinter'),
+    ],
+    hiddenimports=[
+        'src',
+        'src.config',
+        'src.login',
+        'src.notify',
+        'src.wifi',
+        'src.app',
+        'src.ui',
+        'src.ui.components',
+        'src.ui.theme',
+        'src.scheduler',
+        'src.autostart',
+        'customtkinter',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
