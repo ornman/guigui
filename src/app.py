@@ -409,21 +409,32 @@ class App(ctk.CTk):
 
     def _poll_worker(self):
         """Background loop: check login status and reconnect if needed."""
-        interval = self._cfg.get("polling_interval_seconds", 30)
-        while not self._poll_stop.wait(timeout=interval):
+        import time
+
+        while not self._poll_stop.wait(
+            timeout=self._cfg.get("polling_interval_seconds", 30)
+        ):
             try:
+                cfg = self._cfg
                 status = login_mod.check_auth_status()
 
                 if status == "logged_in":
                     self.after(0, lambda: self._status.set_state("connected"))
                     continue
 
-                # Unreachable → try WiFi remediation (short wait)
-                if status == "unreachable" and self._cfg.get("wifi_ssid"):
+                # Unreachable → try WiFi remediation with cancellable wait
+                if status == "unreachable" and cfg.get("wifi_ssid"):
                     if self._poll_stop.is_set():
                         return
-                    wifi.connect(self._cfg["wifi_ssid"])
-                    login_mod.wait_for_network(timeout=30, interval=3)
+                    wifi.connect(cfg["wifi_ssid"])
+                    # Cancellable network wait: check every 3s, stop-aware
+                    deadline = time.time() + 30
+                    while time.time() < deadline:
+                        if self._poll_stop.is_set():
+                            return
+                        if login_mod.check_auth_status() != "unreachable":
+                            break
+                        self._poll_stop.wait(timeout=3)
                     status = login_mod.check_auth_status()
 
                 if status == "logged_in":
@@ -436,13 +447,13 @@ class App(ctk.CTk):
 
                 # status == "not_logged_in" → try login
                 log.info("Poll: disconnected, attempting reconnect...")
-                for _ in range(self._cfg.get("max_retries", 3)):
+                for _ in range(cfg.get("max_retries", 3)):
                     if self._poll_stop.is_set():
                         return
-                    if login_mod.do_login(self._cfg):
+                    if login_mod.do_login(cfg):
                         log.info("Poll: reconnected successfully")
                         self.after(0, lambda: self._status.set_state("connected"))
-                        if self._cfg.get("notification_enabled", True):
+                        if cfg.get("notification_enabled", True):
                             notify.send("校园网自动重连", "已重新连接网络")
                         break
                 else:

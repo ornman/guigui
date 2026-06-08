@@ -44,10 +44,13 @@ def main():
             raise
         except Exception as e:
             log.exception("Silent mode crashed")
+            # Strip PowerShell metacharacters to prevent injection
+            import re
+            safe_msg = re.sub(r'''['"$`()]''', '', str(e))[:200]
             subprocess.run([
                 "powershell", "-Command",
                 f'[System.Windows.Forms.MessageBox]::Show('
-                f'"校园网自动登录失败：{e}", "SchoolAutoLogin")',
+                f'"校园网自动登录失败：{safe_msg}", "SchoolAutoLogin")',
             ], timeout=10)
         return
 
