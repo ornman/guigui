@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from src.login import do_login, is_logged_in
+from src.login import check_auth_status, do_login, is_logged_in
 
 
 class TestIsLoggedIn:
@@ -71,3 +71,28 @@ class TestDoLogin:
             mock_resp.__exit__ = MagicMock(return_value=False)
             mock_urlopen.return_value = mock_resp
             assert do_login(cfg) is False
+
+
+class TestCheckAuthStatus:
+    """Tests for the tri-state auth status detection."""
+
+    def _mock_page(self, html: str) -> MagicMock:
+        resp = MagicMock()
+        resp.read.return_value = html.encode("gb2312")
+        resp.__enter__ = lambda s: resp
+        resp.__exit__ = MagicMock(return_value=False)
+        return resp
+
+    def test_logged_in_page(self):
+        html = "<html><title>信息注销</title></html>"
+        with patch("src.login.urlopen", return_value=self._mock_page(html)):
+            assert check_auth_status() == "logged_in"
+
+    def test_not_logged_in_page(self):
+        html = "<html><title>登录页面</title></html>"
+        with patch("src.login.urlopen", return_value=self._mock_page(html)):
+            assert check_auth_status() == "not_logged_in"
+
+    def test_network_error_returns_unreachable(self):
+        with patch("src.login.urlopen", side_effect=Exception("timeout")):
+            assert check_auth_status() == "unreachable"
