@@ -62,17 +62,30 @@ def wait_for_network(timeout: int = 120, interval: int = 5) -> bool:
     return False
 
 
-def is_logged_in() -> bool:
-    """Check current login status via page title."""
+def check_auth_status() -> str:
+    """Check auth server reachability and login status.
+
+    Returns:
+        "logged_in"     -- server reachable, user already authenticated
+        "not_logged_in" -- server reachable, user needs to login
+        "unreachable"   -- server not reachable (network error)
+    """
     base = _base_url()
     try:
         req = Request(base + "/", headers={"User-Agent": UA})
         with urlopen(req, timeout=5) as resp:
             html = resp.read().decode("gb2312", errors="replace")
         m = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE)
-        return bool(m and "注销" in m.group(1))
+        if m and "注销" in m.group(1):
+            return "logged_in"
+        return "not_logged_in"
     except Exception:
-        return False
+        return "unreachable"
+
+
+def is_logged_in() -> bool:
+    """Check current login status via page title."""
+    return check_auth_status() == "logged_in"
 
 
 def do_login(cfg: dict) -> bool:
@@ -112,5 +125,51 @@ def do_login(cfg: dict) -> bool:
 
     log.warning("Login rejected: result=%s, msg=%s", result, msga)
 
-    log.warning("Login rejected: result=%s, msg=%s", result, msga)
     return False
+
+
+def attempt_login(cfg: dict) -> str:
+    """Full login orchestration: detect → optionally switch WiFi → login.
+
+    Uses 10.1.2.3 as the single source of truth. WiFi switching is only
+    attempted when the auth server is unreachable.
+
+    Returns:
+        "already_logged_in" -- was logged in, nothing to do
+        "success"           -- login succeeded
+        "failed"            -- login failed after retries
+        "unreachable"       -- server never became reachable
+    """
+    # Step 1: Quick probe
+    status = check_auth_status()
+    log.info("Auth status: %s", status)
+
+    if status == "logged_in":
+        return "already_logged_in"
+
+    # Step 2: If unreachable, try WiFi switch as remediation
+    if status == "unreachable":
+        if cfg.get("wifi_ssid"):
+            from . import wifi
+            log.info("Server unreachable, switching WiFi to '%s'...", cfg["wifi_ssid"])
+            wifi.connect(cfg["wifi_ssid"])
+        if not wait_for_network():
+            return "unreachable"
+        # Re-check after network came up
+        status = check_auth_status()
+        log.info("Auth status after remediation: %s", status)
+        if status == "logged_in":
+            return "already_logged_in"
+        if status == "unreachable":
+            return "unreachable"
+
+    # Step 3: "not_logged_in" → attempt login with retries
+    retries = cfg.get("max_retries", 3)
+    interval = cfg.get("retry_interval_seconds", 5)
+    for i in range(retries):
+        if do_login(cfg):
+            return "success"
+        if i < retries - 1:
+            log.info("Retry in %ds...", interval)
+            time.sleep(interval)
+    return "failed"
