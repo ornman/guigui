@@ -2,7 +2,6 @@
 
 import logging
 import threading
-import time as _time
 
 import customtkinter as ctk
 
@@ -195,8 +194,14 @@ class App(ctk.CTk):
     def _build_settings(self, parent):
         p = ctk.CTkFrame(parent, fg_color="transparent")
 
-        self._section(p, "// 网络")
-        self._wifi_entry = self._entry(p, placeholder="校园网 WiFi 名称，留空跳过")
+        self._section(p, "// WiFi 名称")
+        ctk.CTkLabel(
+            p,
+            text="用 WiFi 连校园网的填名称，电脑睡眠后会自动切回。用网线的不用填。",
+            font=T.F_SMALL, text_color=T.TEXT_MUTED, anchor="w",
+            wraplength=380,
+        ).pack(fill="x", pady=(0, T.SPACE_XS))
+        self._wifi_entry = self._entry(p, placeholder="留空跳过 WiFi 切换")
 
         self._section(p, "// 重连")
         self._sw_poll = self._switch(p, "断网自动重连")
@@ -407,13 +412,30 @@ class App(ctk.CTk):
         interval = self._cfg.get("polling_interval_seconds", 30)
         while not self._poll_stop.wait(timeout=interval):
             try:
-                if login_mod.is_logged_in():
+                status = login_mod.check_auth_status()
+
+                if status == "logged_in":
+                    self.after(0, lambda: self._status.set_state("connected"))
                     continue
-                log.info("Poll: disconnected, attempting reconnect...")
-                if self._poll_stop.is_set():
-                    return
-                if self._cfg.get("wifi_ssid"):
+
+                # Unreachable → try WiFi remediation (short wait)
+                if status == "unreachable" and self._cfg.get("wifi_ssid"):
+                    if self._poll_stop.is_set():
+                        return
                     wifi.connect(self._cfg["wifi_ssid"])
+                    login_mod.wait_for_network(timeout=30, interval=3)
+                    status = login_mod.check_auth_status()
+
+                if status == "logged_in":
+                    self.after(0, lambda: self._status.set_state("connected"))
+                    continue
+
+                if status == "unreachable":
+                    self.after(0, lambda: self._status.set_state("disconnected"))
+                    continue
+
+                # status == "not_logged_in" → try login
+                log.info("Poll: disconnected, attempting reconnect...")
                 for _ in range(self._cfg.get("max_retries", 3)):
                     if self._poll_stop.is_set():
                         return
@@ -454,21 +476,15 @@ class App(ctk.CTk):
 
     def _login_worker(self, cfg: dict):
         try:
-            if cfg.get("wifi_ssid"):
-                wifi.connect(cfg["wifi_ssid"])
-            if login_mod.is_logged_in():
+            result = login_mod.attempt_login(cfg)
+            if result == "already_logged_in":
                 self.after(0, lambda: self._done(True, "已登录"))
-                return
-            retries = cfg.get("max_retries", 3)
-            interval = cfg.get("retry_interval_seconds", 5)
-            for i in range(retries):
-                if login_mod.do_login(cfg):
-                    self.after(0, lambda: self._done(True, "登录成功"))
-                    return
-                if i < retries - 1:
-                    log.info("Retry in %ds...", interval)
-                    _time.sleep(interval)
-            self.after(0, lambda: self._done(False, "登录失败"))
+            elif result == "success":
+                self.after(0, lambda: self._done(True, "登录成功"))
+            elif result == "unreachable":
+                self.after(0, lambda: self._done(False, "网络不可用"))
+            else:  # "failed"
+                self.after(0, lambda: self._done(False, "登录失败"))
         except Exception as e:
             log.error("Login worker error: %s", e)
             self.after(0, lambda: self._done(False, str(e)))
