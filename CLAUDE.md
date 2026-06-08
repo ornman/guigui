@@ -16,8 +16,7 @@ auto-login/
 │   └── ui/
 │       ├── components.py # 可复用 UI 组件
 │       └── theme.py      # 主题 / 设计 token
-├── auto_login.py        # 旧版单文件脚本（build.bat 仍引用，待迁移）
-├── auto_login.spec      # 旧版 PyInstaller 配置
+├── main.spec            # PyInstaller 配置
 ├── config.json          # 账号密码配置（gitignore）
 ├── config.example.json  # 配置模板
 ├── setup.iss            # Inno Setup 安装脚本
@@ -33,7 +32,7 @@ auto-login/
 ## 配置
 
 `config.json`（安装在 `%APPDATA%\SchoolAutoLogin\` 下）：
-- `wifi_ssid`: 校园网 WiFi 名称，登录前自动切换到该网络（可选，不填则跳过）
+- `wifi_ssid`: 校园网 WiFi 名称。程序先尝试直接访问认证服务器，仅在无法访问时才切换 WiFi。用网线连接的不需要填写。
 - `operator`: 运营商（"中国电信"/"中国联通"/"校园用户"），当前 Dr.COM 版本不使用运营商后缀
 - `username`: 学号
 - `password`: 密码
@@ -78,16 +77,18 @@ build.bat
 
 手动步骤：
 ```bash
-pyinstaller auto_login.spec
+pyinstaller main.spec
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
 ```
-
-> **注意**：`build.bat` 和 `auto_login.spec` 仍指向旧版 `auto_login.py`，需要更新为 `main.py` + `src/` 结构。
 
 ## 技术细节
 
 - 认证系统：Dr.COM eportal，页面编码 GB2312
-- 登录检测：访问 `http://10.1.2.3`，页面 `<title>` 含"注销"表示已登录
+- **登录决策流程**：以 `http://10.1.2.3` 认证服务器为唯一决策枢纽
+  1. `check_auth_status()` 探测认证服务器：返回 `"logged_in"` / `"not_logged_in"` / `"unreachable"`
+  2. 已登录 → 直接返回，无需任何操作
+  3. 需要登录 → 直接执行登录（不碰 WiFi）
+  4. 不可达 → 如果配置了 WiFi SSID，尝试切换后重试；否则报错
 - 登录方式：HTTP GET 请求 JSONP 接口
   - URL: `http://10.1.2.3/drcom/login?callback=dr1003&DDDDD=<学号>&upass=<密码>&0MKKey=123456&R1=0&R2=&R3=1&R6=0&para=00&v6ip=&terminal_type=1&lang=zh-cn&jsVersion=4.2.1&v=<timestamp>&lang=zh`
   - 响应格式: `dr1003({"result":0/1, "msga":"...", ...})`
@@ -95,5 +96,6 @@ pyinstaller auto_login.spec
 - 使用 `urllib` 标准库，无需第三方依赖（登录部分）
 - GUI 使用 `customtkinter`（基于 tkinter 的现代主题库）
 - Windows 通知通过 PowerShell WinRT API 实现，无需额外安装包
-- 启动时自动切换到指定 WiFi（通过 `netsh wlan connect`），解决睡眠唤醒后连接到其他网络的问题
+- WiFi 切换仅在认证服务器不可达时触发（通过 `netsh wlan connect`），解决睡眠唤醒后连接到其他网络的问题
 - 等待网络就绪（最多 120 秒），解决睡眠唤醒后网络延迟问题
+- 静默模式（`--silent`）异常时通过 PowerShell MessageBox 弹窗兜底，确保用户能看到错误
