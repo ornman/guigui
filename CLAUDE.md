@@ -1,101 +1,109 @@
-# Auto Login - 校园网自动登录
+# CLAUDE.md
 
-Dr.COM 校园网认证系统自动登录工具，带 GUI 界面（customtkinter）、系统托盘、定时登录。打包为 Inno Setup 安装程序，安装后开箱即用。
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 项目结构
+## Project Overview
 
-```
-auto-login/
-├── main.py              # 入口（GUI 模式 / --silent 静默模式）
-├── src/                 # 核心模块
-│   ├── app.py           # GUI 主窗口（customtkinter）
-│   ├── config.py        # 配置读写
-│   ├── login.py         # HTTP GET 登录逻辑
-│   ├── notify.py        # Windows 通知（PowerShell WinRT）
-│   ├── wifi.py          # WiFi 自动切换（netsh）
-│   └── ui/
-│       ├── components.py # 可复用 UI 组件
-│       └── theme.py      # 主题 / 设计 token
-├── main.spec            # PyInstaller 配置
-├── config.json          # 账号密码配置（gitignore）
-├── config.example.json  # 配置模板
-├── setup.iss            # Inno Setup 安装脚本
-├── build.bat            # 一键构建脚本
-├── PRD.md               # 产品需求文档
-├── docs/
-│   └── screenshots/     # UI 调试截图（gitignore）
-├── build/               # PyInstaller 中间产物（gitignore）
-├── dist/                # PyInstaller 输出（gitignore）
-└── installer_output/    # 安装程序输出（gitignore）
-```
+Dr.COM 校园网自动登录工具 — Windows 桌面应用，带 customtkinter GUI、系统托盘、定时登录、自动重连。打包为 Inno Setup 安装程序。
 
-## 配置
-
-`config.json`（安装在 `%APPDATA%\SchoolAutoLogin\` 下）：
-- `wifi_ssid`: 校园网 WiFi 名称。程序先尝试直接访问认证服务器，仅在无法访问时才切换 WiFi。用网线连接的不需要填写。
-- `operator`: 运营商（"中国电信"/"中国联通"/"校园用户"），当前 Dr.COM 版本不使用运营商后缀
-- `username`: 学号
-- `password`: 密码
-- `max_retries`: 失败重试次数，默认 3
-- `retry_interval_seconds`: 重试间隔秒数，默认 5
-
-## 运行模式
-
-| 模式 | 触发方式 | 窗口 | 通知 |
-|------|---------|------|------|
-| GUI 模式 | 双击 exe / `python main.py` | customtkinter 窗口 | Windows 通知 |
-| 静默模式 | `python main.py --silent` | 无 | Windows 通知 |
-| 定时任务 | 任务计划 06:55 | 无 | Windows 通知 |
-
-## 定时任务
-
-Windows 任务计划 `SchoolAutoLogin`，每天 06:55 执行，启用 WakeToRun（从睡眠唤醒）和 StartWhenAvailable（错过后补执行）。
-
-安装程序自动创建，卸载时自动删除。
+## Commands
 
 ```bash
-# 查看
-schtasks //query //tn "SchoolAutoLogin"
+# Run
+python main.py                # GUI 模式
+python main.py --silent       # 静默模式（无窗口，用于定时任务）
 
-# 手动触发
-schtasks //run //tn "SchoolAutoLogin"
+# Test
+pytest                        # 运行全部测试
+pytest tests/test_login.py    # 单文件
+pytest tests/test_login.py::TestAttemptLogin::test_unreachable_no_wifi_configured  # 单用例
+pytest --cov=src --cov-report=term-missing   # 覆盖率
 
-# 删除
-schtasks //delete //tn "SchoolAutoLogin" //f
-```
-
-## 打包
-
-依赖：PyInstaller、Inno Setup 6、customtkinter
-
-```bash
-# 一键构建（检查依赖 → 打包 exe → 生成安装程序）
+# Build（一键打包 exe + 安装程序）
 build.bat
-
 # 输出: installer_output/SchoolAutoLogin_Setup_1.0.0.exe
-```
 
-手动步骤：
-```bash
+# 手动打包步骤
 pyinstaller main.spec
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
 ```
 
-## 技术细节
+依赖：Python 3.12+、customtkinter、PyInstaller、Inno Setup 6。无 `requirements.txt` 或 `pyproject.toml`。
 
-- 认证系统：Dr.COM eportal，页面编码 GB2312
-- **登录决策流程**：以 `http://10.1.2.3` 认证服务器为唯一决策枢纽
-  1. `check_auth_status()` 探测认证服务器：返回 `"logged_in"` / `"not_logged_in"` / `"unreachable"`
-  2. 已登录 → 直接返回，无需任何操作
-  3. 需要登录 → 直接执行登录（不碰 WiFi）
-  4. 不可达 → 如果配置了 WiFi SSID，尝试切换后重试；否则报错
-- 登录方式：HTTP GET 请求 JSONP 接口
-  - URL: `http://10.1.2.3/drcom/login?callback=dr1003&DDDDD=<学号>&upass=<密码>&0MKKey=123456&R1=0&R2=&R3=1&R6=0&para=00&v6ip=&terminal_type=1&lang=zh-cn&jsVersion=4.2.1&v=<timestamp>&lang=zh`
-  - 响应格式: `dr1003({"result":0/1, "msga":"...", ...})`
-  - `result=1` 表示登录成功，`result=0` 表示失败
-- 使用 `urllib` 标准库，无需第三方依赖（登录部分）
-- GUI 使用 `customtkinter`（基于 tkinter 的现代主题库）
-- Windows 通知通过 PowerShell WinRT API 实现，无需额外安装包
-- WiFi 切换仅在认证服务器不可达时触发（通过 `netsh wlan connect`），解决睡眠唤醒后连接到其他网络的问题
-- 等待网络就绪（最多 120 秒），解决睡眠唤醒后网络延迟问题
-- 静默模式（`--silent`）异常时通过 PowerShell MessageBox 弹窗兜底，确保用户能看到错误
+## Architecture
+
+### 模块职责
+
+| 模块 | 职责 |
+|---|---|
+| `main.py` | 入口：`--silent` 走 `run_silent()`，否则启动 `App` GUI |
+| `src/login.py` | 核心登录逻辑：`check_auth_status()` 三态探测 → `attempt_login()` 编排 → `do_login()` HTTP 请求 |
+| `src/config.py` | `config.json` 读写 + schema 验证（`validate()` 返回新 dict，不修改原对象） |
+| `src/app.py` | GUI 主窗口（customtkinter），包含登录面板、设置面板、轮询线程 |
+| `src/wifi.py` | WiFi 切换（`netsh wlan connect`），仅在认证服务器不可达时触发 |
+| `src/notify.py` | Windows Toast 通知（PowerShell WinRT），`_xml_escape()` 防 XSS |
+| `src/scheduler.py` | Windows 任务计划 CRUD（PowerShell `Register-ScheduledTask`） |
+| `src/autostart.py` | 开机自启（HKCU `Run` 注册表键） |
+| `src/ui/theme.py` | 设计 token：调色板、间距、字体、圆角（全部 `R=0`，新粗野主义风格） |
+| `src/ui/components.py` | 可复用组件：`GlassCard`、`BrutalButton`（带阴影动画）、`StatusDot` |
+
+### 登录决策流程（关键）
+
+`src/login.py:attempt_login()` 以认证服务器 `http://10.1.2.3` 为唯一决策枢纽：
+
+```
+check_auth_status()
+  ├─ "logged_in"     → 返回，无需操作
+  ├─ "not_logged_in" → 直接 do_login()（不碰 WiFi）
+  └─ "unreachable"   → 有 wifi_ssid 配置？→ wifi.connect() → wait_for_network()
+                       → 重试 check_auth_status()
+                         ├─ "logged_in"     → 返回
+                         ├─ "not_logged_in" → do_login()
+                         └─ "unreachable"   → 放弃
+```
+
+`do_login()` 失败时按 `max_retries` 重试，间隔 `retry_interval_seconds`。
+
+### GUI 线程模型
+
+- 主线程：customtkinter 事件循环
+- 登录/轮询：`threading.Thread(daemon=True)`，通过 `self.after(0, callback)` 回调 UI 更新
+- 轮询线程用 `threading.Event` (`_poll_stop`) 实现可中断等待
+- 窗口关闭时 `_on_close()` 先 `_stop_polling()` 再 `destroy()`
+
+### 配置
+
+`config.json`（安装后位于 exe 同目录，开发时位于项目根目录）：
+- `url`: 认证服务器地址，默认 `http://10.1.2.3`
+- `wifi_ssid`: 校园网 WiFi 名称，留空跳过 WiFi 切换
+- `operator`: 运营商（当前 Dr.COM 版本不使用运营商后缀）
+- `username` / `password`: 学号和密码
+- `max_retries` / `retry_interval_seconds`: 登录重试策略
+- `polling_enabled` / `polling_interval_seconds`: 断网自动重连
+- `scheduled_login_enabled` / `scheduled_login_time`: 定时登录
+- `auto_start`: 开机自启（HKCU Run 注册表）
+- `notification_enabled`: 桌面通知开关
+
+所有配置通过 `config.validate()` 校验，返回新 dict（不修改原对象）。
+
+### 认证服务器协议
+
+- 编码：GB2312（登录页面）/ GBK（JSONP 响应）
+- 登录：HTTP GET JSONP → `dr1003({"result":0/1, "msga":"..."})`
+- 判断已登录：页面 `<title>` 包含 "注销"
+- 使用 `urllib` 标准库，登录部分无第三方依赖
+
+### 测试结构
+
+`tests/` 下用 pytest + `unittest.mock`：
+- `test_login.py`：`check_auth_status` 三态、`do_login` 成功/失败、`attempt_login` 完整编排（mock `urlopen`）
+- `test_config.py`：load/save/roundtrip、默认值合并
+- `test_notify.py`：`_xml_escape` 特殊字符和中文编码
+
+测试用 `patch("src.login.urlopen")` mock HTTP，不依赖网络。
+
+### 打包
+
+- `main.spec`：PyInstaller 配置（单文件 exe）
+- `setup.iss`：Inno Setup 安装脚本，安装时可选创建定时任务，卸载时自动删除
+- `build.bat`：一键构建（检查依赖 → PyInstaller → 复制 config → Inno Setup）
