@@ -22,10 +22,11 @@ pytest --cov=src --cov-report=term-missing   # 覆盖率
 # Build（一键打包 exe + 安装程序）
 build.bat
 # 输出: installer_output/SchoolAutoLogin_Setup_1.0.0.exe
+# build.bat 会自动检查并安装 PyInstaller 和 Inno Setup
 
 # 手动打包步骤
 pyinstaller main.spec
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
+"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" setup.iss
 ```
 
 依赖：Python 3.12+、customtkinter、PyInstaller、Inno Setup 6。无 `requirements.txt` 或 `pyproject.toml`。
@@ -37,12 +38,12 @@ pyinstaller main.spec
 | 模块 | 职责 |
 |---|---|
 | `main.py` | 入口：`--silent` 走 `run_silent()`，否则启动 `App` GUI |
-| `src/login.py` | 核心登录逻辑：`check_auth_status()` 三态探测 → `attempt_login()` 编排 → `do_login()` HTTP 请求 |
+| `src/login.py` | 核心登录逻辑 + 日志初始化（`RotatingFileHandler` → `login.log`） |
 | `src/config.py` | `config.json` 读写 + schema 验证（`validate()` 返回新 dict，不修改原对象） |
 | `src/app.py` | GUI 主窗口（customtkinter），包含登录面板、设置面板、轮询线程 |
 | `src/wifi.py` | WiFi 切换（`netsh wlan connect`），仅在认证服务器不可达时触发 |
 | `src/notify.py` | Windows Toast 通知（PowerShell WinRT），`_xml_escape()` 防 XSS |
-| `src/scheduler.py` | Windows 任务计划 CRUD（PowerShell `Register-ScheduledTask`） |
+| `src/scheduler.py` | Windows 任务计划 CRUD（`Register-ScheduledTask`），`_ps_escape()` 防注入 |
 | `src/autostart.py` | 开机自启（HKCU `Run` 注册表键） |
 | `src/ui/theme.py` | 设计 token：调色板、间距、字体、圆角（全部 `R=0`，新粗野主义风格） |
 | `src/ui/components.py` | 可复用组件：`GlassCard`、`BrutalButton`（带阴影动画）、`StatusDot` |
@@ -68,8 +69,16 @@ check_auth_status()
 
 - 主线程：customtkinter 事件循环
 - 登录/轮询：`threading.Thread(daemon=True)`，通过 `self.after(0, callback)` 回调 UI 更新
-- 轮询线程用 `threading.Event` (`_poll_stop`) 实现可中断等待
+- 轮询线程用 `threading.Event` (`_poll_stop`) 实现可中断等待（`wait(timeout=...)` 而非 `sleep`）
 - 窗口关闭时 `_on_close()` 先 `_stop_polling()` 再 `destroy()`
+
+### 路径解析
+
+`src/config.py` 中的 `APP_DIR` 决定所有运行时文件位置：
+- 开发模式：项目根目录（`src/` 的父目录）
+- 打包模式（`sys.frozen`）：exe 所在目录
+
+由此派生 `CONFIG_PATH`（`config.json`）和 `LOG_PATH`（`login.log`）。
 
 ### 配置
 
@@ -104,6 +113,6 @@ check_auth_status()
 
 ### 打包
 
-- `main.spec`：PyInstaller 配置（单文件 exe）
-- `setup.iss`：Inno Setup 安装脚本，安装时可选创建定时任务，卸载时自动删除
-- `build.bat`：一键构建（检查依赖 → PyInstaller → 复制 config → Inno Setup）
+- `main.spec`：PyInstaller 配置（单文件 exe，`console=False`，打包 customtkinter 数据文件）
+- `setup.iss`：Inno Setup 安装脚本，安装到 `%USERAPPDATA%`（非 Program Files），安装时可选创建定时任务，卸载时自动删除
+- `build.bat`：一键构建（自动安装依赖 → PyInstaller → 复制 config → Inno Setup）
