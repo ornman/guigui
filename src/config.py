@@ -1,4 +1,4 @@
-"""Config.json read/write with schema validation."""
+"""config.json 读写与 Schema 校验。"""
 
 import json
 import logging
@@ -8,11 +8,14 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
+# ── 路径解析 ──
+# 打包模式（PyInstaller）用 exe 所在目录，开发模式用项目根目录
 _FROZEN = getattr(sys, "frozen", False)
 APP_DIR = Path(sys.executable).parent if _FROZEN else Path(__file__).resolve().parent.parent
 CONFIG_PATH = APP_DIR / "config.json"
 LOG_PATH = APP_DIR / "login.log"
 
+# ── 默认配置 ──
 _DEFAULTS = {
     "url": "http://10.1.2.3",
     "wifi_ssid": "",
@@ -29,7 +32,9 @@ _DEFAULTS = {
     "notification_enabled": True,
 }
 
-# Validation rules: (key, expected_type, validator, fallback)
+# ── 校验规则 ──
+# 每条规则：(键名, 期望类型, 校验 lambda, 不合法时的回退值)
+# polling_interval_seconds 下限为 5 秒，防止过于频繁导致认证服务器压力
 _VALIDATORS = [
     ("url", str, lambda v: v.startswith("http"), _DEFAULTS["url"]),
     ("max_retries", int, lambda v: v > 0, _DEFAULTS["max_retries"]),
@@ -48,7 +53,12 @@ _VALIDATORS = [
 
 
 def validate(cfg: dict) -> dict:
-    """Validate and coerce config values, returning a **new** dict with fixes."""
+    """校验并修正配置值，返回新的 dict（不修改原对象）。
+
+    遍历 ``_VALIDATORS`` 中的每条规则：
+    1. 类型不匹配 → 使用默认值并记录警告日志
+    2. 校验函数返回 False → 使用默认值并记录警告日志
+    """
     result = {**cfg}
     for key, expected_type, validator, fallback in _VALIDATORS:
         value = result.get(key, fallback)
@@ -65,6 +75,10 @@ def validate(cfg: dict) -> dict:
 
 
 def load() -> dict:
+    """从 config.json 加载配置，与默认值合并后校验。
+
+    文件不存在时返回全部默认值。
+    """
     saved = {}
     if CONFIG_PATH.exists():
         with open(CONFIG_PATH, encoding="utf-8") as f:
@@ -73,6 +87,7 @@ def load() -> dict:
 
 
 def save(cfg: dict) -> None:
+    """将配置字典写入 config.json（自动创建父目录）。"""
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)

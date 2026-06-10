@@ -1,4 +1,4 @@
-"""SchoolAutoLogin — main window."""
+"""SchoolAutoLogin — 主窗口。"""
 
 import logging
 import threading
@@ -16,6 +16,7 @@ from .ui.components import BrutalButton, GlassCard, StatusDot
 
 class App(ctk.CTk):
     def __init__(self):
+        """初始化主窗口：加载配置、构建界面、填充表单字段。"""
         super().__init__()
         self.title("SchoolAutoLogin")
         self.geometry(f"{T.WIN_W}x{T.WIN_H}")
@@ -30,40 +31,41 @@ class App(ctk.CTk):
         self._fill_fields()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
-    # ── Build ────────────────────────────────────
+    # ── 界面构建 ────────────────────────────────────
 
     def _build(self):
+        """构建完整 UI：品牌条 → 卡片 → 标签页 → 状态栏。"""
         outer = ctk.CTkFrame(self, fg_color="transparent")
         outer.pack(fill="both", expand=True, padx=20, pady=20)
 
-        # Brand bar — 3px purple strip
+        # 品牌条 — 3px 紫色条纹
         ctk.CTkFrame(outer, fg_color=T.ACCENT, height=3).pack(fill="x")
 
-        # Card
+        # 卡片容器
         card = GlassCard(outer)
         card.pack(fill="both", expand=True)
 
-        # ── Decorative: corner marks ──
+        # ── 装饰：四角 L 形标记 ──
         self._place_corner_marks(card)
 
-        # ── Decorative: version text (bottom-right) ──
+        # ── 装饰：版本号（右下角） ──
         ctk.CTkLabel(
             card, text=f"v{T.VERSION}", font=(T.FF_EN, 9),
             text_color=T.TEXT_MUTED,
         ).pack(side="bottom", anchor="e", padx=T.SPACE_XL, pady=(0, T.SPACE_MD))
 
-        # ── Decorative: system readout (top-right) ──
+        # ── 装饰：系统状态文字（右上角） ──
         ctk.CTkLabel(
             card, text="SYS:// ACTIVE", font=(T.FF_EN, 9),
             text_color=T.TEXT_MUTED,
         ).place(relx=1.0, rely=0.0, anchor="ne", x=-10, y=10)
 
-        # Inner content
+        # 主内容区
         inner = ctk.CTkFrame(card, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=T.SPACE_XL, pady=T.SPACE_XL)
         self._inner = inner
 
-        # ── Title block ──
+        # ── 标题区 ──
         ctk.CTkLabel(
             inner, text="SCHOOL", font=T.F_BRAND,
             text_color=T.TEXT, anchor="w",
@@ -73,13 +75,13 @@ class App(ctk.CTk):
             text_color=T.ACCENT, anchor="w",
         ).pack(fill="x", pady=(0, T.SPACE_MD))
 
-        # Purple divider
+        # 紫色分割线
         ctk.CTkFrame(inner, fg_color=T.ACCENT, height=2).pack(fill="x")
 
-        # ── Tabs ──
+        # ── 标签页导航 ──
         self._build_tabs(inner)
 
-        # ── Content ──
+        # ── 内容区 ──
         self._content = ctk.CTkFrame(inner, fg_color="transparent")
         self._content.pack(fill="both", expand=True, pady=(T.SPACE_SM, 0))
 
@@ -87,14 +89,14 @@ class App(ctk.CTk):
         self._settings_panel = self._build_settings(self._content)
         self._show_tab("login")
 
-        # ── Status ──
+        # ── 状态栏 ──
         self._status = StatusDot(card, state="idle")
         self._status.pack(side="bottom", anchor="w",
                           padx=T.SPACE_XL, pady=(0, T.SPACE_MD))
 
     @staticmethod
     def _place_corner_marks(card: ctk.CTkFrame):
-        """Draw four L-shaped corner marks on *card*."""
+        """在卡片四角绘制 L 形装饰标记。"""
         color = "#2a2a2a"
         length = 16
         offset = 6
@@ -114,6 +116,7 @@ class App(ctk.CTk):
                 relx=relx, rely=rely, anchor=anchor, x=dx, y=dy)
 
     def _build_tabs(self, parent):
+        """构建「01 登录 / 02 设置」标签页导航栏。"""
         bar = ctk.CTkFrame(parent, fg_color="transparent")
         bar.pack(fill="x", pady=(T.SPACE_MD, 0))
 
@@ -131,21 +134,23 @@ class App(ctk.CTk):
             command=lambda: self._show_tab("settings"))
         self._tab_settings.pack(side="left", padx=(16, 0))
 
-        # Active indicator
+        # 当前激活标签的紫色下划线指示器
         self._indicator = ctk.CTkFrame(
             bar, fg_color=T.ACCENT, height=3, width=50, corner_radius=0)
         self._indicator.place(in_=self._tab_login, rely=1.0, relx=0.0)
 
-        # Gray divider
+        # 灰色分割线
         ctk.CTkFrame(parent, fg_color=T.BORDER, height=1).pack(fill="x")
 
     def _move_indicator(self, target):
+        """将标签页指示器移动到 *target* 按钮下方。"""
         self._indicator.place_forget()
         self._indicator.place(in_=target, rely=1.0, relx=0.0)
 
-    # ── Login panel ──────────────────────────────
+    # ── 登录面板 ──────────────────────────────────
 
     def _build_login(self, parent):
+        """构建登录面板：运营商选择、学号、密码、登录/保存按钮。"""
         p = ctk.CTkFrame(parent, fg_color="transparent")
 
         self._section(p, "// 运营商")
@@ -189,9 +194,10 @@ class App(ctk.CTk):
 
         return p
 
-    # ── Settings panel ───────────────────────────
+    # ── 设置面板 ───────────────────────────────────
 
     def _build_settings(self, parent):
+        """构建设置面板：WiFi 名称、断网重连、定时登录、开机自启、通知开关。"""
         p = ctk.CTkFrame(parent, fg_color="transparent")
 
         self._section(p, "// WiFi 名称")
@@ -237,20 +243,22 @@ class App(ctk.CTk):
 
         return p
 
-    # ── Widget helpers ───────────────────────────
+    # ── 控件辅助方法 ───────────────────────────────
 
     def _section(self, parent, text: str):
-        """Section label with // prefix."""
+        """带 // 前缀的段落标签。"""
         ctk.CTkLabel(parent, text=text, font=T.F_LABEL,
                      text_color=T.TEXT_DIM, anchor="w").pack(
             fill="x", pady=(T.SEC_ABOVE, T.SEC_BELOW))
 
     def _entry_kw(self) -> dict:
+        """输入框通用样式配置字典。"""
         return dict(fg_color=T.BG, border_color=T.BORDER,
                     text_color=T.TEXT, placeholder_text_color=T.TEXT_MUTED,
                     font=T.F_INPUT, corner_radius=T.R)
 
     def _entry(self, parent, placeholder: str = "") -> ctk.CTkEntry:
+        """创建带焦点高亮的输入框并添加到 *parent*。"""
         e = ctk.CTkEntry(parent, placeholder_text=placeholder,
                          **self._entry_kw(), height=38)
         e.pack(fill="x", pady=(0, T.SPACE_SM))
@@ -258,6 +266,7 @@ class App(ctk.CTk):
         return e
 
     def _switch(self, parent, label: str) -> ctk.CTkSwitch:
+        """创建带标签的开关控件。"""
         row = ctk.CTkFrame(parent, fg_color="transparent")
         row.pack(fill="x", pady=(T.SPACE_SM, 0))
         ctk.CTkLabel(row, text=label, font=T.F_SWITCH_LABEL,
@@ -270,6 +279,7 @@ class App(ctk.CTk):
         return sw
 
     def _focus_border(self, entry: ctk.CTkEntry):
+        """为输入框绑定焦点高亮：获取焦点时紫色边框，失去焦点时灰色边框。"""
         entry.bind("<FocusIn>",
                     lambda _: entry.configure(border_color=T.ACCENT,
                                               border_width=2))
@@ -277,9 +287,10 @@ class App(ctk.CTk):
                     lambda _: entry.configure(border_color=T.BORDER,
                                               border_width=T.BW_INPUT))
 
-    # ── Tab switching ────────────────────────────
+    # ── 标签页切换 ────────────────────────────────
 
     def _show_tab(self, name: str):
+        """切换显示 *name* 对应的面板（"login" 或 "settings"）。"""
         self._login_panel.pack_forget()
         self._settings_panel.pack_forget()
 
@@ -294,9 +305,10 @@ class App(ctk.CTk):
             self._tab_settings.configure(text_color=T.TEXT)
             self._move_indicator(self._tab_settings)
 
-    # ── Form ─────────────────────────────────────
+    # ── 表单 ─────────────────────────────────────
 
     def _fill_fields(self):
+        """将配置文件中的值填充到表单控件。"""
         c = self._cfg
         self._op.set(c.get("operator", "中国电信"))
         self._user.insert(0, c.get("username", ""))
@@ -316,7 +328,7 @@ class App(ctk.CTk):
             self._sw_notify.select()
 
     def _read_form(self) -> dict:
-        """Read form values into a **new** dict (immutable pattern)."""
+        """读取表单值到新的 dict（不可变模式，不修改 self._cfg）。"""
         c = {**self._cfg}
         c["operator"] = self._op.get()
         c["username"] = self._user.get()
@@ -334,9 +346,10 @@ class App(ctk.CTk):
         c["notification_enabled"] = self._sw_notify.get() == 1
         return c
 
-    # ── Actions ──────────────────────────────────
+    # ── 操作 ──────────────────────────────────────
 
     def _toggle_pw(self):
+        """切换密码框的显示/隐藏状态。"""
         if self._pw.cget("show"):
             self._pw.configure(show="")
             self._pw_toggle.configure(text="隐藏")
@@ -345,25 +358,27 @@ class App(ctk.CTk):
             self._pw_toggle.configure(text="显示")
 
     def _save(self):
+        """验证表单 → 更新配置 → 写盘 → 反馈。"""
         self._cfg = config.validate(self._read_form())
         config.save(self._cfg)
         self._btn_save.show_feedback("✓ 已保存", "保存配置")
 
     def _apply_settings(self):
+        """应用设置：保存配置 + 联动轮询/定时任务/开机自启三个子系统。"""
         new_cfg = config.validate(self._read_form())
         self._cfg = new_cfg
         config.save(self._cfg)
 
         messages: list[str] = []
 
-        # ── Polling (auto-reconnect) ──
+        # ── 轮询（断网自动重连） ──
         if new_cfg.get("polling_enabled"):
             self._start_polling()
             messages.append("轮询已开启")
         else:
             self._stop_polling()
 
-        # ── Scheduled task ──
+        # ── 定时任务 ──
         if new_cfg.get("scheduled_login_enabled"):
             time_str = new_cfg.get("scheduled_login_time", "06:55")
             if scheduler.create_scheduled_task(time_str):
@@ -373,7 +388,7 @@ class App(ctk.CTk):
         else:
             scheduler.remove_scheduled_task()
 
-        # ── Auto-start ──
+        # ── 开机自启 ──
         if new_cfg.get("auto_start"):
             if autostart.enable():
                 messages.append("自启已开启")
@@ -385,10 +400,10 @@ class App(ctk.CTk):
         feedback = "✓ " + "、".join(messages) if messages else "✓ 已应用"
         self._btn_apply.show_feedback(feedback, "应用设置")
 
-    # ── Polling (auto-reconnect) ─────────────────
+    # ── 轮询（断网自动重连） ─────────────────────
 
     def _start_polling(self):
-        """Start or restart the polling daemon thread."""
+        """启动或重启轮询守护线程。"""
         self._stop_polling()
         self._poll_stop.clear()
         self._poll_thread = threading.Thread(
@@ -397,7 +412,7 @@ class App(ctk.CTk):
         log.info("Polling thread started")
 
     def _stop_polling(self):
-        """Stop the polling thread if running."""
+        """停止轮询线程（等待最多 5 秒）。"""
         if self._poll_thread and self._poll_thread.is_alive():
             self._poll_stop.set()
             self._poll_thread.join(timeout=5)
@@ -408,7 +423,12 @@ class App(ctk.CTk):
         self._poll_thread = None
 
     def _poll_worker(self):
-        """Background loop: check login status and reconnect if needed."""
+        """后台轮询循环：检查登录状态，断网时自动重连。
+
+        使用 ``threading.Event.wait(timeout=...)`` 实现可中断等待，
+        避免线程无法响应停止信号。所有 UI 更新通过 ``self.after(0, ...)``
+        调度到主线程执行（customtkinter 非线程安全）。
+        """
         import time
 
         while not self._poll_stop.wait(
@@ -422,12 +442,12 @@ class App(ctk.CTk):
                     self.after(0, lambda: self._status.set_state("connected"))
                     continue
 
-                # Unreachable → try WiFi remediation with cancellable wait
+                # 网络不可达 → 尝试 WiFi 切换恢复（可中断等待）
                 if status == "unreachable" and cfg.get("wifi_ssid"):
                     if self._poll_stop.is_set():
                         return
                     wifi.connect(cfg["wifi_ssid"])
-                    # Cancellable network wait: check every 3s, stop-aware
+                    # 可中断的网络等待：每 3 秒检查一次，随时可停止
                     deadline = time.time() + 30
                     while time.time() < deadline:
                         if self._poll_stop.is_set():
@@ -445,7 +465,7 @@ class App(ctk.CTk):
                     self.after(0, lambda: self._status.set_state("disconnected"))
                     continue
 
-                # status == "not_logged_in" → try login
+                # status == "not_logged_in" → 尝试登录
                 log.info("Poll: disconnected, attempting reconnect...")
                 for _ in range(cfg.get("max_retries", 3)):
                     if self._poll_stop.is_set():
@@ -462,14 +482,15 @@ class App(ctk.CTk):
             except Exception as e:
                 log.error("Poll worker error: %s", e)
 
-    # ── Login ────────────────────────────────────
+    # ── 登录 ────────────────────────────────────
 
     def _on_close(self):
-        """Graceful shutdown — stop polling before destroying window."""
+        """窗口关闭时优雅退出：先停止轮询线程再销毁窗口。"""
         self._stop_polling()
         self.destroy()
 
     def _do_login(self):
+        """验证表单 → 保存 → 禁用按钮 → 在后台线程执行登录。"""
         self._cfg = config.validate(self._read_form())
         config.save(self._cfg)
 
@@ -486,6 +507,11 @@ class App(ctk.CTk):
             args=(self._cfg.copy(),), daemon=True).start()
 
     def _login_worker(self, cfg: dict):
+        """后台登录线程：调用 attempt_login 并通过 ``self.after`` 回调 UI。
+
+        Args:
+            cfg: 配置字典的副本（线程安全）。
+        """
         try:
             result = login_mod.attempt_login(cfg)
             if result == "already_logged_in":
@@ -501,6 +527,12 @@ class App(ctk.CTk):
             self.after(0, lambda: self._done(False, str(e)))
 
     def _done(self, ok: bool, msg: str):
+        """登录完成回调：恢复按钮、更新状态指示器、发送桌面通知。
+
+        Args:
+            ok: 登录是否成功。
+            msg: 展示给用户的结果文本。
+        """
         self._btn_login.set_state(True)
         if ok:
             self._btn_login.show_feedback(f"✓ {msg}", "立即登录")

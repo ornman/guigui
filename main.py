@@ -1,4 +1,4 @@
-"""SchoolAutoLogin — campus network auto-login."""
+"""SchoolAutoLogin — 校园网自动登录工具。"""
 
 import logging
 import subprocess
@@ -8,7 +8,11 @@ log = logging.getLogger(__name__)
 
 
 def run_silent():
-    """Headless login for scheduled tasks."""
+    """静默登录模式（无窗口），用于定时任务。
+
+    加载配置后尝试登录，根据结果发送桌面通知。
+    登录失败时以 exit code 1 退出，供任务计划程序判断状态。
+    """
     from src import config
     from src import login as login_mod
     from src import notify
@@ -37,6 +41,7 @@ def run_silent():
 
 
 def main():
+    """程序入口：``--silent`` 走静默登录，否则启动 GUI 主窗口。"""
     if "--silent" in sys.argv:
         try:
             run_silent()
@@ -44,7 +49,7 @@ def main():
             raise
         except Exception as e:
             log.exception("Silent mode crashed")
-            # Strip PowerShell metacharacters to prevent injection
+            # 过滤 PowerShell 元字符，防止注入
             import re
             safe_msg = re.sub(r'''['"$`()]''', '', str(e))[:200]
             subprocess.run([
