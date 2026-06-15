@@ -23,6 +23,18 @@ if errorlevel 1 (
     echo         OK
 )
 
+:: ---- Check runtime dependencies (customtkinter / pystray / Pillow) ----
+
+echo.
+echo [Check] Runtime dependencies (customtkinter, pystray, Pillow)...
+pip install customtkinter pystray Pillow >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Failed to install runtime dependencies!
+    pause
+    exit /b 1
+)
+echo         OK
+
 :: ---- Check / Install Inno Setup 6 ----
 
 set "ISCC=%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe"

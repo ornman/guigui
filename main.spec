@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import customtkinter as ctk
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_data_files
 
 # Collect customtkinter data files (themes, assets)
 ctk_data = Path(ctk.__file__).parent
@@ -11,7 +12,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(ctk_data), 'customtkinter'),
-    ],
+    ] + collect_data_files('PIL'),
     hiddenimports=[
         'src',
         'src.config',
@@ -24,7 +25,14 @@ a = Analysis(
         'src.ui.theme',
         'src.scheduler',
         'src.autostart',
+        'src.instance',
+        'src.selfheal',
+        'src.ensure',
+        'src.tray',
         'customtkinter',
+        'pystray._win32',
+        'PIL',
+        'PIL._tkinter_finder',
     ],
     hookspath=[],
     hooksconfig={},
