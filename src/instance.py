@@ -5,10 +5,12 @@
 
 import ctypes
 import logging
+from collections.abc import Callable
 from ctypes import wintypes
 
 log = logging.getLogger(__name__)
 
+# Local\ 前缀：会话级互斥量，无需 SeCreateGlobalPrivilege 权限
 _MUTEX_NAME = "Local\\SchoolAutoLogin-Instance"
 _ERROR_ALREADY_EXISTS = 183
 
@@ -24,12 +26,23 @@ def _default_create_mutex(name: str) -> tuple[int, int]:
     return int(handle or 0), ctypes.get_last_error()
 
 
+def _default_close_handle(handle: int) -> bool:
+    """调用 Win32 CloseHandle，返回是否成功。"""
+    return bool(_kernel32.CloseHandle(handle))
+
+
 class SingleInstance:
     """持有命名互斥量；acquire 返回是否抢到（本进程是否为主实例）。"""
 
-    def __init__(self, name: str = _MUTEX_NAME, create_func=None):
+    def __init__(
+        self,
+        name: str = _MUTEX_NAME,
+        create_func: Callable[[str], tuple[int, int]] | None = None,
+        close_func: Callable[[int], bool] | None = None,
+    ):
         self._name = name
         self._create = create_func or _default_create_mutex
+        self._close = close_func or _default_close_handle
         self._handle: int | None = None
 
     def acquire(self) -> bool:
@@ -38,19 +51,26 @@ class SingleInstance:
             log.error("CreateMutex 失败: err=%d", err)
             return False
         if err == _ERROR_ALREADY_EXISTS:
+            # 抢不到也要关掉 CreateMutex 返回的句柄，否则每次探测泄漏一个内核句柄
+            self._close(handle)
             return False
         self._handle = handle
         return True
 
     def release(self) -> None:
-        if self._handle:
-            _kernel32.CloseHandle(self._handle)
+        if self._handle is not None:
+            if not self._close(self._handle):
+                log.warning("CloseHandle 失败")
             self._handle = None
 
 
-def tray_is_running(name: str = _MUTEX_NAME, create_func=None) -> bool:
+def tray_is_running(
+    name: str = _MUTEX_NAME,
+    create_func: Callable[[str], tuple[int, int]] | None = None,
+    close_func: Callable[[int], bool] | None = None,
+) -> bool:
     """探测托盘是否在跑：尝试抢互斥量，抢不到=有人在跑。抢到则立即释放。"""
-    si = SingleInstance(name, create_func=create_func)
+    si = SingleInstance(name, create_func=create_func, close_func=close_func)
     got = si.acquire()
     if got:
         si.release()
