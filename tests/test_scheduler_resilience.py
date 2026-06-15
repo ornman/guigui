@@ -42,3 +42,18 @@ def test_is_legacy_task_false_when_missing():
     fake = MagicMock(returncode=1, stdout="")
     with patch("subprocess.run", return_value=fake):
         assert scheduler.is_legacy_task() is False
+
+
+def test_create_multi_rejects_bad_time():
+    """非法 time_str 时直接返回 False，不调用 subprocess。"""
+    with patch("subprocess.run") as run:
+        assert scheduler.create_scheduled_task_multi("25:99") is False
+        run.assert_not_called()
+
+
+def test_create_multi_rejects_bad_interval():
+    """interval_minutes < 1 或非整数时直接返回 False，不调用 subprocess。"""
+    with patch("subprocess.run") as run:
+        assert scheduler.create_scheduled_task_multi("06:55", interval_minutes=0) is False
+        assert scheduler.create_scheduled_task_multi("06:55", interval_minutes=-5) is False
+        run.assert_not_called()

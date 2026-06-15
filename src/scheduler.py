@@ -9,7 +9,7 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 TASK_NAME = "SchoolAutoLogin"
-_TIME_RE = re.compile(r"^\d{2}:\d{2}$")
+_TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 
 
 def exe_path() -> str:
@@ -115,6 +115,9 @@ def create_scheduled_task_multi(time_str: str, interval_minutes: int = 15) -> bo
     """
     if not _TIME_RE.match(time_str):
         log.error("Invalid time format (expected HH:MM): %r", time_str)
+        return False
+    if not isinstance(interval_minutes, int) or interval_minutes < 1:
+        log.error("Invalid interval_minutes (must be int >= 1): %r", interval_minutes)
         return False
 
     exe = _ps_escape(exe_path())
