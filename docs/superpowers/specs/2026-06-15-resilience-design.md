@@ -1,6 +1,6 @@
 # 意外恢复系统设计（Resilience Design）
 
-> 状态：**草案（Draft）** — 架构已定，部分细节经对抗式审查后修正；标注 🟦 的为待用户拍板的开放问题。
+> 状态：**已确认（Approved）** — 架构与所有开放问题均已定，下一步转实施计划。
 > 日期：2026-06-15
 > 关联：`docs/PRD.md`（PRD 规划了 tray.py / poller.py，但实际从未实现）
 
@@ -125,7 +125,7 @@
 |---|---|---|
 | `resilience_enabled` 🆕 | `true` | L3/L4/L5 总开关。关掉则退回旧行为（仅每日定时 + 手动） |
 | `heartbeat_interval_minutes` 🆕 | `15` | 心跳频率（任务计划重复间隔） |
-| `polling_enabled` | （见开放问题 3） | 托盘轮询/即时重连 |
+| `polling_enabled` | `true`（默认改为开） | 是否对断网主动重连；托盘常驻本身由 `resilience_enabled` 决定 |
 | `polling_interval_seconds` | `30` | 托盘轮询间隔（不变） |
 | `scheduled_login_enabled` / `scheduled_login_time` | `true` / `06:55` | 早晨兜底触发器（语义不变） |
 | `auto_start` | `true` | 自启注册表（语义不变） |
@@ -139,23 +139,15 @@
 - **`--ensure` import 路径**：必须像 `--silent` 一样**只 import `src.config/login/notify`**，绝不拖入 customtkinter，否则心跳冷启动又慢又重。已确认 `main.py` 现有 `run_silent` 就是这个轻量路径，`--ensure` 复用。
 - **通知刷屏**：托盘 `_poll_worker`（`src/app.py:476`）每次重连都发通知，网络抖动会刷屏。**修正：只在状态转换时通知 + 限流（如每 N 分钟最多一条）。**
 
-### 🟦 待用户拍板
+### 已定决策（用户已确认）
 
-**开放问题 2 — 心跳是否做 WiFi 切换修复？**
-- 现状 `attempt_login` 在服务器不可达且配了 `wifi_ssid` 时会 `netsh wlan connect` 强切 WiFi。每 15min 心跳若在非校园网（家里/咖啡店）触发，会反复强切你的 WiFi，体验很差。
-- **推荐**：`--ensure` 心跳**不做 WiFi 切换**（仅"可达就登录，不可达就放弃"），WiFi 修复只留给托盘轮询和早晨 06:55 登录。或加一个"仅在当前已连校园网 SSID 时才修复"的启发式。
+**问题 2 — 心跳不做 WiFi 切换。** `--ensure` 心跳仅"可达就登录，不可达就放弃"，不 `netsh` 切 WiFi。WiFi 修复只留给托盘轮询和早晨 06:55 登录，避免在非校园网下每 15min 扰民。需为 `--ensure` 提供一个"仅登录、不做 WiFi 修复"的入口（或给 `attempt_login` 加 `skip_wifi` 参数）。
 
-**开放问题 3 — 托盘常驻与 `polling_enabled` 的关系？**
-- 若托盘只在 `polling_enabled=true` 时才常驻，而用户配置是 `false`，则关窗即退出 → 场景 ②③ 失效。
-- **推荐**：托盘常驻由 `resilience_enabled` 决定（与 `polling_enabled` 解耦）；`polling_enabled` 只决定"是否对断网主动重连 + 重连频率"，托盘本身（健康检查 + 看门狗载体）始终在跑。并把 `polling_enabled` 默认改为 `true`。
+**问题 3 — 托盘常驻与 polling 解耦，polling 默认改 true。** 新增 `resilience_enabled`（默认 true）决定托盘是否常驻；`polling_enabled`（默认改为 true）只管"是否对断网主动重连 + 重连频率"。托盘本身（健康检查 + 看门狗载体）在 `resilience_enabled` 下始终在跑。
 
-**开放问题 5 — 自愈 `-Force` 覆盖与旧任务迁移？**
-- `create_scheduled_task` 用 `-Force`（`src/scheduler.py:47`）会无条件覆盖，若每次启动都跑会反复覆盖用户的手动改动。
-- **推荐**：自愈逻辑**仅在"任务缺失 / 触发器规格与当前版本不符 / enabled 状态与 config 不符"时才重建**，平时不动。另需一次性的**迁移**：新版本首次运行时把旧的单触发器任务重写为多触发器规格。
+**问题 5 — 仅异常时重建 + 一次性迁移。** 自愈只在"任务缺失 / 触发器规格与新版不符 / enabled 状态与 config 不符"时才重建，平时不动，不覆盖用户手动改动。另做一次性迁移：新版首次运行把旧单触发器任务重写为多触发器规格。
 
-**开放问题 7 — 06:55 触发器是否冗余？**
-- 有了"登录时 + 每 15min"，机器任何时候开机/登录都会被覆盖，06:55 严格说冗余。
-- **推荐**：**保留**，作为用户可配置的显式"早晨登录"语义（`scheduled_login_enabled=false` 可关），且能让用户在日志里看到一条确定的早晨记录。
+**问题 7 — 保留 06:55。** 作为用户可配置的显式"早晨登录"（`scheduled_login_enabled=false` 可关），日志里留一条确定的早晨记录。
 
 ---
 
@@ -185,4 +177,4 @@
 
 ## 12. 后续
 
-本文档为**设计稿（spec）**。用户确认开放问题（第 9 节 🟦）后，转入实施计划（`writing-plans`），计划同样落到 `docs/`，**不在本会话自动执行**。
+本文档为**设计稿（spec）**，所有开放问题已确认。下一步转入实施计划（`writing-plans`），计划同样落到 `docs/`，**不在本会话自动执行**。
