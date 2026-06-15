@@ -431,6 +431,7 @@ class App(ctk.CTk):
         if self._cfg.get("resilience_enabled", True) or self._cfg.get("polling_enabled"):
             self._start_polling()
         # 后台登录一次
+        self._status.set_state("busy")
         threading.Thread(target=self._login_worker, args=(self._cfg.copy(),),
                          daemon=True).start()
 

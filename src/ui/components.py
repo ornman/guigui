@@ -134,6 +134,7 @@ class StatusDot(ctk.CTkFrame):
                 ``"disconnected"`` 或 ``"idle"``。
         """
         super().__init__(master, fg_color="transparent")
+        self._state = state
         color = T.ACCENT if state == "connected" else T.TEXT_MUTED
         label = {"connected": "已连接", "busy": "登录中…",
                  "disconnected": "断网", "idle": "未配置"}.get(state, "未配置")
@@ -150,6 +151,7 @@ class StatusDot(ctk.CTkFrame):
         可选值：``"connected"`` / ``"busy"`` → 紫色高亮；
         其他 → 灰色弱化。
         """
+        self._state = state
         c = T.ACCENT if state in ("connected", "busy") else T.TEXT_MUTED
         t = {"connected": "已连接", "busy": "登录中…",
              "disconnected": "断网", "idle": "未配置"}.get(state, "未配置")
