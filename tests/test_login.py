@@ -159,3 +159,19 @@ class TestAttemptLogin:
             cfg = {**self.CFG, "wifi_ssid": "CampusNet"}
             assert attempt_login(cfg) == "success"
             mock_connect.assert_called_once_with("CampusNet")
+
+    def test_attempt_login_skip_wifi_returns_unreachable(self, monkeypatch):
+        """skip_wifi=True 且服务器不可达时，不碰 WiFi、不等网络，直接返回 unreachable。"""
+        from src import login
+        # check_auth_status 返回 unreachable
+        monkeypatch.setattr(login, "check_auth_status", lambda: "unreachable")
+        called = {"wifi": False, "wait": False}
+        import src.wifi as wifi_mod
+        monkeypatch.setattr(wifi_mod, "connect", lambda ssid: called.__setitem__("wifi", True))
+        monkeypatch.setattr(login, "wait_for_network", lambda *a, **k: called.__setitem__("wait", True))
+
+        result = login.attempt_login({"wifi_ssid": "campus", "username": "u", "password": "p"},
+                                     skip_wifi=True)
+        assert result == "unreachable"
+        assert called["wifi"] is False
+        assert called["wait"] is False

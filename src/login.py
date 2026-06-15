@@ -128,39 +128,49 @@ def do_login(cfg: dict) -> bool:
     return False
 
 
-def attempt_login(cfg: dict) -> str:
-    """Full login orchestration: detect → optionally switch WiFi → login.
+def attempt_login(cfg: dict, skip_wifi: bool = False) -> str:
+    """完整的登录编排：探测状态 → 必要时切换 WiFi → 执行登录。
 
-    Uses 10.1.2.3 as the single source of truth. WiFi switching is only
-    attempted when the auth server is unreachable.
+    以认证服务器（默认 10.1.2.3）为唯一决策枢纽。仅当服务器不可达时
+    才尝试 WiFi 切换作为恢复手段。
+
+    Args:
+        cfg: 登录配置字典（username/password/wifi_ssid 等）。
+        skip_wifi: 心跳场景使用。为 True 时，当服务器不可达会直接放弃，
+            不切换 WiFi、不阻塞等待网络（避免后台心跳抢占用户 WiFi
+            或长时间阻塞）。默认 False，保持原有的 WiFi 恢复行为。
 
     Returns:
-        "already_logged_in" -- was logged in, nothing to do
-        "success"           -- login succeeded
-        "failed"            -- login failed after retries
-        "unreachable"       -- server never became reachable
+        "already_logged_in" -- 已经登录，无需操作
+        "success"           -- 登录成功
+        "failed"            -- 重试耗尽后登录失败
+        "unreachable"       -- 服务器始终不可达
     """
-    # Step 1: Quick probe
+    # Step 1: 快速探测当前状态
     status = check_auth_status()
     log.info("Auth status: %s", status)
 
     if status == "logged_in":
         return "already_logged_in"
 
-    # Step 2: If unreachable, try WiFi switch as remediation
+    # Step 2: 不可达时，尝试切换 WiFi 作为恢复（心跳 skip_wifi 时不做）
     if status == "unreachable":
-        if cfg.get("wifi_ssid"):
+        if cfg.get("wifi_ssid") and not skip_wifi:
             from . import wifi
             log.info("Server unreachable, switching WiFi to '%s'...", cfg["wifi_ssid"])
             wifi.connect(cfg["wifi_ssid"])
-        if not wait_for_network():
-            return "unreachable"
-        # Re-check after network came up
-        status = check_auth_status()
-        log.info("Auth status after remediation: %s", status)
-        if status == "logged_in":
-            return "already_logged_in"
-        if status == "unreachable":
+            if not wait_for_network():
+                return "unreachable"
+            # 网络恢复后重新探测
+            status = check_auth_status()
+            log.info("Auth status after remediation: %s", status)
+            if status == "logged_in":
+                return "already_logged_in"
+            if status == "unreachable":
+                return "unreachable"
+            # 补救后状态为 not_logged_in：落到 Step 3 执行登录
+        else:
+            # skip_wifi=True 或无 wifi_ssid：不做 WiFi 恢复，直接放弃
             return "unreachable"
 
     # Step 3: "not_logged_in" → attempt login with retries
