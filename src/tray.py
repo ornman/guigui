@@ -53,12 +53,14 @@ class Tray:
         """阻塞运行（请在 daemon 线程里调用）。"""
         self._icon = pystray.Icon("SchoolAutoLogin", _make_icon(ACCENT),
                                   "SchoolAutoLogin", self._menu())
+        log.info("Tray: 启动")
         self._icon.run()
 
     def stop(self):
         if self._icon:
             self._icon.stop()
             self._icon = None
+            log.info("Tray: 已停止")
 
     def update_state(self, state: str):
         if self._icon:
