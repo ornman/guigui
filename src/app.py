@@ -12,6 +12,19 @@ from . import login as login_mod
 from . import notify, scheduler
 from .ui import theme as T
 from .ui.components import BrutalButton, GlassCard, StatusDot
+from . import selfheal
+from .tray import Tray
+
+
+def should_auto_start(cfg: dict) -> bool:
+    """启动即自动登录 + 自动轮询的条件：resilience 开 且 有凭据。"""
+    return bool(cfg.get("resilience_enabled", True)
+                and cfg.get("username") and cfg.get("password"))
+
+
+def should_minimize_to_tray(cfg: dict) -> bool:
+    """关窗行为：resilience 开 → 最小化到托盘；否则正常退出。"""
+    return bool(cfg.get("resilience_enabled", True))
 
 
 class App(ctk.CTk):
@@ -30,6 +43,17 @@ class App(ctk.CTk):
         self._build()
         self._fill_fields()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        # ── L1 自主启动 + L5 启动自愈 ──
+        self._tray: Tray | None = None
+        if should_auto_start(self._cfg):
+            self.after(0, self._auto_login_on_launch)
+        # 启动自愈：对齐任务计划/自启（互为兜底的上半边）
+        try:
+            selfheal.reconcile_scheduler(self._cfg)
+            selfheal.reconcile_autostart(self._cfg)
+        except Exception as e:
+            log.warning("Startup self-heal error: %s", e)
 
     # ── 界面构建 ────────────────────────────────────
 
@@ -401,6 +425,35 @@ class App(ctk.CTk):
         self._btn_apply.show_feedback(feedback, "应用设置")
 
     # ── 轮询（断网自动重连） ─────────────────────
+
+    def _auto_login_on_launch(self):
+        """启动即触发一次登录，并在 resilience 下持续轮询。"""
+        if self._cfg.get("resilience_enabled", True) or self._cfg.get("polling_enabled"):
+            self._start_polling()
+        # 后台登录一次
+        threading.Thread(target=self._login_worker, args=(self._cfg.copy(),),
+                         daemon=True).start()
+
+    def _current_state(self) -> str:
+        """供托盘读取的当前状态。"""
+        return getattr(self._status, "_state", "idle")
+
+    def _ensure_tray(self):
+        """启动托盘守护线程（幂等）。"""
+        if self._tray is None:
+            self._tray = Tray(
+                on_show=self._show_from_tray,
+                on_login=self._do_login,
+                on_quit=self._quit_from_tray,
+                get_state=self._current_state,
+            )
+            threading.Thread(target=self._tray.start, daemon=True).start()
+
+    def _show_from_tray(self):
+        self.after(0, lambda: (self.deiconify(), self.lift(), self.focus_force()))
+
+    def _quit_from_tray(self):
+        self.after(0, self._real_quit)
 
     def _start_polling(self):
         """启动或重启轮询守护线程。"""
