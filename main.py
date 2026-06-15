@@ -41,7 +41,16 @@ def run_silent():
 
 
 def main():
-    """程序入口：``--silent`` 走静默登录，否则启动 GUI 主窗口。"""
+    """程序入口：``--ensure`` 心跳 / ``--silent`` 一次性 / 否则 GUI。"""
+    if "--ensure" in sys.argv:
+        from src import ensure
+        try:
+            sys.exit(ensure.run())
+        except Exception:
+            log.exception("Ensure mode crashed")
+            sys.exit(1)
+        return
+
     if "--silent" in sys.argv:
         try:
             run_silent()
@@ -59,11 +68,19 @@ def main():
             ], timeout=10)
         return
 
-    import customtkinter as ctk
-    ctk.set_appearance_mode("dark")
-
-    from src.app import App
-    App().mainloop()
+    # GUI 模式：单实例守卫
+    from src.instance import SingleInstance
+    si = SingleInstance()
+    if not si.acquire():
+        log.info("已有实例运行，退出")
+        return
+    try:
+        import customtkinter as ctk
+        ctk.set_appearance_mode("dark")
+        from src.app import App
+        App().mainloop()
+    finally:
+        si.release()
 
 
 if __name__ == "__main__":
