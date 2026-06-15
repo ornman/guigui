@@ -63,12 +63,18 @@ def run() -> int:
     recovered = False
 
     if actions.should_login:
-        result = login_mod.attempt_login(cfg, skip_wifi=True)  # 心跳不做 WiFi 切换
-        recovered = (result == "success")
+        try:
+            result = login_mod.attempt_login(cfg, skip_wifi=True)  # 心跳不做 WiFi 切换
+            recovered = (result == "success")
+        except Exception as e:
+            log.warning("Ensure: 登录异常: %s", e)
 
     if actions.should_spawn_tray:
-        _spawn_tray_detached()
-        recovered = True
+        try:
+            _spawn_tray_detached()
+            recovered = True
+        except Exception as e:
+            log.warning("Ensure: 拉起托盘失败: %s", e)
 
     if actions.should_reconcile_autostart:
         try:

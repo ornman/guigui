@@ -72,3 +72,44 @@ def test_run_skips_when_no_credentials():
     with patch("src.ensure.config") as mcfg:
         mcfg.load.return_value = {"username": "", "password": ""}
         assert ensure.run() == 0
+
+
+def test_run_survives_login_exception():
+    """attempt_login 抛异常时心跳仍返回 0，不崩溃。"""
+    cfg = {"resilience_enabled": True, "username": "u", "password": "p",
+           "notification_enabled": True, "scheduled_login_time": "06:55",
+           "heartbeat_interval_minutes": 15}
+    with patch("src.ensure.config") as mcfg, \
+         patch("src.ensure.login_mod") as mlogin, \
+         patch("src.ensure.instance") as minst, \
+         patch("src.ensure.selfheal"), \
+         patch("src.ensure.notify") as mnotify, \
+         patch("src.ensure._spawn_tray_detached") as mspawn:
+        mcfg.load.return_value = cfg
+        mlogin.check_auth_status.return_value = "not_logged_in"
+        mlogin.attempt_login.side_effect = RuntimeError("boom")
+        minst.tray_is_running.return_value = True  # 不拉起托盘，专注测登录异常
+        code = ensure.run()
+    assert code == 0
+    mnotify.send.assert_not_called()  # 登录异常 → 未恢复 → 不通知
+
+
+def test_run_survives_reconcile_exception_and_still_notifies():
+    """reconcile_autostart 抛异常时心跳仍通知（恢复已发生），不崩溃。"""
+    cfg = {"resilience_enabled": True, "username": "u", "password": "p",
+           "notification_enabled": True, "scheduled_login_time": "06:55",
+           "heartbeat_interval_minutes": 15}
+    with patch("src.ensure.config") as mcfg, \
+         patch("src.ensure.login_mod") as mlogin, \
+         patch("src.ensure.instance") as minst, \
+         patch("src.ensure.selfheal") as mheal, \
+         patch("src.ensure.notify") as mnotify, \
+         patch("src.ensure._spawn_tray_detached"):
+        mcfg.load.return_value = cfg
+        mlogin.check_auth_status.return_value = "not_logged_in"
+        mlogin.attempt_login.return_value = "success"
+        minst.tray_is_running.return_value = True
+        mheal.reconcile_autostart.side_effect = RuntimeError("boom")
+        code = ensure.run()
+    assert code == 0
+    mnotify.send.assert_called_once()  # 登录已成功 → 恢复 → 仍通知（reconcile 异常不影响）
