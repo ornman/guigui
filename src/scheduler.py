@@ -125,7 +125,7 @@ def create_scheduled_task_multi(time_str: str, interval_minutes: int = 15) -> bo
     ps = (
         "$action = New-ScheduledTaskAction "
         f"-Execute {exe} -Argument '--ensure'; "
-        "$tLogon = New-ScheduledTaskTrigger -AtLogOn; "
+        "$tLogon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME; "
         "$tRepeat = New-ScheduledTaskTrigger -Once -At (Get-Date) "
         f"-RepetitionInterval (New-TimeSpan -Minutes {int(interval_minutes)}) "
         "-RepetitionDuration (New-TimeSpan -Days 3650); "

@@ -26,6 +26,19 @@ def test_create_multi_task_has_three_triggers_and_ensure_arg():
     assert "IgnoreNew" in ps  # 防止重叠实例堆积
 
 
+def test_create_multi_atlogon_scoped_to_current_user():
+    """AtLogon 触发器必须限定到当前用户，否则非管理员无法注册（机器级 any-user 触发器需提权）。
+
+    回归：缺 -User 时 Register-ScheduledTask 在非 admin 会话返回 0x80070005 拒绝访问，
+    导致 resilience 自愈（重建/迁移任务）对普通用户失效。
+    """
+    captured, fake = _capture_ps(scheduler.create_scheduled_task_multi)
+    with patch("subprocess.run", side_effect=fake):
+        scheduler.create_scheduled_task_multi("06:55", interval_minutes=5)
+    ps = " ".join(captured["cmd"])
+    assert "-AtLogOn -User $env:USERNAME" in ps
+
+
 def test_is_legacy_task_detects_silent():
     fake = MagicMock(returncode=0, stdout="<Task><Actions>...--silent...</Actions></Task>")
     with patch("subprocess.run", return_value=fake):
