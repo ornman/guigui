@@ -389,7 +389,11 @@ class App(ctk.CTk):
         self._btn_save.show_feedback("✓ 已保存", "保存配置")
 
     def _apply_settings(self):
-        """应用设置：保存配置 + 联动轮询/定时任务/开机自启三个子系统。"""
+        """应用设置：保存配置 + 联动轮询/任务计划/开机自启三个子系统。
+
+        任务计划与开机自启均走 resilience 感知判断（与启动自愈一致）：
+        resilience 开启时，即使单独开关关掉也保持开启（互为兜底）。
+        """
         new_cfg = config.validate(self._read_form())
         self._cfg = new_cfg
         config.save(self._cfg)
@@ -403,18 +407,20 @@ class App(ctk.CTk):
         else:
             self._stop_polling()
 
-        # ── 定时任务 ──
-        if new_cfg.get("scheduled_login_enabled"):
+        # ── 任务计划（多触发器，resilience 感知） ──
+        if selfheal.should_task_be_enabled(new_cfg):
             time_str = new_cfg.get("scheduled_login_time", "06:55")
-            if scheduler.create_scheduled_task(time_str):
-                messages.append(f"定时任务 {time_str}")
+            interval = new_cfg.get("heartbeat_interval_minutes", 15)
+            if scheduler.create_scheduled_task_multi(time_str, interval):
+                messages.append(f"任务计划 {time_str}")
             else:
-                messages.append("定时任务创建失败")
+                messages.append("任务计划创建失败")
         else:
             scheduler.remove_scheduled_task()
+            messages.append("任务计划已移除")
 
-        # ── 开机自启 ──
-        if new_cfg.get("auto_start"):
+        # ── 开机自启（resilience 感知） ──
+        if selfheal.should_autostart_be_enabled(new_cfg):
             if autostart.enable():
                 messages.append("自启已开启")
             else:
