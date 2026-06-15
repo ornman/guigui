@@ -106,3 +106,61 @@ def get_scheduled_task_info() -> dict:
     except Exception:
         pass
     return info
+
+
+def create_scheduled_task_multi(time_str: str, interval_minutes: int = 15) -> bool:
+    """创建多触发器任务：登录时 + 每 N 分钟心跳 + 每天 time_str。都跑 --ensure。
+
+    Returns True on success.
+    """
+    if not _TIME_RE.match(time_str):
+        log.error("Invalid time format (expected HH:MM): %r", time_str)
+        return False
+
+    exe = _ps_escape(exe_path())
+    task = _ps_escape(TASK_NAME)
+    ps = (
+        "$action = New-ScheduledTaskAction "
+        f"-Execute {exe} -Argument '--ensure'; "
+        "$tLogon = New-ScheduledTaskTrigger -AtLogOn; "
+        "$tRepeat = New-ScheduledTaskTrigger -Once -At (Get-Date) "
+        f"-RepetitionInterval (New-TimeSpan -Minutes {int(interval_minutes)}) "
+        "-RepetitionDuration (New-TimeSpan -Days 3650); "
+        f"$tDaily = New-ScheduledTaskTrigger -Daily -At '{time_str}:00'; "
+        "$settings = New-ScheduledTaskSettingsSet "
+        "-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries "
+        "-StartWhenAvailable -WakeToRun "
+        "-ExecutionTimeLimit (New-TimeSpan -Minutes 5) "
+        "-MultipleInstances IgnoreNew; "
+        f"Register-ScheduledTask -TaskName {task} "
+        "-Action $action -Trigger @($tLogon, $tRepeat, $tDaily) "
+        "-Settings $settings -Force"
+    )
+    try:
+        r = subprocess.run(
+            ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps],
+            capture_output=True, text=True, timeout=30,
+        )
+        if r.returncode == 0:
+            log.info("Multi-trigger task created: %s (every %dmin + logon + daily %s)",
+                     TASK_NAME, interval_minutes, time_str)
+            return True
+        log.error("Failed to create multi-trigger task: %s", r.stderr.strip())
+        return False
+    except Exception as e:
+        log.error("Scheduler error: %s", e)
+        return False
+
+
+def is_legacy_task() -> bool:
+    """旧任务跑 --silent（单触发器），新版跑 --ensure（多触发器）。"""
+    try:
+        r = subprocess.run(
+            ["schtasks", "/query", "/tn", TASK_NAME, "/xml"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if r.returncode != 0:
+            return False
+        return "--silent" in r.stdout and "--ensure" not in r.stdout
+    except Exception:
+        return False
