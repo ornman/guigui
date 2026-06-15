@@ -47,7 +47,7 @@ def test_is_legacy_task_false_when_missing():
 def test_create_multi_rejects_bad_time():
     """非法 time_str 时直接返回 False，不调用 subprocess。"""
     with patch("subprocess.run") as run:
-        assert scheduler.create_scheduled_task_multi("25:99") is False
+        assert scheduler.create_scheduled_task_multi("6:55") is False
         run.assert_not_called()
 
 
