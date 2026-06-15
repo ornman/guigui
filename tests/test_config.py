@@ -15,7 +15,8 @@ class TestDefaults:
                      "retry_interval_seconds", "polling_enabled",
                      "polling_interval_seconds", "scheduled_login_enabled",
                      "scheduled_login_time", "auto_start",
-                     "notification_enabled"]
+                     "notification_enabled", "resilience_enabled",
+                     "heartbeat_interval_minutes"]
         for key in required:
             assert key in _DEFAULTS, f"Missing default: {key}"
 
@@ -56,3 +57,26 @@ class TestSave:
             loaded = load()
         assert loaded["username"] == original["username"]
         assert loaded["max_retries"] == original["max_retries"]
+
+
+class TestResilienceFields:
+    """意外恢复系统新增配置字段的校验测试。"""
+
+    def test_defaults_include_resilience_fields(self):
+        from src import config
+        d = config.validate({})
+        assert d["resilience_enabled"] is True
+        assert d["heartbeat_interval_minutes"] == 15
+        assert d["polling_enabled"] is True  # 默认改为开
+
+    def test_heartbeat_interval_invalid_falls_back(self):
+        from src import config
+        d = config.validate({"heartbeat_interval_minutes": 0})
+        assert d["heartbeat_interval_minutes"] == 15
+        d = config.validate({"heartbeat_interval_minutes": "x"})
+        assert d["heartbeat_interval_minutes"] == 15
+
+    def test_resilience_enabled_must_be_bool(self):
+        from src import config
+        d = config.validate({"resilience_enabled": "yes"})
+        assert d["resilience_enabled"] is True  # 非布尔 → 回退默认 True

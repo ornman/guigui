@@ -24,12 +24,14 @@ _DEFAULTS = {
     "password": "",
     "max_retries": 3,
     "retry_interval_seconds": 5,
-    "polling_enabled": False,
+    "polling_enabled": True,
     "polling_interval_seconds": 30,
     "scheduled_login_enabled": False,
     "scheduled_login_time": "06:55",
     "auto_start": False,
     "notification_enabled": True,
+    "resilience_enabled": True,
+    "heartbeat_interval_minutes": 15,
 }
 
 # ── 校验规则 ──
@@ -49,6 +51,8 @@ _VALIDATORS = [
     ("operator", str, lambda v: True, _DEFAULTS["operator"]),
     ("username", str, lambda v: True, _DEFAULTS["username"]),
     ("password", str, lambda v: True, _DEFAULTS["password"]),
+    ("resilience_enabled", bool, lambda v: True, _DEFAULTS["resilience_enabled"]),
+    ("heartbeat_interval_minutes", int, lambda v: v >= 1, _DEFAULTS["heartbeat_interval_minutes"]),
 ]
 
 
@@ -56,8 +60,10 @@ def validate(cfg: dict) -> dict:
     """校验并修正配置值，返回新的 dict（不修改原对象）。
 
     遍历 ``_VALIDATORS`` 中的每条规则：
-    1. 类型不匹配 → 使用默认值并记录警告日志
-    2. 校验函数返回 False → 使用默认值并记录警告日志
+    1. 键不存在 → 使用默认值
+    2. 类型不匹配 → 使用默认值并记录警告日志
+    3. 校验函数返回 False → 使用默认值并记录警告日志
+    4. 合法则保留原值
     """
     result = {**cfg}
     for key, expected_type, validator, fallback in _VALIDATORS:
@@ -71,6 +77,8 @@ def validate(cfg: dict) -> dict:
             log.warning("Config '%s': invalid value %r — using default %r",
                         key, value, fallback)
             result[key] = fallback
+        else:
+            result[key] = value
     return result
 
 
