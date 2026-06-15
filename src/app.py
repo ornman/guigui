@@ -40,6 +40,7 @@ class App(ctk.CTk):
         self._cfg = config.load()
         self._poll_thread: threading.Thread | None = None
         self._poll_stop = threading.Event()
+        self._last_notified_state: str | None = None
         self._build()
         self._fill_fields()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -476,6 +477,23 @@ class App(ctk.CTk):
                 log.info("Polling thread stopped")
         self._poll_thread = None
 
+    def _set_state(self, state: str):
+        """统一状态更新：UI 状态点 + 托盘图标 + 限流通知。
+
+        通知仅在「转入 connected」时发出一次，避免轮询每次都弹通知。
+        必须在主线程调用（更新 widget）。
+        """
+        self._status.set_state(state)
+        if self._tray:
+            self._tray.update_state(state)
+        # 通知限流：仅在状态转入 connected 时通知一次
+        if state == "connected" and self._last_notified_state != "connected":
+            if self._cfg.get("notification_enabled", True):
+                notify.send("校园网", "已连接")
+            self._last_notified_state = "connected"
+        elif state == "disconnected":
+            self._last_notified_state = "disconnected"
+
     def _poll_worker(self):
         """后台轮询循环：检查登录状态，断网时自动重连。
 
@@ -493,7 +511,7 @@ class App(ctk.CTk):
                 status = login_mod.check_auth_status()
 
                 if status == "logged_in":
-                    self.after(0, lambda: self._status.set_state("connected"))
+                    self.after(0, lambda: self._set_state("connected"))
                     continue
 
                 # 网络不可达 → 尝试 WiFi 切换恢复（可中断等待）
@@ -512,11 +530,11 @@ class App(ctk.CTk):
                     status = login_mod.check_auth_status()
 
                 if status == "logged_in":
-                    self.after(0, lambda: self._status.set_state("connected"))
+                    self.after(0, lambda: self._set_state("connected"))
                     continue
 
                 if status == "unreachable":
-                    self.after(0, lambda: self._status.set_state("disconnected"))
+                    self.after(0, lambda: self._set_state("disconnected"))
                     continue
 
                 # status == "not_logged_in" → 尝试登录
@@ -526,21 +544,32 @@ class App(ctk.CTk):
                         return
                     if login_mod.do_login(cfg):
                         log.info("Poll: reconnected successfully")
-                        self.after(0, lambda: self._status.set_state("connected"))
-                        if cfg.get("notification_enabled", True):
-                            notify.send("校园网自动重连", "已重新连接网络")
+                        self.after(0, lambda: self._set_state("connected"))
                         break
                 else:
                     log.warning("Poll: reconnect failed")
-                    self.after(0, lambda: self._status.set_state("disconnected"))
+                    self.after(0, lambda: self._set_state("disconnected"))
             except Exception as e:
                 log.error("Poll worker error: %s", e)
 
     # ── 登录 ────────────────────────────────────
 
     def _on_close(self):
-        """窗口关闭时优雅退出：先停止轮询线程再销毁窗口。"""
+        """关窗行为：resilience 开 → 隐藏到托盘并保活；否则真正退出。"""
+        if should_minimize_to_tray(self._cfg):
+            self._ensure_tray()
+            self.withdraw()  # 隐藏窗口，进程保活继续轮询
+            if self._cfg.get("notification_enabled", True):
+                notify.send("SchoolAutoLogin", "已在后台运行，断网自动重连")
+        else:
+            self._real_quit()
+
+    def _real_quit(self):
+        """真正退出：停轮询 + 停托盘 + 销毁窗口。"""
         self._stop_polling()
+        if self._tray is not None:
+            self._tray.stop()
+            self._tray = None
         self.destroy()
 
     def _do_login(self):
@@ -581,7 +610,7 @@ class App(ctk.CTk):
             self.after(0, lambda: self._done(False, str(e)))
 
     def _done(self, ok: bool, msg: str):
-        """登录完成回调：恢复按钮、更新状态指示器、发送桌面通知。
+        """登录完成回调：恢复按钮、更新状态指示器（通知由 _set_state 统一限流）。
 
         Args:
             ok: 登录是否成功。
@@ -590,11 +619,7 @@ class App(ctk.CTk):
         self._btn_login.set_state(True)
         if ok:
             self._btn_login.show_feedback(f"✓ {msg}", "立即登录")
-            self._status.set_state("connected")
-            if self._cfg.get("notification_enabled", True):
-                notify.send("校园网登录成功", msg)
+            self._set_state("connected")
         else:
             self._btn_login.show_feedback(f"✕ {msg}", "立即登录")
-            self._status.set_state("disconnected")
-            if self._cfg.get("notification_enabled", True):
-                notify.send("校园网登录失败", msg)
+            self._set_state("disconnected")
