@@ -19,6 +19,48 @@ def exe_path() -> str:
     return str(Path(sys.argv[0]).resolve())
 
 
+def _main_script() -> str:
+    """dev 模式入口脚本绝对路径（frozen 模式不用）。"""
+    return str(Path(sys.argv[0]).resolve())
+
+
+def _interpreter() -> str:
+    """dev 模式无窗口解释器：优先 pythonw.exe，缺失时回退 python.exe。"""
+    pyw = Path(sys.executable).with_name("pythonw.exe")
+    if pyw.exists():
+        return str(pyw)
+    return sys.executable
+
+
+def scheduled_action_parts(mode: str, *, executable: str | None = None,
+                           script: str | None = None) -> tuple[str, str]:
+    """构造 New-ScheduledTaskAction 的 (Execute, Argument)。
+
+    frozen → (exe, mode)：exe 自带入口，Argument 仅含模式参数。
+    dev   → (pythonw.exe, '"main.py" mode')：显式指定解释器，
+            绕开被 VSCode 等 UserChoice 抢占的 .py 关联。
+    """
+    if getattr(sys, "frozen", False):
+        return sys.executable, mode
+    exe = executable or _interpreter()
+    scr = script or _main_script()
+    return exe, f'"{scr}" {mode}'
+
+
+def autostart_command(*, executable: str | None = None,
+                      script: str | None = None) -> str:
+    """构造 HKCU Run 注册表值字符串。
+
+    frozen → '"exe"'
+    dev   → '"pythonw.exe" "main.py"'：无窗口且绕开 .py 关联。
+    """
+    if getattr(sys, "frozen", False):
+        return f'"{sys.executable}"'
+    exe = executable or _interpreter()
+    scr = script or _main_script()
+    return f'"{exe}" "{scr}"'
+
+
 def _ps_escape(s: str) -> str:
     """Escape a string for safe embedding in a PowerShell single-quoted string."""
     return "'" + s.replace("'", "''") + "'"
@@ -33,11 +75,11 @@ def create_scheduled_task(time_str: str) -> bool:
         log.error("Invalid time format (expected HH:MM): %r", time_str)
         return False
 
-    exe = _ps_escape(exe_path())
+    execute, argument = scheduled_action_parts("--silent")
     task = _ps_escape(TASK_NAME)
     ps = (
         "$action = New-ScheduledTaskAction "
-        f"-Execute {exe} -Argument '--silent'; "
+        f"-Execute {_ps_escape(execute)} -Argument {_ps_escape(argument)}; "
         f"$trigger = New-ScheduledTaskTrigger -Daily -At '{time_str}:00'; "
         "$settings = New-ScheduledTaskSettingsSet "
         "-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries "
@@ -120,11 +162,11 @@ def create_scheduled_task_multi(time_str: str, interval_minutes: int = 15) -> bo
         log.error("Invalid interval_minutes (must be int >= 1): %r", interval_minutes)
         return False
 
-    exe = _ps_escape(exe_path())
+    execute, argument = scheduled_action_parts("--ensure")
     task = _ps_escape(TASK_NAME)
     ps = (
         "$action = New-ScheduledTaskAction "
-        f"-Execute {exe} -Argument '--ensure'; "
+        f"-Execute {_ps_escape(execute)} -Argument {_ps_escape(argument)}; "
         "$tLogon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME; "
         "$tRepeat = New-ScheduledTaskTrigger -Once -At (Get-Date) "
         f"-RepetitionInterval (New-TimeSpan -Minutes {int(interval_minutes)}) "

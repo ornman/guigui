@@ -3,7 +3,7 @@
 import logging
 import winreg
 
-from .scheduler import exe_path
+from .scheduler import autostart_command
 
 log = logging.getLogger(__name__)
 
@@ -13,13 +13,13 @@ _REG_NAME = "SchoolAutoLogin"
 
 def enable() -> bool:
     """Register the app in HKCU Run key. Returns True on success."""
-    exe = exe_path()
+    cmd = autostart_command()
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, _REG_PATH, 0,
                              winreg.KEY_SET_VALUE)
-        winreg.SetValueEx(key, _REG_NAME, 0, winreg.REG_SZ, f'"{exe}"')
+        winreg.SetValueEx(key, _REG_NAME, 0, winreg.REG_SZ, cmd)
         winreg.CloseKey(key)
-        log.info("Auto-start enabled: %s", exe)
+        log.info("Auto-start enabled: %s", cmd)
         return True
     except Exception as e:
         log.error("Failed to enable auto-start: %s", e)
