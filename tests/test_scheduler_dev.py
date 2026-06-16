@@ -57,9 +57,13 @@ class TestInterpreterResolution:
         monkeypatch.setattr(scheduler.sys, "executable", str(tmp_path / "python.exe"))
         assert scheduler._interpreter() == str(pyw)
 
-    def test_falls_back_to_python_when_no_pythonw(self, tmp_path, monkeypatch):
+    def test_falls_back_to_python_when_no_pythonw(self, tmp_path, monkeypatch, caplog):
+        """pythonw.exe 缺失时回退 python.exe 并记 warning（便于排查控制台黑窗）。"""
         monkeypatch.setattr(scheduler.sys, "executable", str(tmp_path / "python.exe"))
-        assert scheduler._interpreter() == str(tmp_path / "python.exe")
+        with caplog.at_level("WARNING", logger="src.scheduler"):
+            result = scheduler._interpreter()
+        assert result == str(tmp_path / "python.exe")
+        assert any("pythonw" in r.getMessage() for r in caplog.records)
 
 
 def test_main_script_resolves_argv0(monkeypatch, tmp_path):

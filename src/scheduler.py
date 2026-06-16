@@ -29,6 +29,7 @@ def _interpreter() -> str:
     pyw = Path(sys.executable).with_name("pythonw.exe")
     if pyw.exists():
         return str(pyw)
+    log.warning("pythonw.exe 不存在（%s），回退 python.exe（任务计划可能短暂弹出控制台窗口）", pyw)
     return sys.executable
 
 
