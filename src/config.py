@@ -16,6 +16,12 @@ CONFIG_PATH = APP_DIR / "config.json"
 LOG_PATH = APP_DIR / "login.log"
 
 # ── 默认配置 ──
+# 窗口化自动化模型：
+#   scheduled_login_time  = 窗口中心（展示用，如 06:55）
+#   window_duration_minutes = 窗口总时长（前后各半，默认 60 → 06:25–07:25）
+#   heartbeat_interval_minutes = 窗口内每 N 分钟探测（默认 5）
+#   patrol_enabled / patrol_interval_minutes = 全天巡逻（默认关，每 30 分钟）
+#   resilience_enabled = 自动化总开关（窗口任务 + AtLogon 是否部署）
 _DEFAULTS = {
     "url": "http://10.1.2.3",
     "wifi_ssid": "",
@@ -24,50 +30,52 @@ _DEFAULTS = {
     "password": "",
     "max_retries": 3,
     "retry_interval_seconds": 5,
-    "polling_enabled": True,
-    "polling_interval_seconds": 30,
-    "scheduled_login_enabled": False,
     "scheduled_login_time": "06:55",
-    "auto_start": False,
+    "window_duration_minutes": 60,
+    "heartbeat_interval_minutes": 5,
+    "patrol_enabled": False,
+    "patrol_interval_minutes": 30,
     "notification_enabled": True,
     "resilience_enabled": True,
-    "heartbeat_interval_minutes": 15,
 }
 
 # ── 校验规则 ──
 # 每条规则：(键名, 期望类型, 校验 lambda, 不合法时的回退值)
-# polling_interval_seconds 下限为 5 秒，防止过于频繁导致认证服务器压力
+# 注意：validate 只保留 schema 内的键，旧版残留字段（polling_*/auto_start/
+# scheduled_login_enabled）会被丢弃，确保配置干净收敛到新模型。
 _VALIDATORS = [
     ("url", str, lambda v: v.startswith("http"), _DEFAULTS["url"]),
     ("max_retries", int, lambda v: v > 0, _DEFAULTS["max_retries"]),
     ("retry_interval_seconds", int, lambda v: v >= 0, _DEFAULTS["retry_interval_seconds"]),
-    ("polling_interval_seconds", int, lambda v: v >= 5, _DEFAULTS["polling_interval_seconds"]),
     ("scheduled_login_time", str, lambda v: bool(re.match(r"^\d{2}:\d{2}$", v)), _DEFAULTS["scheduled_login_time"]),
-    ("polling_enabled", bool, lambda v: True, _DEFAULTS["polling_enabled"]),
-    ("scheduled_login_enabled", bool, lambda v: True, _DEFAULTS["scheduled_login_enabled"]),
-    ("auto_start", bool, lambda v: True, _DEFAULTS["auto_start"]),
+    ("window_duration_minutes", int, lambda v: v > 0, _DEFAULTS["window_duration_minutes"]),
+    ("heartbeat_interval_minutes", int, lambda v: v >= 1, _DEFAULTS["heartbeat_interval_minutes"]),
+    ("patrol_interval_minutes", int, lambda v: v >= 1, _DEFAULTS["patrol_interval_minutes"]),
+    ("patrol_enabled", bool, lambda v: True, _DEFAULTS["patrol_enabled"]),
     ("notification_enabled", bool, lambda v: True, _DEFAULTS["notification_enabled"]),
+    ("resilience_enabled", bool, lambda v: True, _DEFAULTS["resilience_enabled"]),
     ("wifi_ssid", str, lambda v: True, _DEFAULTS["wifi_ssid"]),
     ("operator", str, lambda v: True, _DEFAULTS["operator"]),
     ("username", str, lambda v: True, _DEFAULTS["username"]),
     ("password", str, lambda v: True, _DEFAULTS["password"]),
-    ("resilience_enabled", bool, lambda v: True, _DEFAULTS["resilience_enabled"]),
-    ("heartbeat_interval_minutes", int, lambda v: v >= 1, _DEFAULTS["heartbeat_interval_minutes"]),
 ]
 
 
 def validate(cfg: dict) -> dict:
-    """校验并修正配置值，返回新的 dict（不修改原对象）。
+    """校验并修正配置值，返回仅含 schema 键的新 dict（不修改原对象）。
 
     遍历 ``_VALIDATORS`` 中的每条规则：
     1. 键不存在 → 使用默认值
     2. 类型不匹配 → 使用默认值并记录警告日志
     3. 校验函数返回 False → 使用默认值并记录警告日志
     4. 合法则保留原值
+
+    不在 schema 内的键（如旧版残留的 polling_*/auto_start）会被丢弃，
+    保证配置干净收敛到当前模型。
     """
-    result = {**cfg}
+    result: dict = {}
     for key, expected_type, validator, fallback in _VALIDATORS:
-        value = result.get(key, fallback)
+        value = cfg.get(key, fallback)
         if not isinstance(value, expected_type):
             log.warning("Config '%s': expected %s, got %s — using default %r",
                         key, expected_type.__name__, type(value).__name__, fallback)
