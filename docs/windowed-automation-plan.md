@@ -52,7 +52,7 @@ GUI 同时承担:设置界面 + 常驻守护(轮询)+ 托盘宿主;`--ensure` �
   - **已验证语法可行**(2026-06-17 实测 `New-ScheduledTaskTrigger -Daily -At "06:25"` + `.Repetition` 嫁接,输出 `Interval=PT5M Duration=PT1H`)
   - Action:`pythonw.exe "main.py" --ensure`(复用已修复的 `scheduled_action_parts`)
 - **新增** `create_patrol_task(interval)`:全天每 N 分钟一次(Once + Repetition,Duration 3650 天)
-- `create_scheduled_task_multi` 标记弃用(保留供迁移/回滚),或重构为按 config 选择窗口/巡逻
+- `create_scheduled_task_multi` **删除**(旧全天心跳模型整体移除);self-heal 迁移逻辑把现存旧全天任务转到「窗口任务」
 - 新增对应的 `is_windowed_task()` / `is_patrol_task()` 供 self-heal 对齐判断
 
 ### 3.2 `src/ensure.py`(治弹窗的关键)
@@ -125,9 +125,21 @@ GUI 同时承担:设置界面 + 常驻守护(轮询)+ 托盘宿主;`--ensure` �
 - 全程 git 分支/commit 粒度提交,可逐步 revert
 - `create_scheduled_task_multi` 保留备用,确保能恢复全天模型
 
-## 八、待用户审批确认的开放问题
-1. **开机自启 / AtLogon**:砍掉?(推荐)还是保留开机自启启动到托盘?
-2. **全天巡逻默认间隔**:10 分钟?
-3. **窗口时间**:固定 06:25–07:25,还是 GUI 可调窗口中心和时长?
-4. **通知策略**:仅"从断到通"发一次?失败是否通知?
-5. **`--silent` 模式**:保留还是并入 `--ensure`?
+## 八、最终决策(2026-06-17 已确认)
+1. **开机**:保留 `AtLogon` 触发器(登录 Windows 时静默 `--ensure` 登录一次);**删除开机自启 GUI**(HKCU Run)——避免开机弹窗。开机完全静默登录。
+2. **全天机制合并为单一开关**:GUI「全天巡逻」开关,默认**关**。
+   - 开 = 全天每 **30 分钟** `--ensure`(断网自动重连)
+   - 关 = 无任何全天后台
+   - **旧的"全天每 15 分钟心跳"删除**(不再作为独立机制,被巡逻完全取代,不保留两个名字)
+3. **窗口任务**:默认开,06:25–07:25 每 5 分钟;**GUI 可调**窗口中心和时长。
+4. **通知**:"从断到通" + "登录失败"各发一次;已登录不反复发(状态翻转去重)。
+5. **`--silent` 模式**:并入 `--ensure`(废弃 `--silent`,统一一个静默执行入口)。
+
+### 任务计划最终触发器
+| 触发器 | 默认 | 说明 |
+|---|---|---|
+| `AtLogon` | ✅ 开 | 开机/登录时静默登录一次 |
+| 窗口 `Daily + Repetition(PT5M/PT1H)` | ✅ 开 | 06:25–07:25 每 5 分钟,早起保底 |
+| 巡逻 `Once + Repetition(PT30M/3650d)` | ❌ 默认关 | 全天断网重连,GUI 开关控制 |
+| ~~全天每 15 分钟~~ | 🗑 删除 | 被巡逻取代 |
+| ~~开机自启 GUI(HKCU Run)~~ | 🗑 删除 | 避免开机弹窗 |
