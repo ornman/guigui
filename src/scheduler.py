@@ -9,6 +9,7 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 TASK_NAME = "SchoolAutoLogin"
+PATROL_TASK_NAME = "SchoolAutoLogin-Patrol"
 _TIME_RE = re.compile(r"^\d{2}:\d{2}$")
 
 
@@ -104,36 +105,36 @@ def create_scheduled_task(time_str: str) -> bool:
         return False
 
 
-def remove_scheduled_task() -> bool:
-    """Delete the scheduled task. Returns True on success."""
+def remove_scheduled_task(task_name: str = TASK_NAME) -> bool:
+    """Delete the scheduled task *task_name*. Returns True on success."""
     try:
         r = subprocess.run(
-            ["schtasks", "/delete", "/tn", TASK_NAME, "/f"],
+            ["schtasks", "/delete", "/tn", task_name, "/f"],
             capture_output=True, text=True, timeout=15,
         )
         if r.returncode == 0:
-            log.info("Scheduled task removed: %s", TASK_NAME)
+            log.info("Scheduled task removed: %s", task_name)
             return True
         # Task doesn't exist is not an error
         if "cannot find" in r.stderr.lower() or "找不到" in r.stderr:
-            log.info("Scheduled task does not exist, nothing to remove")
+            log.info("Scheduled task does not exist, nothing to remove: %s", task_name)
             return True
-        log.warning("Failed to remove task: %s", r.stderr.strip())
+        log.warning("Failed to remove task %s: %s", task_name, r.stderr.strip())
         return False
     except Exception as e:
         log.error("Remove task error: %s", e)
         return False
 
 
-def get_scheduled_task_info() -> dict:
-    """Query the scheduled task status.
+def get_scheduled_task_info(task_name: str = TASK_NAME) -> dict:
+    """Query the scheduled task *task_name* status.
 
     Returns dict with keys: exists (bool), next_run (str), enabled (bool).
     """
     info = {"exists": False, "next_run": "", "enabled": False}
     try:
         r = subprocess.run(
-            ["schtasks", "/query", "/tn", TASK_NAME, "/fo", "LIST"],
+            ["schtasks", "/query", "/tn", task_name, "/fo", "LIST"],
             capture_output=True, text=True, timeout=10,
         )
         if r.returncode != 0:
@@ -198,15 +199,171 @@ def create_scheduled_task_multi(time_str: str, interval_minutes: int = 15) -> bo
         return False
 
 
-def is_legacy_task() -> bool:
-    """旧任务跑 --silent（单触发器），新版跑 --ensure（多触发器）。"""
+# ── 窗口化任务（新模型）──────────────────────────────────────
+
+
+def window_start_from_center(center: str, duration_minutes: int) -> str:
+    """窗口中心(HH:MM) + 总时长(分钟) → 窗口起点(HH:MM)，跨午夜回绕。
+
+    例：``('06:55', 60) → '06:25'``（前后各 30 分钟）；
+    ``('00:10', 60) → '23:40'``（跨午夜）。奇数时长向前取整。
+    """
+    h, m = center.split(":")
+    total = (int(h) * 60 + int(m) - int(duration_minutes) // 2) % 1440
+    return f"{total // 60:02d}:{total % 60:02d}"
+
+
+def create_windowed_task(center_time: str, window_minutes: int,
+                         interval_minutes: int) -> bool:
+    """创建核心自动化任务：AtLogon(当前用户) + 窗口(Daily@start + Repetition)。
+
+    窗口起点 = ``center_time - window_minutes/2``，窗口内每 ``interval_minutes``
+    分钟跑一次 ``--ensure``。AtLogon 保证开机/登录时静默登录一次。
+
+    Returns True on success.
+    """
+    if not _TIME_RE.match(center_time):
+        log.error("Invalid center_time (expected HH:MM): %r", center_time)
+        return False
+    if not isinstance(window_minutes, int) or window_minutes < 1:
+        log.error("Invalid window_minutes (must be int >= 1): %r", window_minutes)
+        return False
+    if not isinstance(interval_minutes, int) or interval_minutes < 1:
+        log.error("Invalid interval_minutes (must be int >= 1): %r", interval_minutes)
+        return False
+
+    start = window_start_from_center(center_time, window_minutes)
+    execute, argument = scheduled_action_parts("--ensure")
+    task = _ps_escape(TASK_NAME)
+    ps = (
+        "$action = New-ScheduledTaskAction "
+        f"-Execute {_ps_escape(execute)} -Argument {_ps_escape(argument)}; "
+        f"$tWin = New-ScheduledTaskTrigger -Daily -At '{start}:00'; "
+        "$rep = New-ScheduledTaskTrigger -Once -At (Get-Date) "
+        f"-RepetitionInterval (New-TimeSpan -Minutes {int(interval_minutes)}) "
+        f"-RepetitionDuration (New-TimeSpan -Minutes {int(window_minutes)}); "
+        "$tWin.Repetition = $rep.Repetition; "
+        "$tLogon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME; "
+        "$settings = New-ScheduledTaskSettingsSet "
+        "-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries "
+        "-StartWhenAvailable -WakeToRun "
+        "-ExecutionTimeLimit (New-TimeSpan -Minutes 5) "
+        "-MultipleInstances IgnoreNew; "
+        f"Register-ScheduledTask -TaskName {task} "
+        "-Action $action -Trigger @($tWin, $tLogon) -Settings $settings -Force"
+    )
     try:
         r = subprocess.run(
-            ["schtasks", "/query", "/tn", TASK_NAME, "/xml"],
+            ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps],
+            capture_output=True, text=True, timeout=30,
+        )
+        if r.returncode == 0:
+            log.info("Windowed task created: %s (%s ±%dmin, every %dmin)",
+                     TASK_NAME, center_time, window_minutes // 2, interval_minutes)
+            return True
+        log.error("Failed to create windowed task: %s", r.stderr.strip())
+        return False
+    except Exception as e:
+        log.error("Scheduler error: %s", e)
+        return False
+
+
+def create_patrol_task(interval_minutes: int) -> bool:
+    """创建全天巡逻任务（独立任务名）：Once + Repetition(全天每 N 分钟)。
+
+    全天断网自动重连，由 GUI「全天巡逻」开关控制。Action 跑 ``--ensure``。
+
+    Returns True on success.
+    """
+    if not isinstance(interval_minutes, int) or interval_minutes < 1:
+        log.error("Invalid interval_minutes (must be int >= 1): %r", interval_minutes)
+        return False
+
+    execute, argument = scheduled_action_parts("--ensure")
+    task = _ps_escape(PATROL_TASK_NAME)
+    ps = (
+        "$action = New-ScheduledTaskAction "
+        f"-Execute {_ps_escape(execute)} -Argument {_ps_escape(argument)}; "
+        "$tPatrol = New-ScheduledTaskTrigger -Once -At (Get-Date) "
+        f"-RepetitionInterval (New-TimeSpan -Minutes {int(interval_minutes)}) "
+        "-RepetitionDuration (New-TimeSpan -Days 3650); "
+        "$settings = New-ScheduledTaskSettingsSet "
+        "-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries "
+        "-StartWhenAvailable -WakeToRun "
+        "-ExecutionTimeLimit (New-TimeSpan -Minutes 5) "
+        "-MultipleInstances IgnoreNew; "
+        f"Register-ScheduledTask -TaskName {task} "
+        "-Action $action -Trigger @($tPatrol) -Settings $settings -Force"
+    )
+    try:
+        r = subprocess.run(
+            ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps],
+            capture_output=True, text=True, timeout=30,
+        )
+        if r.returncode == 0:
+            log.info("Patrol task created: %s (every %dmin)",
+                     PATROL_TASK_NAME, interval_minutes)
+            return True
+        log.error("Failed to create patrol task: %s", r.stderr.strip())
+        return False
+    except Exception as e:
+        log.error("Scheduler error: %s", e)
+        return False
+
+
+# ── 任务类型检测（self-heal 对齐用）─────────────────────────
+
+
+def _task_xml(task_name: str = TASK_NAME) -> str | None:
+    """读取任务 XML；不存在/出错返回 None。"""
+    try:
+        r = subprocess.run(
+            ["schtasks", "/query", "/tn", task_name, "/xml"],
             capture_output=True, text=True, timeout=10,
         )
         if r.returncode != 0:
-            return False
-        return "--silent" in r.stdout and "--ensure" not in r.stdout
+            return None
+        return r.stdout
     except Exception:
+        return None
+
+
+def _calendar_trigger_has_repetition(xml: str) -> bool:
+    """XML 中是否存在「含 Repetition 的 CalendarTrigger」（窗口任务标志）。
+
+    旧多触发器任务的 CalendarTrigger 无 Repetition（其 Repetition 在 TimeTrigger 上），
+    据此区分新窗口模型与旧模型。
+    """
+    for m in re.finditer(r"<CalendarTrigger\b.*?</CalendarTrigger>", xml, re.IGNORECASE | re.DOTALL):
+        if "<Repetition>" in m.group(0):
+            return True
+    return False
+
+
+def is_windowed_task() -> bool:
+    """核心任务是否已为窗口模型（--ensure + LogonTrigger + 窗口 CalendarTrigger）。"""
+    xml = _task_xml(TASK_NAME)
+    if not xml:
         return False
+    return ("--ensure" in xml
+            and "<LogonTrigger>" in xml
+            and _calendar_trigger_has_repetition(xml))
+
+
+def is_patrol_task() -> bool:
+    """巡逻任务是否已注册为正确模型（--ensure + TimeTrigger/Repetition，无登录/窗口触发器）。"""
+    xml = _task_xml(PATROL_TASK_NAME)
+    if not xml:
+        return False
+    return ("--ensure" in xml
+            and "<TimeTrigger>" in xml
+            and "<Repetition>" in xml
+            and "<LogonTrigger>" not in xml
+            and "<CalendarTrigger>" not in xml)
+
+
+def is_legacy_task() -> bool:
+    """核心任务存在但不符合窗口模型 → 需迁移（含旧 --silent 与旧多触发器 --ensure）。"""
+    if not _task_xml(TASK_NAME):
+        return False
+    return not is_windowed_task()
