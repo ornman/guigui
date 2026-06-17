@@ -30,15 +30,15 @@ Source: "dist\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "dist\config.json"; DestDir: "{app}"; Flags: confirmoverwrite
 
 [Tasks]
-Name: "createtask"; Description: "创建每日定时登录任务（06:55）"; GroupDescription: "定时任务:"; \
+Name: "createtask"; Description: "创建自动登录任务（开机登录 + 06:25–07:25 每 5 分钟保底）"; GroupDescription: "定时任务:"; \
     Flags: checkedonce
 
 [Run]
 Filename: "powershell.exe"; \
-    Parameters: "-ExecutionPolicy Bypass -Command ""$exe = '{app}\{#AppExeName}'; $action = New-ScheduledTaskAction -Execute $exe -Argument '--silent'; $trigger = New-ScheduledTaskTrigger -Daily -At '06:55:00'; $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -WakeToRun -ExecutionTimeLimit (New-TimeSpan -Minutes 5); Register-ScheduledTask -TaskName '{#TaskName}' -Action $action -Trigger $trigger -Settings $settings -Force"""; \
+    Parameters: "-ExecutionPolicy Bypass -Command ""$exe = '{app}\{#AppExeName}'; $action = New-ScheduledTaskAction -Execute $exe -Argument '--ensure'; $tWin = New-ScheduledTaskTrigger -Daily -At '06:25:00'; $rep = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Minutes 60); $tWin.Repetition = $rep.Repetition; $tLogon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME; $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -WakeToRun -ExecutionTimeLimit (New-TimeSpan -Minutes 5) -MultipleInstances IgnoreNew; Register-ScheduledTask -TaskName '{#TaskName}' -Action $action -Trigger @($tWin, $tLogon) -Settings $settings -Force"""; \
     Flags: runhidden; \
     Tasks: createtask; \
-    StatusMsg: "正在配置定时登录任务..."
+    StatusMsg: "正在配置自动登录任务..."
 
 [Code]
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

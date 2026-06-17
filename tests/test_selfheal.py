@@ -1,60 +1,131 @@
+"""self-heal：窗口化任务模型的对齐测试。
+
+核心任务 SchoolAutoLogin（AtLogon + 窗口）由 resilience_enabled 控制；
+巡逻任务 SchoolAutoLogin-Patrol 由 resilience_enabled AND patrol_enabled 控制。
+"""
+
 from unittest.mock import patch
-from src import selfheal
+
+from src import scheduler, selfheal
 
 
-def test_should_autostart_when_resilience_on():
-    assert selfheal.should_autostart_be_enabled({"resilience_enabled": True, "auto_start": False}) is True
+# ── should_* 判定 ─────────────────────────────────────
 
 
-def test_should_not_autostart_when_both_off():
-    assert selfheal.should_autostart_be_enabled({"resilience_enabled": False, "auto_start": False}) is False
+def test_core_task_on_when_resilience():
+    assert selfheal.should_core_task_exist({"resilience_enabled": True}) is True
 
 
-def test_reconcile_autostart_enables_when_missing():
-    with patch("src.autostart.is_enabled", return_value=False), \
-         patch("src.autostart.enable") as enable:
-        changed = selfheal.reconcile_autostart({"resilience_enabled": True})
-    assert changed is True
-    enable.assert_called_once()
+def test_core_task_off_when_resilience_off():
+    assert selfheal.should_core_task_exist({"resilience_enabled": False}) is False
 
 
-def test_reconcile_autostart_noop_when_aligned():
-    with patch("src.autostart.is_enabled", return_value=True), \
-         patch("src.autostart.enable") as enable:
-        changed = selfheal.reconcile_autostart({"resilience_enabled": True})
-    assert changed is False
-    enable.assert_not_called()
+def test_patrol_on_only_when_resilience_and_patrol():
+    assert selfheal.should_patrol_task_exist(
+        {"resilience_enabled": True, "patrol_enabled": True}) is True
 
 
-def test_reconcile_scheduler_recreates_when_missing():
-    with patch("src.scheduler.get_scheduled_task_info",
-               return_value={"exists": False}), \
+def test_patrol_off_when_patrol_disabled():
+    assert selfheal.should_patrol_task_exist(
+        {"resilience_enabled": True, "patrol_enabled": False}) is False
+
+
+def test_patrol_off_when_resilience_off():
+    """resilience 关 → 全自动停，巡逻也停。"""
+    assert selfheal.should_patrol_task_exist(
+        {"resilience_enabled": False, "patrol_enabled": True}) is False
+
+
+_BASE = {"scheduled_login_time": "06:55", "window_duration_minutes": 60,
+         "heartbeat_interval_minutes": 5, "patrol_interval_minutes": 30}
+
+
+def test_reconcile_creates_windowed_when_missing():
+    cfg = {"resilience_enabled": True, "patrol_enabled": False, **_BASE}
+    with patch("src.scheduler.is_windowed_task", return_value=False), \
          patch("src.scheduler.is_legacy_task", return_value=False), \
-         patch("src.scheduler.create_scheduled_task_multi") as create:
-        changed = selfheal.reconcile_scheduler(
-            {"resilience_enabled": True, "scheduled_login_enabled": True,
-             "scheduled_login_time": "06:55", "heartbeat_interval_minutes": 15})
-    assert changed is True
-    create.assert_called_once_with("06:55", 15)
-
-
-def test_reconcile_scheduler_migrates_legacy():
-    with patch("src.scheduler.get_scheduled_task_info",
-               return_value={"exists": True}), \
-         patch("src.scheduler.is_legacy_task", return_value=True), \
-         patch("src.scheduler.create_scheduled_task_multi") as create:
-        changed = selfheal.reconcile_scheduler(
-            {"resilience_enabled": True, "scheduled_login_enabled": True,
-             "scheduled_login_time": "07:00", "heartbeat_interval_minutes": 20})
-    assert changed is True
-    create.assert_called_once_with("07:00", 20)
-
-
-def test_reconcile_scheduler_removes_when_disabled():
-    with patch("src.scheduler.get_scheduled_task_info",
-               return_value={"exists": True}), \
+         patch("src.scheduler.is_patrol_task", return_value=False), \
+         patch("src.scheduler.create_windowed_task") as create_win, \
+         patch("src.scheduler.create_patrol_task") as create_patrol, \
          patch("src.scheduler.remove_scheduled_task") as remove:
-        changed = selfheal.reconcile_scheduler(
-            {"resilience_enabled": False, "scheduled_login_enabled": False})
+        changed = selfheal.reconcile_scheduler(cfg)
     assert changed is True
-    remove.assert_called_once()
+    create_win.assert_called_once_with("06:55", 60, 5)
+    create_patrol.assert_not_called()
+    remove.assert_not_called()
+
+
+def test_reconcile_migrates_legacy_core():
+    cfg = {"resilience_enabled": True, "patrol_enabled": False, **_BASE}
+    with patch("src.scheduler.is_windowed_task", return_value=False), \
+         patch("src.scheduler.is_legacy_task", return_value=True), \
+         patch("src.scheduler.is_patrol_task", return_value=False), \
+         patch("src.scheduler.create_windowed_task") as create_win:
+        changed = selfheal.reconcile_scheduler(cfg)
+    assert changed is True
+    create_win.assert_called_once_with("06:55", 60, 5)
+
+
+def test_reconcile_noop_when_core_correct():
+    cfg = {"resilience_enabled": True, "patrol_enabled": False, **_BASE}
+    with patch("src.scheduler.is_windowed_task", return_value=True), \
+         patch("src.scheduler.is_legacy_task", return_value=False), \
+         patch("src.scheduler.is_patrol_task", return_value=False), \
+         patch("src.scheduler.create_windowed_task") as create_win, \
+         patch("src.scheduler.remove_scheduled_task") as remove:
+        changed = selfheal.reconcile_scheduler(cfg)
+    assert changed is False
+    create_win.assert_not_called()
+    remove.assert_not_called()
+
+
+def test_reconcile_removes_core_when_disabled():
+    cfg = {"resilience_enabled": False, "patrol_enabled": False, **_BASE}
+    with patch("src.scheduler.is_windowed_task", return_value=True), \
+         patch("src.scheduler.is_legacy_task", return_value=False), \
+         patch("src.scheduler.is_patrol_task", return_value=False), \
+         patch("src.scheduler.remove_scheduled_task") as remove:
+        changed = selfheal.reconcile_scheduler(cfg)
+    assert changed is True
+    # 核心任务用默认名移除
+    remove.assert_any_call()
+
+
+def test_reconcile_creates_patrol_when_enabled():
+    cfg = {"resilience_enabled": True, "patrol_enabled": True, **_BASE}
+    with patch("src.scheduler.is_windowed_task", return_value=True), \
+         patch("src.scheduler.is_legacy_task", return_value=False), \
+         patch("src.scheduler.is_patrol_task", return_value=False), \
+         patch("src.scheduler.create_patrol_task") as create_patrol:
+        changed = selfheal.reconcile_scheduler(cfg)
+    assert changed is True
+    create_patrol.assert_called_once_with(30)
+
+
+def test_reconcile_removes_patrol_when_disabled():
+    cfg = {"resilience_enabled": True, "patrol_enabled": False, **_BASE}
+    with patch("src.scheduler.is_windowed_task", return_value=True), \
+         patch("src.scheduler.is_legacy_task", return_value=False), \
+         patch("src.scheduler.is_patrol_task", return_value=True), \
+         patch("src.scheduler.remove_scheduled_task") as remove:
+        changed = selfheal.reconcile_scheduler(cfg)
+    assert changed is True
+    # 巡逻任务用独立名移除
+    remove.assert_called_with(scheduler.PATROL_TASK_NAME)
+
+
+def test_reconcile_removes_both_when_resilience_off():
+    """resilience 关 → 核心与巡逻任务都应移除。"""
+    cfg = {"resilience_enabled": False, "patrol_enabled": True, **_BASE}
+    with patch("src.scheduler.is_windowed_task", return_value=True), \
+         patch("src.scheduler.is_legacy_task", return_value=False), \
+         patch("src.scheduler.is_patrol_task", return_value=True), \
+         patch("src.scheduler.remove_scheduled_task") as remove:
+        changed = selfheal.reconcile_scheduler(cfg)
+    assert changed is True
+    assert remove.call_count == 2
+    calls = remove.call_args_list
+    # 核心任务用默认名（无位置参数）
+    assert any(c.args == () and not c.kwargs for c in calls)
+    # 巡逻任务用独立名
+    assert any(c.args == (scheduler.PATROL_TASK_NAME,) for c in calls)

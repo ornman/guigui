@@ -176,25 +176,3 @@ class TestTaskDetection:
         with patch("subprocess.run",
                    return_value=MagicMock(returncode=0, stdout=_WINDOW_XML)):
             assert scheduler.is_patrol_task() is False
-
-
-# ── 旧版多触发器任务（仍保留，迁移期兼容）──────────────────────
-
-
-class TestCreateMultiTaskStillPresent:
-    """create_scheduled_task_multi 在迁移完成前仍保留。"""
-
-    def test_has_three_triggers_and_ensure_arg(self):
-        captured, fake = _capture_ps()
-        with patch("subprocess.run", side_effect=fake):
-            scheduler.create_scheduled_task_multi("06:55", interval_minutes=15)
-        ps = " ".join(captured["cmd"])
-        assert "--ensure" in ps
-        assert "-AtLogOn -User $env:USERNAME" in ps
-        assert "New-TimeSpan -Minutes 15" in ps
-        assert "-Daily -At '06:55:00'" in ps
-
-    def test_rejects_bad_time(self):
-        with patch("subprocess.run") as run:
-            assert scheduler.create_scheduled_task_multi("6:55") is False
-            run.assert_not_called()

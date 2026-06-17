@@ -1,58 +1,63 @@
-"""自修复：把任务计划 / 自启注册表按 config 意图幂等对齐。
+"""自修复：把任务计划按 config 意图幂等对齐到窗口化模型。
 
-只在"缺失 / 规格不符 / 状态不符"时动手，不覆盖用户的对齐状态。
-自启与任务计划互为兜底：任一存活即可重建另一个。
+窗口化模型两个任务：
+  - 核心任务 SchoolAutoLogin（AtLogon + 窗口 Daily/Repetition）← resilience_enabled
+  - 巡逻任务 SchoolAutoLogin-Patrol（全天 Repetition）           ← resilience AND patrol_enabled
+
+仅在「缺失 / 旧版需迁移 / 应关却存在」时动手，不覆盖已对齐状态。
 """
 
 import logging
 
-from . import autostart, scheduler
+from . import scheduler
 
 log = logging.getLogger(__name__)
 
 
-def should_autostart_be_enabled(cfg: dict) -> bool:
-    """resilience 开 或 auto_start 开 → 自启应为开。"""
-    return bool(cfg.get("resilience_enabled", True) or cfg.get("auto_start"))
+def should_core_task_exist(cfg: dict) -> bool:
+    """resilience 开 → 核心窗口任务（含 AtLogon）应为开。"""
+    return bool(cfg.get("resilience_enabled", True))
 
 
-def should_task_be_enabled(cfg: dict) -> bool:
-    """scheduled_login 开 或 resilience 开 → 多触发器任务应为开。"""
-    return bool(cfg.get("scheduled_login_enabled", False)
-                or cfg.get("resilience_enabled", True))
-
-
-def reconcile_autostart(cfg: dict) -> bool:
-    """对齐自启注册表，返回是否做了改动。"""
-    want = should_autostart_be_enabled(cfg)
-    current = autostart.is_enabled()
-    if want and not current:
-        autostart.enable()
-        log.info("Self-heal: 重新开启自启")
-        return True
-    if not want and current:
-        autostart.disable()
-        log.info("Self-heal: 关闭自启")
-        return True
-    return False
+def should_patrol_task_exist(cfg: dict) -> bool:
+    """resilience 开 且 patrol 开 → 全天巡逻任务应为开。"""
+    return bool(cfg.get("resilience_enabled", True) and cfg.get("patrol_enabled", False))
 
 
 def reconcile_scheduler(cfg: dict) -> bool:
-    """对齐任务计划（缺失→重建 / 旧版→迁移 / 应关却存在→删除），返回是否改动。"""
-    want = should_task_be_enabled(cfg)
-    info = scheduler.get_scheduled_task_info()
-    time_str = cfg.get("scheduled_login_time", "06:55")
-    interval = cfg.get("heartbeat_interval_minutes", 15)
-    if want and not info.get("exists"):
-        scheduler.create_scheduled_task_multi(time_str, interval)
-        log.info("Self-heal: 重建任务计划")
-        return True
-    if want and info.get("exists") and scheduler.is_legacy_task():
-        scheduler.create_scheduled_task_multi(time_str, interval)
-        log.info("Self-heal: 迁移旧任务到多触发器")
-        return True
-    if not want and info.get("exists"):
-        scheduler.remove_scheduled_task()
-        log.info("Self-heal: 删除任务计划")
-        return True
-    return False
+    """对齐任务计划到窗口化模型，返回是否做了改动。
+
+    核心任务：应开时缺失/旧版则建（迁移），不应开时存在则删。
+    巡逻任务：应开时缺失则建，不应开时存在则删。
+    """
+    changed = False
+    center = cfg.get("scheduled_login_time", "06:55")
+    window = cfg.get("window_duration_minutes", 60)
+    interval = cfg.get("heartbeat_interval_minutes", 5)
+    patrol_interval = cfg.get("patrol_interval_minutes", 30)
+
+    # ── 核心窗口任务 ──
+    if should_core_task_exist(cfg):
+        if not scheduler.is_windowed_task():  # 缺失或旧版 → 建/迁移
+            scheduler.create_windowed_task(center, window, interval)
+            log.info("Self-heal: 创建/迁移核心窗口任务")
+            changed = True
+    else:
+        if scheduler.is_windowed_task() or scheduler.is_legacy_task():
+            scheduler.remove_scheduled_task()
+            log.info("Self-heal: 移除核心任务（自动化已停用）")
+            changed = True
+
+    # ── 巡逻任务 ──
+    if should_patrol_task_exist(cfg):
+        if not scheduler.is_patrol_task():
+            scheduler.create_patrol_task(patrol_interval)
+            log.info("Self-heal: 创建巡逻任务")
+            changed = True
+    else:
+        if scheduler.is_patrol_task():
+            scheduler.remove_scheduled_task(scheduler.PATROL_TASK_NAME)
+            log.info("Self-heal: 移除巡逻任务")
+            changed = True
+
+    return changed

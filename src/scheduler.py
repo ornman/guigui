@@ -49,60 +49,9 @@ def scheduled_action_parts(mode: str, *, executable: str | None = None,
     return exe, f'"{scr}" {mode}'
 
 
-def autostart_command(*, executable: str | None = None,
-                      script: str | None = None) -> str:
-    """构造 HKCU Run 注册表值字符串。
-
-    frozen → '"exe"'
-    dev   → '"pythonw.exe" "main.py"'：无窗口且绕开 .py 关联。
-    """
-    if getattr(sys, "frozen", False):
-        return f'"{sys.executable}"'
-    exe = executable or _interpreter()
-    scr = script or _main_script()
-    return f'"{exe}" "{scr}"'
-
-
 def _ps_escape(s: str) -> str:
     """Escape a string for safe embedding in a PowerShell single-quoted string."""
     return "'" + s.replace("'", "''") + "'"
-
-
-def create_scheduled_task(time_str: str) -> bool:
-    """Create or update a daily scheduled task at *time_str* (HH:MM).
-
-    Returns True on success.
-    """
-    if not _TIME_RE.match(time_str):
-        log.error("Invalid time format (expected HH:MM): %r", time_str)
-        return False
-
-    execute, argument = scheduled_action_parts("--silent")
-    task = _ps_escape(TASK_NAME)
-    ps = (
-        "$action = New-ScheduledTaskAction "
-        f"-Execute {_ps_escape(execute)} -Argument {_ps_escape(argument)}; "
-        f"$trigger = New-ScheduledTaskTrigger -Daily -At '{time_str}:00'; "
-        "$settings = New-ScheduledTaskSettingsSet "
-        "-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries "
-        "-StartWhenAvailable -WakeToRun "
-        "-ExecutionTimeLimit (New-TimeSpan -Minutes 5); "
-        f"Register-ScheduledTask -TaskName {task} "
-        "-Action $action -Trigger $trigger -Settings $settings -Force"
-    )
-    try:
-        r = subprocess.run(
-            ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps],
-            capture_output=True, text=True, timeout=30,
-        )
-        if r.returncode == 0:
-            log.info("Scheduled task created/updated: %s at %s", TASK_NAME, time_str)
-            return True
-        log.error("Failed to create task: %s", r.stderr.strip())
-        return False
-    except Exception as e:
-        log.error("Scheduler error: %s", e)
-        return False
 
 
 def remove_scheduled_task(task_name: str = TASK_NAME) -> bool:
@@ -150,53 +99,6 @@ def get_scheduled_task_info(task_name: str = TASK_NAME) -> dict:
     except Exception:
         pass
     return info
-
-
-def create_scheduled_task_multi(time_str: str, interval_minutes: int = 15) -> bool:
-    """创建多触发器任务：登录时 + 每 N 分钟心跳 + 每天 time_str。都跑 --ensure。
-
-    Returns True on success.
-    """
-    if not _TIME_RE.match(time_str):
-        log.error("Invalid time format (expected HH:MM): %r", time_str)
-        return False
-    if not isinstance(interval_minutes, int) or interval_minutes < 1:
-        log.error("Invalid interval_minutes (must be int >= 1): %r", interval_minutes)
-        return False
-
-    execute, argument = scheduled_action_parts("--ensure")
-    task = _ps_escape(TASK_NAME)
-    ps = (
-        "$action = New-ScheduledTaskAction "
-        f"-Execute {_ps_escape(execute)} -Argument {_ps_escape(argument)}; "
-        "$tLogon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME; "
-        "$tRepeat = New-ScheduledTaskTrigger -Once -At (Get-Date) "
-        f"-RepetitionInterval (New-TimeSpan -Minutes {int(interval_minutes)}) "
-        "-RepetitionDuration (New-TimeSpan -Days 3650); "
-        f"$tDaily = New-ScheduledTaskTrigger -Daily -At '{time_str}:00'; "
-        "$settings = New-ScheduledTaskSettingsSet "
-        "-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries "
-        "-StartWhenAvailable -WakeToRun "
-        "-ExecutionTimeLimit (New-TimeSpan -Minutes 5) "
-        "-MultipleInstances IgnoreNew; "
-        f"Register-ScheduledTask -TaskName {task} "
-        "-Action $action -Trigger @($tLogon, $tRepeat, $tDaily) "
-        "-Settings $settings -Force"
-    )
-    try:
-        r = subprocess.run(
-            ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps],
-            capture_output=True, text=True, timeout=30,
-        )
-        if r.returncode == 0:
-            log.info("Multi-trigger task created: %s (every %dmin + logon + daily %s)",
-                     TASK_NAME, interval_minutes, time_str)
-            return True
-        log.error("Failed to create multi-trigger task: %s", r.stderr.strip())
-        return False
-    except Exception as e:
-        log.error("Scheduler error: %s", e)
-        return False
 
 
 # ── 窗口化任务（新模型）──────────────────────────────────────

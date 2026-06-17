@@ -24,7 +24,6 @@ a = Analysis(
         'src.ui.components',
         'src.ui.theme',
         'src.scheduler',
-        'src.autostart',
         'src.instance',
         'src.selfheal',
         'src.ensure',

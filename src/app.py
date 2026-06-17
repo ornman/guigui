@@ -1,4 +1,8 @@
-"""SchoolAutoLogin — 主窗口。"""
+"""SchoolAutoLogin — 主窗口（设置前端 + 手动登录）。
+
+GUI 非常驻：设完即关，绝不被自动拉起。后台自动化全部交给任务计划
+（窗口任务 + 可选巡逻），两者通过 self-heal 在 GUI 启动/应用设置时对齐。
+"""
 
 import logging
 import threading
@@ -7,7 +11,7 @@ import customtkinter as ctk
 
 log = logging.getLogger(__name__)
 
-from . import autostart, config, wifi
+from . import config
 from . import login as login_mod
 from . import notify, scheduler
 from .ui import theme as T
@@ -16,14 +20,8 @@ from . import selfheal
 from .tray import Tray
 
 
-def should_auto_start(cfg: dict) -> bool:
-    """启动即自动登录 + 自动轮询的条件：resilience 开 且 有凭据。"""
-    return bool(cfg.get("resilience_enabled", True)
-                and cfg.get("username") and cfg.get("password"))
-
-
 def should_minimize_to_tray(cfg: dict) -> bool:
-    """关窗行为：resilience 开 → 最小化到托盘；否则正常退出。"""
+    """关窗行为：resilience 开 → 最小化到托盘保活；否则正常退出。"""
     return bool(cfg.get("resilience_enabled", True))
 
 
@@ -38,21 +36,14 @@ class App(ctk.CTk):
         self.resizable(True, True)
 
         self._cfg = config.load()
-        self._poll_thread: threading.Thread | None = None
-        self._poll_stop = threading.Event()
-        self._last_notified_state: str | None = None
+        self._tray: Tray | None = None
         self._build()
         self._fill_fields()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        # ── L1 自主启动 + L5 启动自愈 ──
-        self._tray: Tray | None = None
-        if should_auto_start(self._cfg):
-            self.after(0, self._auto_login_on_launch)
-        # 启动自愈：对齐任务计划/自启（互为兜底的上半边）
+        # 启动自愈：对齐任务计划到窗口化模型（核心窗口 + 可选巡逻）
         try:
             selfheal.reconcile_scheduler(self._cfg)
-            selfheal.reconcile_autostart(self._cfg)
         except Exception as e:
             log.warning("Startup self-heal error: %s", e)
 
@@ -222,7 +213,7 @@ class App(ctk.CTk):
     # ── 设置面板 ───────────────────────────────────
 
     def _build_settings(self, parent):
-        """构建设置面板：WiFi 名称、断网重连、定时登录、开机自启、通知开关。"""
+        """构建设置面板：WiFi、自动化（窗口/巡逻/总开关）、通知。"""
         p = ctk.CTkFrame(parent, fg_color="transparent")
 
         self._section(p, "// WiFi 名称")
@@ -234,32 +225,43 @@ class App(ctk.CTk):
         ).pack(fill="x", pady=(0, T.SPACE_XS))
         self._wifi_entry = self._entry(p, placeholder="留空跳过 WiFi 切换")
 
-        self._section(p, "// 重连")
-        self._sw_poll = self._switch(p, "断网自动重连")
+        # ── 自动化 ──
+        self._section(p, "// 自动化")
+        self._sw_resilience = self._switch(p, "启用自动化（窗口登录）")
+
         r1 = ctk.CTkFrame(p, fg_color="transparent")
         r1.pack(fill="x", pady=(T.SPACE_SM, T.SPACE_SM))
-        ctk.CTkLabel(r1, text="检测间隔（秒）", font=T.F_SWITCH_VAL,
+        ctk.CTkLabel(r1, text="窗口时间 HH:MM", font=T.F_SWITCH_VAL,
                      text_color=T.TEXT_DIM).pack(side="left")
-        self._poll_interval = ctk.CTkEntry(
+        self._win_time = ctk.CTkEntry(
             r1, width=72, height=28, fg_color=T.BG,
             border_color=T.BORDER, text_color=T.TEXT,
             font=T.F_SWITCH_VAL, corner_radius=T.R)
-        self._poll_interval.pack(side="right")
+        self._win_time.pack(side="right")
 
-        self._section(p, "// 定时")
-        self._sw_sched = self._switch(p, "定时登录")
         r2 = ctk.CTkFrame(p, fg_color="transparent")
-        r2.pack(fill="x", pady=(T.SPACE_SM, T.SPACE_SM))
-        ctk.CTkLabel(r2, text="执行时间 HH:MM", font=T.F_SWITCH_VAL,
+        r2.pack(fill="x", pady=(0, T.SPACE_SM))
+        ctk.CTkLabel(r2, text="窗口内间隔（分）", font=T.F_SWITCH_VAL,
                      text_color=T.TEXT_DIM).pack(side="left")
-        self._sched_time = ctk.CTkEntry(
+        self._win_interval = ctk.CTkEntry(
             r2, width=72, height=28, fg_color=T.BG,
             border_color=T.BORDER, text_color=T.TEXT,
             font=T.F_SWITCH_VAL, corner_radius=T.R)
-        self._sched_time.pack(side="right")
+        self._win_interval.pack(side="right")
 
+        self._sw_patrol = self._switch(p, "全天巡逻（断网重连）")
+        r3 = ctk.CTkFrame(p, fg_color="transparent")
+        r3.pack(fill="x", pady=(T.SPACE_SM, T.SPACE_SM))
+        ctk.CTkLabel(r3, text="巡逻间隔（分）", font=T.F_SWITCH_VAL,
+                     text_color=T.TEXT_DIM).pack(side="left")
+        self._patrol_interval = ctk.CTkEntry(
+            r3, width=72, height=28, fg_color=T.BG,
+            border_color=T.BORDER, text_color=T.TEXT,
+            font=T.F_SWITCH_VAL, corner_radius=T.R)
+        self._patrol_interval.pack(side="right")
+
+        # ── 系统 ──
         self._section(p, "// 系统")
-        self._sw_autostart = self._switch(p, "开机自启")
         self._sw_notify = self._switch(p, "桌面通知")
 
         self._btn_apply = BrutalButton(p, text="应用设置",
@@ -339,16 +341,15 @@ class App(ctk.CTk):
         self._user.insert(0, c.get("username", ""))
         self._pw.insert(0, c.get("password", ""))
         self._wifi_entry.insert(0, c.get("wifi_ssid", ""))
-        self._poll_interval.insert(0,
-                                    str(c.get("polling_interval_seconds", 30)))
-        self._sched_time.insert(0,
-                                 c.get("scheduled_login_time", "06:55"))
-        if c.get("polling_enabled"):
-            self._sw_poll.select()
-        if c.get("scheduled_login_enabled"):
-            self._sw_sched.select()
-        if c.get("auto_start"):
-            self._sw_autostart.select()
+        self._win_time.insert(0, c.get("scheduled_login_time", "06:55"))
+        self._win_interval.insert(0,
+                                   str(c.get("heartbeat_interval_minutes", 5)))
+        self._patrol_interval.insert(0,
+                                      str(c.get("patrol_interval_minutes", 30)))
+        if c.get("resilience_enabled", True):
+            self._sw_resilience.select()
+        if c.get("patrol_enabled"):
+            self._sw_patrol.select()
         if c.get("notification_enabled", True):
             self._sw_notify.select()
 
@@ -359,15 +360,17 @@ class App(ctk.CTk):
         c["username"] = self._user.get()
         c["password"] = self._pw.get()
         c["wifi_ssid"] = self._wifi_entry.get()
-        c["polling_enabled"] = self._sw_poll.get() == 1
+        c["scheduled_login_time"] = self._win_time.get() or "06:55"
         try:
-            c["polling_interval_seconds"] = int(
-                self._poll_interval.get() or "30")
+            c["heartbeat_interval_minutes"] = int(self._win_interval.get() or "5")
         except ValueError:
-            c["polling_interval_seconds"] = 30
-        c["scheduled_login_enabled"] = self._sw_sched.get() == 1
-        c["scheduled_login_time"] = self._sched_time.get() or "06:55"
-        c["auto_start"] = self._sw_autostart.get() == 1
+            c["heartbeat_interval_minutes"] = 5
+        try:
+            c["patrol_interval_minutes"] = int(self._patrol_interval.get() or "30")
+        except ValueError:
+            c["patrol_interval_minutes"] = 30
+        c["resilience_enabled"] = self._sw_resilience.get() == 1
+        c["patrol_enabled"] = self._sw_patrol.get() == 1
         c["notification_enabled"] = self._sw_notify.get() == 1
         return c
 
@@ -389,58 +392,33 @@ class App(ctk.CTk):
         self._btn_save.show_feedback("✓ 已保存", "保存配置")
 
     def _apply_settings(self):
-        """应用设置：保存配置 + 联动轮询/任务计划/开机自启三个子系统。
+        """应用设置：保存配置 + 联动任务计划（核心窗口 + 可选巡逻）。
 
-        任务计划与开机自启均走 resilience 感知判断（与启动自愈一致）：
-        resilience 开启时，即使单独开关关掉也保持开启（互为兜底）。
+        走 self-heal 对齐：resilience 开 → 窗口任务；patrol 开 → 巡逻任务；
+        对应关闭则删除。GUI 自身不再常驻轮询，断网重连交给巡逻任务。
         """
         new_cfg = config.validate(self._read_form())
         self._cfg = new_cfg
         config.save(self._cfg)
 
         messages: list[str] = []
+        try:
+            selfheal.reconcile_scheduler(new_cfg)
+        except Exception as e:
+            log.warning("Apply: 任务对齐失败: %s", e)
+            messages.append("任务对齐失败")
 
-        # ── 轮询（断网自动重连） ──
-        if new_cfg.get("polling_enabled"):
-            self._start_polling()
-            messages.append("轮询已开启")
+        if new_cfg.get("resilience_enabled", True):
+            messages.append(f"窗口登录 {new_cfg.get('scheduled_login_time')}")
+            if new_cfg.get("patrol_enabled"):
+                messages.append("全天巡逻已开")
         else:
-            self._stop_polling()
+            messages.append("自动化已停用")
 
-        # ── 任务计划（多触发器，resilience 感知） ──
-        if selfheal.should_task_be_enabled(new_cfg):
-            time_str = new_cfg.get("scheduled_login_time", "06:55")
-            interval = new_cfg.get("heartbeat_interval_minutes", 15)
-            if scheduler.create_scheduled_task_multi(time_str, interval):
-                messages.append(f"任务计划 {time_str}")
-            else:
-                messages.append("任务计划创建失败")
-        else:
-            scheduler.remove_scheduled_task()
-            messages.append("任务计划已移除")
-
-        # ── 开机自启（resilience 感知） ──
-        if selfheal.should_autostart_be_enabled(new_cfg):
-            if autostart.enable():
-                messages.append("自启已开启")
-            else:
-                messages.append("自启设置失败")
-        else:
-            autostart.disable()
-
-        feedback = "✓ " + "、".join(messages) if messages else "✓ 已应用"
+        feedback = "✓ " + "、".join(messages)
         self._btn_apply.show_feedback(feedback, "应用设置")
 
-    # ── 轮询（断网自动重连） ─────────────────────
-
-    def _auto_login_on_launch(self):
-        """启动即触发一次登录，并在 resilience 下持续轮询。"""
-        if self._cfg.get("resilience_enabled", True) or self._cfg.get("polling_enabled"):
-            self._start_polling()
-        # 后台登录一次
-        self._status.set_state("busy")
-        threading.Thread(target=self._login_worker, args=(self._cfg.copy(),),
-                         daemon=True).start()
+    # ── 托盘 / 关窗 ─────────────────────────────────
 
     def _current_state(self) -> str:
         """供托盘读取的当前状态。"""
@@ -463,120 +441,28 @@ class App(ctk.CTk):
     def _quit_from_tray(self):
         self.after(0, self._real_quit)
 
-    def _start_polling(self):
-        """启动或重启轮询守护线程。"""
-        self._stop_polling()
-        self._poll_stop.clear()
-        self._poll_thread = threading.Thread(
-            target=self._poll_worker, daemon=True)
-        self._poll_thread.start()
-        log.info("Polling thread started")
-
-    def _stop_polling(self):
-        """停止轮询线程（等待最多 5 秒）。"""
-        if self._poll_thread and self._poll_thread.is_alive():
-            self._poll_stop.set()
-            self._poll_thread.join(timeout=5)
-            if self._poll_thread.is_alive():
-                log.warning("Polling thread did not stop within timeout")
-            else:
-                log.info("Polling thread stopped")
-        self._poll_thread = None
-
     def _set_state(self, state: str):
-        """统一状态更新：UI 状态点 + 托盘图标 + 限流通知。
-
-        通知仅在「转入 connected」时发出一次，避免轮询每次都弹通知。
-        必须在主线程调用（更新 widget）。
-        """
+        """统一状态更新：UI 状态点 + 托盘图标（主线程调用）。"""
         self._status.set_state(state)
         if self._tray:
             self._tray.update_state(state)
-        # 通知限流：仅在状态转入 connected 时通知一次
-        if state == "connected" and self._last_notified_state != "connected":
-            if self._cfg.get("notification_enabled", True):
-                notify.send("校园网", "已连接")
-            self._last_notified_state = "connected"
-        elif state == "disconnected":
-            self._last_notified_state = "disconnected"
-
-    def _poll_worker(self):
-        """后台轮询循环：检查登录状态，断网时自动重连。
-
-        使用 ``threading.Event.wait(timeout=...)`` 实现可中断等待，
-        避免线程无法响应停止信号。所有 UI 更新通过 ``self.after(0, ...)``
-        调度到主线程执行（customtkinter 非线程安全）。
-        """
-        import time
-
-        while not self._poll_stop.wait(
-            timeout=self._cfg.get("polling_interval_seconds", 30)
-        ):
-            try:
-                cfg = self._cfg
-                status = login_mod.check_auth_status()
-
-                if status == "logged_in":
-                    self.after(0, lambda: self._set_state("connected"))
-                    continue
-
-                # 网络不可达 → 尝试 WiFi 切换恢复（可中断等待）
-                if status == "unreachable" and cfg.get("wifi_ssid"):
-                    if self._poll_stop.is_set():
-                        return
-                    wifi.connect(cfg["wifi_ssid"])
-                    # 可中断的网络等待：每 3 秒检查一次，随时可停止
-                    deadline = time.time() + 30
-                    while time.time() < deadline:
-                        if self._poll_stop.is_set():
-                            return
-                        if login_mod.check_auth_status() != "unreachable":
-                            break
-                        self._poll_stop.wait(timeout=3)
-                    status = login_mod.check_auth_status()
-
-                if status == "logged_in":
-                    self.after(0, lambda: self._set_state("connected"))
-                    continue
-
-                if status == "unreachable":
-                    self.after(0, lambda: self._set_state("disconnected"))
-                    continue
-
-                # status == "not_logged_in" → 尝试登录
-                log.info("Poll: disconnected, attempting reconnect...")
-                for _ in range(cfg.get("max_retries", 3)):
-                    if self._poll_stop.is_set():
-                        return
-                    if login_mod.do_login(cfg):
-                        log.info("Poll: reconnected successfully")
-                        self.after(0, lambda: self._set_state("connected"))
-                        break
-                else:
-                    log.warning("Poll: reconnect failed")
-                    self.after(0, lambda: self._set_state("disconnected"))
-            except Exception as e:
-                log.error("Poll worker error: %s", e)
-
-    # ── 登录 ────────────────────────────────────
 
     def _on_close(self):
-        """关窗行为：resilience 开 → 隐藏到托盘并保活；否则真正退出。"""
+        """关窗行为：resilience 开 → 隐藏到托盘保活；否则真正退出。"""
         if should_minimize_to_tray(self._cfg):
             self._ensure_tray()
-            self.withdraw()  # 隐藏窗口，进程保活继续轮询
-            if self._cfg.get("notification_enabled", True):
-                notify.send("SchoolAutoLogin", "已在后台运行，断网自动重连")
+            self.withdraw()  # 隐藏窗口，进程保活
         else:
             self._real_quit()
 
     def _real_quit(self):
-        """真正退出：停轮询 + 停托盘 + 销毁窗口。"""
-        self._stop_polling()
+        """真正退出：停托盘 + 销毁窗口。"""
         if self._tray is not None:
             self._tray.stop()
             self._tray = None
         self.destroy()
+
+    # ── 登录 ────────────────────────────────────
 
     def _do_login(self):
         """验证表单 → 保存 → 禁用按钮 → 在后台线程执行登录。"""
@@ -616,7 +502,7 @@ class App(ctk.CTk):
             self.after(0, lambda: self._done(False, str(e)))
 
     def _done(self, ok: bool, msg: str):
-        """登录完成回调：恢复按钮、更新状态指示器（通知由 _set_state 统一限流）。
+        """登录完成回调：恢复按钮、更新状态指示器。
 
         Args:
             ok: 登录是否成功。

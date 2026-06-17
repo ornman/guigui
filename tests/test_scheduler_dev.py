@@ -1,7 +1,7 @@
-"""测试 dev 模式下任务计划/自启命令显式指定解释器，绕开被抢占的 .py 关联。
+"""测试 dev 模式下任务计划命令显式指定解释器，绕开被抢占的 .py 关联。
 
 背景：Windows UserChoice 可把 .py 关联到 VSCode（编辑器）而非 Python 解释器，
-导致 dev 模式 Action=main.py / 自启值="main.py" 被 VSCode 拦截、进程空转
+导致 dev 模式 Action=main.py 被 VSCode 拦截、进程空转
 （任务触发但 Python 根本没跑，LastResult=0x41303 未运行，login.log 无新增）。
 修复：dev 模式显式拼 pythonw.exe + main.py，frozen 模式保持原样。
 """
@@ -20,11 +20,6 @@ class TestScheduledActionParts:
         assert exe == "PYW"
         assert arg == '"MAIN" --ensure'
 
-    def test_dev_uses_explicit_interpreter_for_silent(self):
-        exe, arg = scheduler.scheduled_action_parts("--silent", executable="PYW", script="MAIN")
-        assert exe == "PYW"
-        assert arg == '"MAIN" --silent'
-
     def test_frozen_exe_is_self_with_mode(self, monkeypatch):
         """frozen：Execute=exe 自身，Argument=mode（exe 自带入口，无需脚本）。"""
         monkeypatch.setattr(scheduler.sys, "frozen", True, raising=False)
@@ -32,20 +27,6 @@ class TestScheduledActionParts:
         exe, arg = scheduler.scheduled_action_parts("--ensure")
         assert exe == r"C:\app\SchoolAutoLogin.exe"
         assert arg == "--ensure"
-
-
-class TestAutostartCommand:
-    """autostart_command：返回 HKCU Run 注册表值字符串。"""
-
-    def test_dev_uses_pythonw_and_script(self):
-        """dev：'"pythonw" "main"'，无窗口且绕开 .py 关联。"""
-        assert scheduler.autostart_command(executable="PYW", script="MAIN") == '"PYW" "MAIN"'
-
-    def test_frozen_exe_quoted(self, monkeypatch):
-        """frozen：'"exe"'（直接运行 exe）。"""
-        monkeypatch.setattr(scheduler.sys, "frozen", True, raising=False)
-        monkeypatch.setattr(scheduler.sys, "executable", r"C:\app\SchoolAutoLogin.exe")
-        assert scheduler.autostart_command() == r'"C:\app\SchoolAutoLogin.exe"'
 
 
 class TestInterpreterResolution:

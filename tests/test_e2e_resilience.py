@@ -1,6 +1,6 @@
-"""端到端集成测试：真实 Windows 子系统（任务计划/注册表/互斥量/子进程）。
+"""端到端集成测试：真实 Windows 子系统（任务计划/互斥量/子进程）。
 
-这些测试会修改真实的任务计划和注册表，默认跳过。
+这些测试会修改真实的任务计划，默认跳过。
 运行：set RUN_E2E=1 && python -m pytest tests/test_e2e_resilience.py -v
 """
 
@@ -10,85 +10,114 @@ import sys
 
 import pytest
 
-from src import scheduler, selfheal, instance, autostart
+from src import scheduler, selfheal, instance
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("RUN_E2E"),
-    reason="E2E 测试改动真实任务计划/注册表；设置 RUN_E2E=1 后运行",
+    reason="E2E 测试改动真实任务计划；设置 RUN_E2E=1 后运行",
 )
 
 _TEST_MUTEX = "Local\\SchoolAutoLogin-E2E-Test"
 
 
 @pytest.fixture
-def clean_task():
-    """每个测试前后确保 SchoolAutoLogin 任务计划不存在。"""
+def clean_tasks():
+    """每个测试前后确保核心与巡逻任务计划都不存在。"""
     scheduler.remove_scheduled_task()
+    scheduler.remove_scheduled_task(scheduler.PATROL_TASK_NAME)
     yield
     scheduler.remove_scheduled_task()
+    scheduler.remove_scheduled_task(scheduler.PATROL_TASK_NAME)
 
 
-@pytest.fixture
-def clean_autostart():
-    """每个测试前后确保自启注册表键不存在。"""
-    autostart.disable()
-    yield
-    autostart.disable()
+def _register_legacy_silent_task():
+    """注册一个旧版 --silent 单触发器每日任务（迁移源）。"""
+    ps = (
+        "$a = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument '/c echo legacy'; "
+        "$t = New-ScheduledTaskTrigger -Daily -At '06:55:00'; "
+        "$s = New-ScheduledTaskSettingsSet; "
+        "Register-ScheduledTask -TaskName 'SchoolAutoLogin' "
+        "-Action $a -Trigger $t -Settings $s -Force"
+    )
+    subprocess.run(
+        ["powershell", "-NoProfile", "-Command", ps],
+        capture_output=True, timeout=20,
+    )
 
 
-def test_multi_trigger_task_registers_real_triggers(clean_task):
-    """真实注册多触发器任务，校验 XML 含三触发器 + --ensure + IgnoreNew。"""
-    assert scheduler.create_scheduled_task_multi("06:55", 5) is True
-
+def _task_xml(name):
     r = subprocess.run(
-        ["schtasks", "/query", "/tn", scheduler.TASK_NAME, "/xml"],
+        ["schtasks", "/query", "/tn", name, "/xml"],
         capture_output=True, text=True, timeout=15,
     )
-    assert r.returncode == 0
-    xml = r.stdout
-    assert "--ensure" in xml            # 跑 --ensure，非 --silent
-    assert "<LogonTrigger>" in xml      # 登录时触发器（① 开机代理）
-    assert "<Repetition>" in xml        # 心跳重复触发器（③ 看门狗代理）
-    assert "<CalendarTrigger>" in xml   # 每日触发器
-    assert "IgnoreNew" in xml           # 防重叠实例堆积
+    return r.stdout if r.returncode == 0 else ""
+
+
+def test_windowed_task_registers_real_triggers(clean_tasks):
+    """真实注册窗口任务：XML 含 CalendarTrigger+Repetition(PT5M/PT1H) + LogonTrigger。"""
+    assert scheduler.create_windowed_task("06:55", 60, 5) is True
+    xml = _task_xml(scheduler.TASK_NAME)
+    assert "--ensure" in xml
+    assert "<LogonTrigger>" in xml
+    assert "<CalendarTrigger>" in xml
+    assert "<Interval>PT5M</Interval>" in xml
+    assert "<Duration>PT1H</Duration>" in xml
+    assert "IgnoreNew" in xml
+    assert scheduler.is_windowed_task() is True
     assert scheduler.is_legacy_task() is False
 
 
-def test_selfheal_rebuilds_deleted_task(clean_task):
-    """场景 ④a：删掉任务计划后，reconcile_scheduler 重建（多触发器 --ensure）。"""
-    cfg = {"resilience_enabled": True, "scheduled_login_enabled": False,
-           "scheduled_login_time": "06:55", "heartbeat_interval_minutes": 5}
-    assert not scheduler.get_scheduled_task_info()["exists"]
+def test_patrol_task_registers_all_day_repetition(clean_tasks):
+    """真实注册巡逻任务：TimeTrigger + Repetition PT30M，独立任务名。"""
+    assert scheduler.create_patrol_task(30) is True
+    xml = _task_xml(scheduler.PATROL_TASK_NAME)
+    assert "--ensure" in xml
+    assert "<TimeTrigger>" in xml
+    assert "<Interval>PT30M</Interval>" in xml
+    assert "<LogonTrigger>" not in xml
+    assert scheduler.is_patrol_task() is True
+
+
+def test_selfheal_rebuilds_windowed_when_deleted(clean_tasks):
+    """删掉核心任务后，reconcile_scheduler 重建窗口任务。"""
+    cfg = {"resilience_enabled": True, "patrol_enabled": False,
+           "scheduled_login_time": "06:55", "window_duration_minutes": 60,
+           "heartbeat_interval_minutes": 5, "patrol_interval_minutes": 30}
+    assert not scheduler.is_windowed_task()
 
     changed = selfheal.reconcile_scheduler(cfg)
 
     assert changed is True
-    assert scheduler.get_scheduled_task_info()["exists"] is True
-    assert scheduler.is_legacy_task() is False
+    assert scheduler.is_windowed_task() is True
 
 
-def test_selfheal_migrates_legacy_task(clean_task):
-    """旧 --silent 任务被 reconcile_scheduler 迁移成 --ensure 多触发器。"""
-    cfg = {"resilience_enabled": True, "scheduled_login_enabled": True,
-           "scheduled_login_time": "06:55", "heartbeat_interval_minutes": 5}
-    assert scheduler.create_scheduled_task("06:55") is True   # legacy --silent
+def test_selfheal_migrates_legacy_task(clean_tasks):
+    """旧 --silent 单触发器任务被 reconcile_scheduler 迁移成窗口任务。"""
+    _register_legacy_silent_task()
     assert scheduler.is_legacy_task() is True
+    assert scheduler.is_windowed_task() is False
 
+    cfg = {"resilience_enabled": True, "patrol_enabled": False,
+           "scheduled_login_time": "06:55", "window_duration_minutes": 60,
+           "heartbeat_interval_minutes": 5, "patrol_interval_minutes": 30}
     changed = selfheal.reconcile_scheduler(cfg)
 
     assert changed is True
+    assert scheduler.is_windowed_task() is True
     assert scheduler.is_legacy_task() is False
 
 
-def test_selfheal_reenables_deleted_autostart(clean_autostart):
-    """场景 ④b：删掉自启注册表后，reconcile_autostart 重建（resilience 开）。"""
-    cfg = {"resilience_enabled": True, "auto_start": False}
-    assert autostart.is_enabled() is False
+def test_selfheal_creates_and_removes_patrol(clean_tasks):
+    """patrol 开 → 建巡逻；patrol 关 → 删巡逻。"""
+    cfg_on = {"resilience_enabled": True, "patrol_enabled": True,
+              "scheduled_login_time": "06:55", "window_duration_minutes": 60,
+              "heartbeat_interval_minutes": 5, "patrol_interval_minutes": 20}
+    selfheal.reconcile_scheduler(cfg_on)
+    assert scheduler.is_patrol_task() is True
 
-    changed = selfheal.reconcile_autostart(cfg)
-
-    assert changed is True
-    assert autostart.is_enabled() is True
+    cfg_off = {**cfg_on, "patrol_enabled": False}
+    selfheal.reconcile_scheduler(cfg_off)
+    assert scheduler.is_patrol_task() is False
 
 
 def test_single_instance_mutex_blocks_second_holder():
@@ -107,7 +136,7 @@ def test_single_instance_mutex_blocks_second_holder():
 
 
 def test_ensure_subprocess_exits_zero():
-    """真实跑 python main.py --ensure，退出码 0（心跳可独立运行）。"""
+    """真实跑 python main.py --ensure，退出码 0（静默执行体可独立运行）。"""
     r = subprocess.run(
         [sys.executable, "main.py", "--ensure"],
         capture_output=True, timeout=60,

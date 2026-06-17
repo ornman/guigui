@@ -9,6 +9,9 @@ installer_output/
 # Config (contains credentials)
 config.json
 
+# Ensure cross-process notification state
+ensure_state.json
+
 # Python
 __pycache__/
 *.pyc
