@@ -96,8 +96,9 @@ def get_scheduled_task_info(task_name: str = TASK_NAME) -> dict:
             elif line.startswith("Status:"):
                 status = line.split(":", 1)[1].strip().lower()
                 info["enabled"] = status in ("ready", "running", "正在运行")
-    except Exception:
-        pass
+    except Exception as e:
+        # 查询失败 ≠ 任务缺失：记录日志，避免 self-heal 误判后反复重建
+        log.warning("get_scheduled_task_info(%s) 查询失败: %s", task_name, e)
     return info
 
 
@@ -226,7 +227,9 @@ def _task_xml(task_name: str = TASK_NAME) -> str | None:
         if r.returncode != 0:
             return None
         return r.stdout
-    except Exception:
+    except Exception as e:
+        # 查询失败时返回 None（视同缺失），但记录日志便于排查 self-heal 反复重建
+        log.warning("_task_xml(%s) 查询失败: %s", task_name, e)
         return None
 
 

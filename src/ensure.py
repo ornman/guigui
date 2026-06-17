@@ -9,6 +9,8 @@
 
 import json
 import logging
+import os
+import tempfile
 
 from . import config, login as login_mod, notify
 from .config import APP_DIR
@@ -55,11 +57,26 @@ def _load_prev_state() -> str | None:
 
 
 def _save_prev_state(state: str) -> None:
-    """持久化本次状态（失败只记日志，不影响主流程）。"""
+    """持久化本次状态（原子写，失败只记日志，不影响主流程）。
+
+    窗口任务/巡逻/AtLogon 可能并发触发多个 --ensure 进程，用「临时文件 + os.replace」
+    保证写入原子性，避免并发读到半截 JSON。
+    """
+    data = json.dumps({"last_state": state})
+    tmp = None
     try:
-        STATE_PATH.write_text(json.dumps({"last_state": state}), encoding="utf-8")
+        fd, tmp = tempfile.mkstemp(dir=str(STATE_PATH.parent), suffix=".tmp",
+                                    prefix=".ensure_state_")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(data)
+        os.replace(tmp, STATE_PATH)
     except Exception as e:
         log.warning("Ensure: 状态持久化失败: %s", e)
+        if tmp and os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
 
 def run() -> int:

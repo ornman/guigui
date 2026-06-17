@@ -79,6 +79,17 @@ def test_reconcile_noop_when_core_correct():
     remove.assert_not_called()
 
 
+def test_reconcile_not_changed_when_create_fails():
+    """创建任务失败（PowerShell 报错）→ changed 为 False，不谎报成功。"""
+    cfg = {"resilience_enabled": True, "patrol_enabled": False, **_BASE}
+    with patch("src.scheduler.is_windowed_task", return_value=False), \
+         patch("src.scheduler.is_legacy_task", return_value=False), \
+         patch("src.scheduler.is_patrol_task", return_value=False), \
+         patch("src.scheduler.create_windowed_task", return_value=False):
+        changed = selfheal.reconcile_scheduler(cfg)
+    assert changed is False
+
+
 def test_reconcile_removes_core_when_disabled():
     cfg = {"resilience_enabled": False, "patrol_enabled": False, **_BASE}
     with patch("src.scheduler.is_windowed_task", return_value=True), \

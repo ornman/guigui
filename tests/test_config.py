@@ -91,6 +91,14 @@ class TestWindowedAutomationFields:
         from src import config
         assert config.validate({"patrol_enabled": "yes"})["patrol_enabled"] is False
 
+    def test_int_fields_reject_bool(self):
+        """bool 是 int 的子类：JSON true/false 不应被当作整数接受。"""
+        from src import config
+        assert config.validate({"window_duration_minutes": True})["window_duration_minutes"] == 60
+        assert config.validate({"patrol_interval_minutes": True})["patrol_interval_minutes"] == 30
+        assert config.validate({"max_retries": False})["max_retries"] == 3
+        assert config.validate({"heartbeat_interval_minutes": True})["heartbeat_interval_minutes"] == 5
+
     def test_heartbeat_interval_invalid_falls_back(self):
         from src import config
         d = config.validate({"heartbeat_interval_minutes": 0})

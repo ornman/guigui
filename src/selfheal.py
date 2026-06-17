@@ -39,25 +39,33 @@ def reconcile_scheduler(cfg: dict) -> bool:
     # ── 核心窗口任务 ──
     if should_core_task_exist(cfg):
         if not scheduler.is_windowed_task():  # 缺失或旧版 → 建/迁移
-            scheduler.create_windowed_task(center, window, interval)
-            log.info("Self-heal: 创建/迁移核心窗口任务")
-            changed = True
+            if scheduler.create_windowed_task(center, window, interval):
+                log.info("Self-heal: 创建/迁移核心窗口任务")
+                changed = True
+            else:
+                log.error("Self-heal: 创建核心窗口任务失败")
     else:
         if scheduler.is_windowed_task() or scheduler.is_legacy_task():
-            scheduler.remove_scheduled_task()
-            log.info("Self-heal: 移除核心任务（自动化已停用）")
-            changed = True
+            if scheduler.remove_scheduled_task():
+                log.info("Self-heal: 移除核心任务（自动化已停用）")
+                changed = True
+            else:
+                log.error("Self-heal: 移除核心任务失败")
 
     # ── 巡逻任务 ──
     if should_patrol_task_exist(cfg):
         if not scheduler.is_patrol_task():
-            scheduler.create_patrol_task(patrol_interval)
-            log.info("Self-heal: 创建巡逻任务")
-            changed = True
+            if scheduler.create_patrol_task(patrol_interval):
+                log.info("Self-heal: 创建巡逻任务")
+                changed = True
+            else:
+                log.error("Self-heal: 创建巡逻任务失败")
     else:
         if scheduler.is_patrol_task():
-            scheduler.remove_scheduled_task(scheduler.PATROL_TASK_NAME)
-            log.info("Self-heal: 移除巡逻任务")
-            changed = True
+            if scheduler.remove_scheduled_task(scheduler.PATROL_TASK_NAME):
+                log.info("Self-heal: 移除巡逻任务")
+                changed = True
+            else:
+                log.error("Self-heal: 移除巡逻任务失败")
 
     return changed

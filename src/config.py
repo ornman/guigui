@@ -76,6 +76,12 @@ def validate(cfg: dict) -> dict:
     result: dict = {}
     for key, expected_type, validator, fallback in _VALIDATORS:
         value = cfg.get(key, fallback)
+        # bool 是 int 的子类：JSON true/false 不应被当作整数字段接受
+        if isinstance(value, bool) and expected_type is not bool:
+            log.warning("Config '%s': expected %s, got bool — using default %r",
+                        key, expected_type.__name__, fallback)
+            result[key] = fallback
+            continue
         if not isinstance(value, expected_type):
             log.warning("Config '%s': expected %s, got %s — using default %r",
                         key, expected_type.__name__, type(value).__name__, fallback)
