@@ -107,3 +107,54 @@ class TestWindowedTaskDetection:
         xml = self._xml(f'"{main_py}" --ensure')
         with patch("src.scheduler._task_xml", return_value=xml):
             assert scheduler.is_windowed_task() is True
+
+
+class TestActionScriptExists:
+    """_action_script_exists：脚本路径存在性 + XML 实体反转义 + 无引号兜底。"""
+
+    def test_unescapes_xml_entities_in_path(self, tmp_path):
+        """schtasks /xml 会把路径中的 & 转义为 &amp;；必须反转义后校验，否则好任务被误判。"""
+        script = tmp_path / "A&B" / "s.py"
+        script.parent.mkdir()
+        script.touch()
+        raw = str(script).replace("&", "&amp;")  # 模拟 schtasks 导出的转义
+        xml = f'<Arguments>"{raw}" --ensure</Arguments>'
+        assert scheduler._action_script_exists(xml) is True
+
+    def test_true_when_no_quoted_path(self):
+        """frozen 模式 Argument 仅含 mode（无引号路径）→ 视为有效，不误判。"""
+        assert scheduler._action_script_exists("<Arguments>--ensure</Arguments>") is True
+
+    def test_true_when_no_arguments_node(self):
+        """无 Arguments 节点不阻断。"""
+        assert scheduler._action_script_exists("<Task></Task>") is True
+
+
+class TestPatrolTaskDetection:
+    """is_patrol_task：与核心任务一致，Action 脚本路径必须真实存在（修复范围一致性）。"""
+
+    @staticmethod
+    def _xml(arguments: str) -> str:
+        """构造结构正确的巡逻任务 XML（TimeTrigger+Repetition，无登录/窗口触发器）。"""
+        return (
+            "<Task><Actions><Exec><Command>pythonw.exe</Command>"
+            f"<Arguments>{arguments}</Arguments></Exec></Actions>"
+            "<Triggers>"
+            "<TimeTrigger><Enabled>true</Enabled>"
+            "<Repetition><Interval>PT30M</Interval></Repetition>"
+            "</TimeTrigger>"
+            "</Triggers></Task>"
+        )
+
+    def test_rejects_when_action_script_missing(self):
+        """巡逻任务 Action 指向不存在的脚本 → False（与核心任务修复范围一致）。"""
+        xml = self._xml(r'"C:\nonexistent\-c" --ensure')
+        with patch("src.scheduler._task_xml", return_value=xml):
+            assert scheduler.is_patrol_task() is False
+
+    def test_accepts_when_action_script_exists(self):
+        """巡逻任务 Action 指向真实 main.py → True。"""
+        main_py = Path(scheduler.__file__).resolve().parent.parent / "main.py"
+        xml = self._xml(f'"{main_py}" --ensure')
+        with patch("src.scheduler._task_xml", return_value=xml):
+            assert scheduler.is_patrol_task() is True

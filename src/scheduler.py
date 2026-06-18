@@ -5,6 +5,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from xml.sax.saxutils import unescape
 
 log = logging.getLogger(__name__)
 
@@ -259,8 +260,9 @@ def _action_script_exists(xml: str) -> bool:
 
     Arguments 形如 ``"<main.py 绝对路径>" --ensure``；提取首个双引号内路径并校验存在性。
     坏任务（如历史 ``python -c`` 污染产生的 ``"<cwd>\\-c"``）脚本不存在 → 返回 False，
-    使 ``is_windowed_task`` 判定为非窗口任务、触发 self-heal 重建，避免故障任务长期苟活。
+    使 ``is_windowed_task``/``is_patrol_task`` 判定为需迁移，触发 self-heal 重建，避免故障任务长期苟活。
     无 Arguments 节点或无可识别脚本路径（frozen 模式 Argument 仅含 mode）→ 视为有效。
+    路径经 XML 实体反转义（``schtasks /xml`` 会把 ``&`` 等转义为 ``&amp;``），避免含特殊字符的好任务被误判。
     """
     m = re.search(r"<Arguments>(.*?)</Arguments>", xml, re.IGNORECASE | re.DOTALL)
     if not m:
@@ -268,7 +270,7 @@ def _action_script_exists(xml: str) -> bool:
     quoted = re.search(r'"([^"]+)"', m.group(1))
     if not quoted:
         return True
-    return Path(quoted.group(1)).exists()
+    return Path(unescape(quoted.group(1))).exists()
 
 
 def is_windowed_task() -> bool:
@@ -283,7 +285,7 @@ def is_windowed_task() -> bool:
 
 
 def is_patrol_task() -> bool:
-    """巡逻任务是否已注册为正确模型（--ensure + TimeTrigger/Repetition，无登录/窗口触发器）。"""
+    """巡逻任务是否已注册为正确模型（--ensure + TimeTrigger/Repetition + 无登录/窗口触发器 + Action 脚本真实存在）。"""
     xml = _task_xml(PATROL_TASK_NAME)
     if not xml:
         return False
@@ -291,7 +293,8 @@ def is_patrol_task() -> bool:
             and "<TimeTrigger>" in xml
             and "<Repetition>" in xml
             and "<LogonTrigger>" not in xml
-            and "<CalendarTrigger>" not in xml)
+            and "<CalendarTrigger>" not in xml
+            and _action_script_exists(xml))
 
 
 def is_legacy_task() -> bool:
