@@ -21,8 +21,17 @@ def exe_path() -> str:
 
 
 def _main_script() -> str:
-    """dev 模式入口脚本绝对路径（frozen 模式不用）。"""
-    return str(Path(sys.argv[0]).resolve())
+    """dev 模式入口脚本绝对路径（frozen 模式不用）。
+
+    优先 sys.argv[0]；但 ``python -c`` 模式下 argv[0]=='-c' 会被 resolve 成
+    ``<cwd>\\-c`` 并写进任务 Action，导致任务每次触发都启动失败（返回码 2、零日志）。
+    遇到此类非脚本入口时，回退到基于本模块位置定位的项目根 main.py。
+    """
+    argv0 = sys.argv[0] if sys.argv else ""
+    if argv0 and not argv0.startswith("-") and argv0.lower().endswith((".py", ".pyw")):
+        return str(Path(argv0).resolve())
+    # python -c / REPL / 无脚本入口：基于本模块(src/)定位项目根的 main.py
+    return str(Path(__file__).resolve().parent.parent / "main.py")
 
 
 def _interpreter() -> str:
@@ -245,14 +254,32 @@ def _calendar_trigger_has_repetition(xml: str) -> bool:
     return False
 
 
+def _action_script_exists(xml: str) -> bool:
+    """校验任务 Action 的 Arguments 中首个脚本路径是否真实存在。
+
+    Arguments 形如 ``"<main.py 绝对路径>" --ensure``；提取首个双引号内路径并校验存在性。
+    坏任务（如历史 ``python -c`` 污染产生的 ``"<cwd>\\-c"``）脚本不存在 → 返回 False，
+    使 ``is_windowed_task`` 判定为非窗口任务、触发 self-heal 重建，避免故障任务长期苟活。
+    无 Arguments 节点或无可识别脚本路径（frozen 模式 Argument 仅含 mode）→ 视为有效。
+    """
+    m = re.search(r"<Arguments>(.*?)</Arguments>", xml, re.IGNORECASE | re.DOTALL)
+    if not m:
+        return True
+    quoted = re.search(r'"([^"]+)"', m.group(1))
+    if not quoted:
+        return True
+    return Path(quoted.group(1)).exists()
+
+
 def is_windowed_task() -> bool:
-    """核心任务是否已为窗口模型（--ensure + LogonTrigger + 窗口 CalendarTrigger）。"""
+    """核心任务是否已为窗口模型（--ensure + LogonTrigger + 窗口 CalendarTrigger + Action 脚本真实存在）。"""
     xml = _task_xml(TASK_NAME)
     if not xml:
         return False
     return ("--ensure" in xml
             and "<LogonTrigger>" in xml
-            and _calendar_trigger_has_repetition(xml))
+            and _calendar_trigger_has_repetition(xml)
+            and _action_script_exists(xml))
 
 
 def is_patrol_task() -> bool:

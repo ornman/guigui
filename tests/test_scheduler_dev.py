@@ -7,6 +7,7 @@
 """
 
 from pathlib import Path
+from unittest.mock import patch
 
 from src import scheduler
 
@@ -54,3 +55,55 @@ def test_main_script_resolves_argv0(monkeypatch, tmp_path):
     result = scheduler._main_script()
     assert Path(result).is_absolute()
     assert result.endswith("main.py")
+
+
+def test_main_script_falls_back_when_argv_is_dash_c(monkeypatch, tmp_path):
+    """``python -c`` 模式下 argv[0]=='-c'，_main_script 不得 resolve 成 ``<cwd>\\-c``。
+
+    历史 bug：曾因 ``python -c "..."`` 触发部署，sys.argv[0]=='-c' 被 resolve 成
+    ``<cwd>\\-c`` 并写进任务 Action，导致任务每次触发都启动失败（返回码 2、零日志）。
+    应回退到基于本模块位置定位的项目根 main.py。
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(scheduler.sys, "argv", ["-c"])
+    result = scheduler._main_script()
+    assert result.endswith("main.py")
+    assert "-c" not in result
+    # 回退路径必须指向真实存在的 main.py
+    assert Path(result).exists()
+
+
+class TestWindowedTaskDetection:
+    """is_windowed_task：结构标签齐全 之外，Action 脚本路径必须真实存在。
+
+    历史 bug：仅检查 ``--ensure``/``<LogonTrigger>``/``CalendarTrigger+Repetition`` 标签，
+    坏任务（Action 指向不存在的 ``-c`` 文件）恰好标签齐全，被误判「已对齐」，
+    self-heal 永不重建，故障任务长期苟活。
+    """
+
+    @staticmethod
+    def _xml(arguments: str) -> str:
+        """构造一个结构标签齐全的核心窗口任务 XML（Action/Arguments 可定制）。"""
+        return (
+            "<Task><Actions><Exec><Command>pythonw.exe</Command>"
+            f"<Arguments>{arguments}</Arguments></Exec></Actions>"
+            "<Triggers>"
+            "<LogonTrigger><Enabled>true</Enabled></LogonTrigger>"
+            "<CalendarTrigger><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>"
+            "<Repetition><Interval>PT15M</Interval></Repetition>"
+            "</CalendarTrigger>"
+            "</Triggers></Task>"
+        )
+
+    def test_rejects_when_action_script_missing(self):
+        """Action 指向不存在的脚本（如历史 -c 污染）→ 即使结构标签齐全也判 False。"""
+        xml = self._xml(r'"C:\nonexistent\-c" --ensure')
+        with patch("src.scheduler._task_xml", return_value=xml):
+            assert scheduler.is_windowed_task() is False
+
+    def test_accepts_when_action_script_exists(self):
+        """Action 指向真实存在的 main.py → True。"""
+        main_py = Path(scheduler.__file__).resolve().parent.parent / "main.py"
+        xml = self._xml(f'"{main_py}" --ensure')
+        with patch("src.scheduler._task_xml", return_value=xml):
+            assert scheduler.is_windowed_task() is True
