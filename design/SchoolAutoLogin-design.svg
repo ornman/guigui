@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================================
+  SchoolAutoLogin — 可编辑设计稿 (矢量 / 分层)
+  ============================================================================
+  由 src/ui/theme.py + src/app.py + src/ui/components.py 自动转写。
+
+  · 所有 <g id="..."> = 一个图层/对象 (Figma/Inkscape/Illustrator 导入后即图层)
+  · 所有文字均为 <text>，未转曲，可直接改文案/字号
+  · 所有颜色为精确 hex，改 fill/stroke 即换色
+  · 左侧 = 登录面板，右侧 = 设置面板（translate(480,0)）
+
+  ---- 设计 Token 对照 (改这里 = 全局换肤) ----
+  BG         #0a0a0a   主背景
+  SURFACE    #141414   卡片底
+  BORDER     #222222   描边/分割线
+  SHADOW     #000000   按钮硬阴影
+  TEXT       #e0e0e0   主文字
+  TEXT_DIM   #666666   次文字 / 段落标签
+  TEXT_MUTED #444444   弱文字 / 占位符 / 状态点
+  ACCENT     #7c3aed   强调紫（按钮/标题/指示器）
+  ACCENT_DARK#5b21b6   按钮描边
+  字体: Inter (英文) + Noto Sans SC (中文)
+  圆角: 0（粗野主义，开关除外）
+  窗口: 460 × 780
+  ============================================================================
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 940 790"
+     font-family="Inter, 'Noto Sans SC', sans-serif">
+
+  <title>SchoolAutoLogin — 可编辑设计稿</title>
+  <desc>登录 + 设置双面板矢量设计稿，分组即图层，文字可编辑，颜色为精确 hex。</desc>
+
+  <!-- =====================================================================
+       左面板：登录 (01 登录)
+       ===================================================================== -->
+  <g id="login-panel">
+
+    <!-- ── 图层：背景 ── -->
+    <g id="login/background">
+      <rect x="0" y="0" width="460" height="780" fill="#0a0a0a"/>
+    </g>
+
+    <!-- ── 图层：品牌紫条 ── -->
+    <g id="login/brand-stripe">
+      <rect x="20" y="20" width="420" height="3" fill="#7c3aed"/>
+    </g>
+
+    <!-- ── 图层：毛玻璃卡片 (GlassCard) ── -->
+    <g id="login/card">
+      <rect x="20" y="23" width="420" height="737" fill="#141414" stroke="#222222" stroke-width="2"/>
+      <!-- 顶部高光线 -->
+      <rect x="20" y="24" width="420" height="1" fill="#2a2a2a"/>
+    </g>
+
+    <!-- ── 图层：四角 L 形标记 ── -->
+    <g id="login/corner-marks" stroke="#2a2a2a" stroke-width="1" fill="none">
+      <path d="M26 29 H42 M26 29 V45"/>
+      <path d="M434 29 H418 M434 29 V45"/>
+      <path d="M26 754 H42 M26 754 V738"/>
+      <path d="M434 754 H418 M434 754 V738"/>
+    </g>
+
+    <!-- ── 图层：角标元信息 ── -->
+    <g id="login/meta" font-size="9" fill="#444444">
+      <text x="430" y="36" text-anchor="end">SYS:// ACTIVE</text>
+      <text x="412" y="749" text-anchor="end">v1.0.0</text>
+    </g>
+
+    <!-- ── 图层：标题区 ── -->
+    <g id="login/header">
+      <text x="48" y="75" font-size="28" font-weight="bold" fill="#e0e0e0">SCHOOL</text>
+      <text x="48" y="97" font-size="13" fill="#7c3aed">// AUTOLOGIN</text>
+      <rect x="48" y="104" width="364" height="2" fill="#7c3aed"/>
+    </g>
+
+    <!-- ── 图层：标签页导航 ── -->
+    <g id="login/tabs">
+      <text x="48"  y="140" font-size="14" font-weight="bold" fill="#e0e0e0">01 登录</text>
+      <text x="164" y="140" font-size="14" font-weight="bold" fill="#666666">02 设置</text>
+      <!-- 激活标签紫色下划线指示器（切到设置页时移动到 x=164） -->
+      <rect id="login/tab-indicator" x="48" y="144" width="50" height="3" fill="#7c3aed"/>
+      <rect x="48" y="152" width="364" height="1" fill="#222222"/>
+    </g>
+
+    <!-- ── 图层：登录表单 ── -->
+    <g id="login/form">
+      <!-- 运营商 -->
+      <text x="48" y="180" font-size="12" font-weight="bold" fill="#666666">// 运营商</text>
+      <g id="login/operator-field">
+        <rect x="48" y="186" width="364" height="40" fill="#0a0a0a" stroke="#222222" stroke-width="1"/>
+        <text x="60" y="211" font-size="14" fill="#e0e0e0">中国电信</text>
+        <!-- 下拉按钮 -->
+        <rect x="376" y="186" width="36" height="40" fill="#7c3aed"/>
+        <text x="394" y="212" font-size="9" text-anchor="middle" fill="#ffffff">▼</text>
+      </g>
+
+      <!-- 学号 -->
+      <text x="48" y="252" font-size="12" font-weight="bold" fill="#666666">// 学号</text>
+      <g id="login/username-field">
+        <rect x="48" y="258" width="364" height="38" fill="#0a0a0a" stroke="#222222" stroke-width="1"/>
+        <text x="60" y="282" font-size="14" fill="#444444">学号</text>
+      </g>
+
+      <!-- 密码 -->
+      <text x="48" y="320" font-size="12" font-weight="bold" fill="#666666">// 密码</text>
+      <g id="login/password-row">
+        <rect x="48" y="326" width="308" height="38" fill="#0a0a0a" stroke="#222222" stroke-width="1"/>
+        <text x="60" y="350" font-size="14" fill="#e0e0e0">●●●●●●</text>
+        <!-- 显示按钮 -->
+        <rect x="364" y="326" width="48" height="38" fill="#141414" stroke="#222222" stroke-width="1"/>
+        <text x="388" y="350" font-size="11" text-anchor="middle" fill="#666666">显示</text>
+      </g>
+
+      <!-- 立即登录 (BrutalButton primary，硬阴影偏移 +4) -->
+      <g id="login/btn-login">
+        <rect x="48" y="392" width="364" height="44" fill="#000000"/>
+        <rect x="48" y="388" width="364" height="44" fill="#7c3aed" stroke="#5b21b6" stroke-width="2"/>
+        <text x="230" y="415" font-size="15" font-weight="bold" text-anchor="middle" fill="#ffffff">立即登录</text>
+      </g>
+
+      <!-- 保存配置 (BrutalButton secondary，描边镂空) -->
+      <g id="login/btn-save">
+        <rect x="48" y="444" width="364" height="44" fill="#000000"/>
+        <rect x="48" y="440" width="364" height="44" fill="#141414" stroke="#7c3aed" stroke-width="2"/>
+        <text x="230" y="467" font-size="15" font-weight="bold" text-anchor="middle" fill="#7c3aed">保存配置</text>
+      </g>
+    </g>
+
+    <!-- ── 图层：状态栏 (StatusDot) ── -->
+    <g id="login/status-bar">
+      <text x="48" y="748" font-size="10" fill="#444444">●</text>
+      <text x="60" y="749" font-size="11" fill="#666666">未配置</text>
+    </g>
+
+  </g>
+
+  <!-- =====================================================================
+       右面板：设置 (02 设置) —— 内部坐标与左面板一致，整体右移 480
+       ===================================================================== -->
+  <g id="settings-panel" transform="translate(480,0)">
+
+    <g id="settings/background">
+      <rect x="0" y="0" width="460" height="780" fill="#0a0a0a"/>
+    </g>
+
+    <g id="settings/brand-stripe">
+      <rect x="20" y="20" width="420" height="3" fill="#7c3aed"/>
+    </g>
+
+    <g id="settings/card">
+      <rect x="20" y="23" width="420" height="737" fill="#141414" stroke="#222222" stroke-width="2"/>
+      <rect x="20" y="24" width="420" height="1" fill="#2a2a2a"/>
+    </g>
+
+    <g id="settings/corner-marks" stroke="#2a2a2a" stroke-width="1" fill="none">
+      <path d="M26 29 H42 M26 29 V45"/>
+      <path d="M434 29 H418 M434 29 V45"/>
+      <path d="M26 754 H42 M26 754 V738"/>
+      <path d="M434 754 H418 M434 754 V738"/>
+    </g>
+
+    <g id="settings/meta" font-size="9" fill="#444444">
+      <text x="430" y="36" text-anchor="end">SYS:// ACTIVE</text>
+      <text x="412" y="749" text-anchor="end">v1.0.0</text>
+    </g>
+
+    <g id="settings/header">
+      <text x="48" y="75" font-size="28" font-weight="bold" fill="#e0e0e0">SCHOOL</text>
+      <text x="48" y="97" font-size="13" fill="#7c3aed">// AUTOLOGIN</text>
+      <rect x="48" y="104" width="364" height="2" fill="#7c3aed"/>
+    </g>
+
+    <g id="settings/tabs">
+      <text x="48"  y="140" font-size="14" font-weight="bold" fill="#666666">01 登录</text>
+      <text x="164" y="140" font-size="14" font-weight="bold" fill="#e0e0e0">02 设置</text>
+      <!-- 设置页激活：指示器移到 02 下方 -->
+      <rect id="settings/tab-indicator" x="164" y="144" width="50" height="3" fill="#7c3aed"/>
+      <rect x="48" y="152" width="364" height="1" fill="#222222"/>
+    </g>
+
+    <!-- ── 图层：设置表单 ── -->
+    <g id="settings/form">
+
+      <!-- WiFi 名称 -->
+      <text x="48" y="180" font-size="12" font-weight="bold" fill="#666666">// WiFi 名称</text>
+      <text x="48" y="200" font-size="11" fill="#444444">用 WiFi 连校园网的填名称，电脑睡眠后会自动切回。</text>
+      <text x="48" y="216" font-size="11" fill="#444444">用网线的不用填。</text>
+      <g id="settings/wifi-field">
+        <rect x="48" y="232" width="364" height="38" fill="#0a0a0a" stroke="#222222" stroke-width="1"/>
+        <text x="60" y="256" font-size="14" fill="#444444">留空跳过 WiFi 切换</text>
+      </g>
+
+      <!-- 自动化 -->
+      <text x="48" y="300" font-size="12" font-weight="bold" fill="#666666">// 自动化</text>
+
+      <!-- 开关：启用自动化（窗口登录）—— 开态 -->
+      <g id="settings/sw-resilience">
+        <text x="48" y="334" font-size="13" fill="#e0e0e0">启用自动化（窗口登录）</text>
+        <rect x="352" y="320" width="48" height="24" rx="12" fill="#7c3aed"/>
+        <circle cx="388" cy="332" r="9" fill="#ffffff"/>
+      </g>
+
+      <!-- 窗口时间 -->
+      <g id="settings/win-time-row">
+        <text x="48" y="374" font-size="12" fill="#666666">窗口时间 HH:MM</text>
+        <rect x="312" y="358" width="72" height="28" fill="#0a0a0a" stroke="#222222" stroke-width="1"/>
+        <text x="348" y="376" font-size="12" text-anchor="middle" fill="#e0e0e0">06:55</text>
+      </g>
+
+      <!-- 开关：全天巡逻（断网重连）—— 关态 -->
+      <g id="settings/sw-patrol">
+        <text x="48" y="418" font-size="13" fill="#e0e0e0">全天巡逻（断网重连）</text>
+        <rect x="352" y="396" width="48" height="24" rx="12" fill="#222222"/>
+        <circle cx="360" cy="408" r="9" fill="#7c3aed"/>
+      </g>
+
+      <!-- 巡逻间隔 -->
+      <g id="settings/patrol-interval-row">
+        <text x="48" y="454" font-size="12" fill="#666666">巡逻间隔（分）</text>
+        <rect x="312" y="438" width="72" height="28" fill="#0a0a0a" stroke="#222222" stroke-width="1"/>
+        <text x="348" y="456" font-size="12" text-anchor="middle" fill="#e0e0e0">30</text>
+      </g>
+
+      <!-- 系统 -->
+      <text x="48" y="498" font-size="12" font-weight="bold" fill="#666666">// 系统</text>
+
+      <!-- 开关：桌面通知 —— 开态 -->
+      <g id="settings/sw-notify">
+        <text x="48" y="532" font-size="13" fill="#e0e0e0">桌面通知</text>
+        <rect x="352" y="510" width="48" height="24" rx="12" fill="#7c3aed"/>
+        <circle cx="388" cy="522" r="9" fill="#ffffff"/>
+      </g>
+
+      <!-- 应用设置 (BrutalButton primary) -->
+      <g id="settings/btn-apply">
+        <rect x="48" y="560" width="364" height="44" fill="#000000"/>
+        <rect x="48" y="556" width="364" height="44" fill="#7c3aed" stroke="#5b21b6" stroke-width="2"/>
+        <text x="230" y="583" font-size="15" font-weight="bold" text-anchor="middle" fill="#ffffff">应用设置</text>
+      </g>
+
+    </g>
+
+    <g id="settings/status-bar">
+      <text x="48" y="748" font-size="10" fill="#444444">●</text>
+      <text x="60" y="749" font-size="11" fill="#666666">未配置</text>
+    </g>
+
+  </g>
+
+  <!-- 两面板间隔参考线（可选，删掉无影响） -->
+  <g id="layout-guide" opacity="0.25">
+    <line x1="470" y1="20" x2="470" y2="760" stroke="#444444" stroke-width="1" stroke-dasharray="2 4"/>
+  </g>
+
+</svg>
