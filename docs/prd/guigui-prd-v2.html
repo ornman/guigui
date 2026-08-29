@@ -55,14 +55,15 @@ body{
 .titlebar{display:flex;align-items:center;height:44px;padding:0 14px;
   border-bottom:1px solid oklch(100% 0 0 / 0.45)}
 .titlebar .name{font-family:Inter,"PingFang SC",sans-serif;font-size:11px;font-weight:600;
-  letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin-left:58px}
+  letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
 .titlebar .spacer{flex:1}
 .tbtn{width:26px;height:26px;border:none;border-radius:8px;background:transparent;
   color:var(--ink-3);font-family:Inter,sans-serif;font-size:13px;line-height:1;cursor:pointer;
   display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s}
 .tbtn:hover{background:oklch(100% 0 0 / 0.55);color:var(--ink)}
 
-.body{position:relative;height:calc(100% - 44px);padding:28px 36px 26px;overflow:hidden}
+.body{position:relative;height:calc(100% - 44px);padding:28px 36px 26px;
+  overflow-y:auto;overflow-x:hidden}
 .v{display:none;animation:fadein .3s ease-out}
 .v.on{display:block}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -71,7 +72,14 @@ body{
 .bot{position:absolute;z-index:5;width:104px;height:104px;
   left:calc(50% - 52px);top:calc(50% - 70px);
   transition:all .75s cubic-bezier(.3,1.45,.4,1)}
-.bot.docked{width:40px;height:40px;left:8px;top:2px}
+.bot.docked{width:58px;height:58px;left:28px;top:32px}
+.bot.big{width:116px;height:116px;left:calc(50% - 58px);top:22px}
+.bot.hidden{opacity:0;pointer-events:none}
+/* 停靠在问候标题左侧时,文字整体让位 */
+.window.bot-docked .v.on h1{margin-left:72px;transition:margin-left .5s cubic-bezier(.3,1.2,.4,1)}
+.window.bot-docked .v.on .lede{margin-left:72px}
+/* 成功页:bot 恢复首次仪式级大尺寸,内容下移让位 */
+.window.bot-big #v-success{padding-top:124px}
 .bot svg{width:100%;height:100%;display:block}
 .bot .b-body{fill:var(--ink)}
 .bot .eye,.bot .mouth{fill:none;stroke:oklch(97% 0.005 295);stroke-width:5;stroke-linecap:round}
@@ -130,12 +138,20 @@ input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 
 .link:hover{color:var(--ink)}
 
 .times{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.times button{padding:10px 4px;border:1px solid oklch(60% 0.01 295 / 0.30);border-radius:10px;
+.times button{position:relative;padding:10px 4px;border:1px solid oklch(60% 0.01 295 / 0.30);border-radius:10px;
   background:oklch(100% 0 0 / 0.55);font-family:Inter,sans-serif;font-size:13px;color:var(--ink-2);
   cursor:pointer;transition:background .15s,color .15s,border-color .15s}
 .times button:hover{border-color:var(--ink-3)}
-.times button.on{background:var(--ink);border-color:var(--ink);color:oklch(97% 0.005 295)}
+.times button.on{background:oklch(58% 0.15 295 / 0.07);border-color:transparent;color:var(--ink)}
 .times button.off{opacity:.32;pointer-events:none}
+
+/* 选中态:紫→粉渐变描边,渐显过渡(用户指定) */
+.ssid::before,.times button::before{content:"";position:absolute;inset:-1px;border-radius:inherit;
+  padding:1.5px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  opacity:0;transition:opacity .35s ease-out;pointer-events:none}
+.ssid.on::before,.times button.on::before{opacity:1}
 
 .row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;
   border-bottom:1px solid oklch(60% 0.01 295 / 0.18)}
@@ -155,11 +171,11 @@ input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 
 .check-row .k{color:var(--ink-3);font-size:12.5px;flex-shrink:0;font-family:Inter,"PingFang SC",sans-serif}
 .check-row .v2{text-align:right}
 
-.ssid{display:flex;align-items:center;gap:10px;padding:11px 14px;margin-bottom:6px;
+.ssid{position:relative;display:flex;align-items:center;gap:10px;padding:11px 14px;margin-bottom:6px;
   border:1px solid oklch(60% 0.01 295 / 0.28);border-radius:12px;
   background:oklch(100% 0 0 / 0.55);cursor:pointer;transition:border-color .15s}
-.ssid:hover{border-color:var(--accent)}
-.ssid.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.ssid:hover{border-color:var(--accent-2)}
+.ssid.on{border-color:transparent;box-shadow:0 0 0 3px var(--accent-soft)}
 .ssid .n{font-size:14px}
 .ssid .q{margin-left:auto;font-family:Inter,sans-serif;font-size:11px;color:var(--ink-3);
   padding:2px 8px;border-radius:99px;background:oklch(60% 0.01 295 / 0.10)}
@@ -256,12 +272,12 @@ input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 
       <button class="link" onclick="openSettings()">高级设置</button>
     </div>
 
-    <!-- 登录成功 = 庆祝页(默认 07:00,改时间去高级设置) -->
+    <!-- 登录成功 = 庆祝页(bot 恢复仪式级大尺寸 + 摇晃) -->
     <div class="v" id="v-success">
       <h1>恭喜登录成功~</h1>
       <p class="lede">桂桂每天都会在 <b id="succ-time">07:00</b> 帮你自动登录校园网~</p>
       <div class="status ok"><span class="dot"></span><span>Campus-WiFi · 已认证</span></div>
-      <div class="micro-line">每天到点前 30 分钟开始,窗口里试 6 次,登上就停。<br>✓ 可以直接关闭窗口了,桂桂在后台守着</div>
+      <div class="micro-line">校园网 06:50 开门,桂桂 07:00 准时出手 · 到点前 30 分钟起每 5 分钟试一次,登上就停<br>✓ 可以直接关闭窗口了,桂桂在后台守着</div>
       <button class="link" onclick="openSettings()">高级设置</button>
     </div>
 
@@ -311,39 +327,50 @@ input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 
       <button class="link" onclick="show('v-main');setMain('ok')">稍后再说</button>
     </div>
 
-    <!-- 高级设置(二级,对齐原版全功能) -->
+    <!-- 高级设置(二级,按后端真实业务全量对齐) -->
     <div class="v" id="v-settings">
       <button class="back" onclick="backFromSettings()">‹ 返回</button>
-      <h1 style="font-size:22px">高级设置</h1>
+      <h1 style="font-size:22px;margin-left:0!important">高级设置</h1>
 
       <div class="tiny-label">每日自动登录</div>
       <div class="times times-pick">
-        <button class="off" title="开放前,登不上">06:30</button><button class="off" title="开放前,登不上">06:45</button><button class="on">07:00</button><button>07:15</button>
+        <button class="off" title="校园网还没开门,登不上">06:30</button><button class="off" title="校园网还没开门,登不上">06:45</button><button class="on">07:00</button><button>07:15</button>
         <button>07:30</button><button>07:45</button><button>08:00</button><button>自定义</button>
       </div>
-      <div class="micro-line">校园网默认 06:50 开放 · 置灰 = 开放前 · 窗口 = 所选时间 ±30 分钟,试 6 次,登上即停</div>
-      <div class="row"><div><div class="t">窗口内重试间隔</div><div class="d">登上即停,不浪费探测</div></div>
+      <div class="micro-line">校园网默认 06:50 开门 · 置灰 = 还没开门 · 到点前 30 分钟开始,每 5 分钟试一次,登上就停</div>
+      <div class="row"><div><div class="t">窗口内重试间隔</div><div class="d">登上就停,不浪费探测</div></div>
         <select class="mini-select"><option>5 分钟</option><option>10 分钟</option><option>15 分钟</option></select></div>
+      <div class="row"><div><div class="t">开机时补登录</div><div class="d">开机或重新登录系统时,桂桂顺手登一次</div></div>
+        <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="row"><div><div class="t">登录失败重试</div><div class="d">单轮登录失败后,换个姿势再试几回</div></div>
+        <select class="mini-select"><option>3 次</option><option>1 次</option><option>5 次</option></select></div>
+      <div class="row"><div><div class="t">重试间隔</div><div class="d">每次失败后歇一歇再试</div></div>
+        <select class="mini-select"><option>5 秒</option><option>10 秒</option><option>30 秒</option></select></div>
 
-      <div class="tiny-label">网络兜底</div>
-      <div class="row"><div><div class="t">WiFi 兜底</div><div class="d">认证服务器不可达时,切到下面选的网络</div></div>
+      <div class="tiny-label">保底机制</div>
+      <div class="row"><div><div class="t">WiFi 兜底</div><div class="d">认证服务器连不上时,自动切到下面选的网络</div></div>
         <div class="sw" id="sw-fallback" onclick="toggleFallback()"></div></div>
       <div id="fallback-pick" style="display:none;padding:6px 0 2px">
-        <div class="ssid sel-pick on"><span class="n">Campus-WiFi</span><span class="q">信号强 · 已选</span></div>
-        <div class="ssid sel-pick"><span class="n">Campus-5G</span><span class="q">信号中</span></div>
-        <div class="ssid sel-pick"><span class="n">eduroam</span><span class="q">信号弱</span></div>
-        <div class="micro-line">扫描到的网络点一下即选,不用手填名字</div>
+        <div class="ssid sel-pick on"><span class="n">Campus-WiFi</span><span class="q" data-orig="信号强">信号强</span></div>
+        <div class="ssid sel-pick"><span class="n">Campus-5G</span><span class="q" data-orig="信号中">信号中</span></div>
+        <div class="ssid sel-pick"><span class="n">eduroam</span><span class="q" data-orig="信号弱">信号弱</span></div>
+        <div class="micro-line">扫到的网络点一下即选,不用手填名字</div>
       </div>
-      <div class="row"><div><div class="t">白天巡逻</div><div class="d">白天意外断网时自动重连</div></div>
+      <div class="row"><div><div class="t">白天巡逻</div><div class="d">白天意外断网时,自动悄悄重连</div></div>
         <div class="sw" onclick="this.classList.toggle('on')"></div></div>
       <div class="row"><div><div class="t">巡逻间隔</div><div class="d">断网后每 N 分钟试一次</div></div>
         <select class="mini-select"><option>30 分钟</option><option>15 分钟</option><option>60 分钟</option></select></div>
+      <div class="row"><div><div class="t">睡眠唤醒补登录</div><div class="d">合盖再打开 30 秒后补一次(笔记本推荐)</div></div>
+        <div class="sw" onclick="this.classList.toggle('on')"></div></div>
+      <div class="row"><div><div class="t">假期静默</div><div class="d">连续 2 天连不上(放假回家了?),自动降为每天 1 次、不打扰</div></div>
+        <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
 
       <div class="tiny-label">系统</div>
-      <div class="row"><div><div class="t">弹通知</div><div class="d">登录结果以系统通知告知</div></div>
+      <div class="row"><div><div class="t">弹通知</div><div class="d">断网恢复、登录失败时才说,平时不打扰</div></div>
         <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
-      <div class="row"><div><div class="t">后台自动化</div><div class="d">总开关:关闭后停止全部自动登录</div></div>
+      <div class="row"><div><div class="t">后台自动化</div><div class="d">总开关:关掉后桂桂就退休,不再自动登录</div></div>
         <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+      <div style="height:8px"></div>
     </div>
 
   </div>
@@ -386,24 +413,35 @@ const $=id=>document.getElementById(id);
 const views=['v-boot','v-wait','v-ok','v-login','v-success','v-guide','v-main','v-badauth','v-settings'];
 let prev='v-main',mainState='ok',fixMode=false;
 
+/* bot 状态由当前视图驱动:center 初始化 / docked 问候标题左侧 / big 庆祝仪式级 / hidden */
+const botByView={'v-boot':'center','v-wait':'center','v-ok':'docked','v-login':'docked',
+  'v-success':'big','v-guide':'docked','v-main':'docked','v-badauth':'docked','v-settings':'hidden'};
+function setBot(state){
+  bot.classList.remove('docked','big','hidden');
+  win.classList.remove('bot-docked','bot-big');
+  if(state==='docked'){bot.classList.add('docked');win.classList.add('bot-docked')}
+  else if(state==='big'){bot.classList.add('big');win.classList.add('bot-big')}
+  else if(state==='hidden'){bot.classList.add('hidden')}
+}
 function mood(m){bot.dataset.mood=m;bot.classList.remove('pop');void bot.offsetWidth;bot.classList.add('pop')}
 function show(id){
   views.forEach(v=>$(v).classList.remove('on'));
   $(id).classList.add('on');
   bot.classList.remove('sway');
+  setBot(botByView[id]||'hidden');
   if(id!=='v-settings')prev=id;
 }
 function greet(){const h=new Date().getHours();const g=h<11?'早上好':(h<18?'下午好':'晚上好');
   document.querySelectorAll('.g').forEach(e=>e.textContent=g+'。')}
 
-/* 首次:完整仪式(2.1s)→ 分流 */
+/* 首次:完整仪式(2.1s)→ 分流(bot 由 show() 自动归位) */
 function firstRun(which){
   fixMode=false;
-  bot.classList.remove('docked');bot.classList.remove('awake');
+  bot.classList.remove('awake');
   mood('sleep');show('v-boot');
   setTimeout(()=>{mood('idle');bot.classList.add('awake')},1300);
   setTimeout(()=>{
-    bot.classList.add('docked');greet();
+    greet();
     if(which==='ok'){mood('happy');show('v-ok')}
     else if(which==='login'){mood('sad');show('v-login')}
     else{mood('cry');show('v-guide')}
@@ -411,15 +449,15 @@ function firstRun(which){
 }
 /* 开机太快:等待态 → 自动继续 */
 function bootWait(){
-  bot.classList.remove('docked');mood('sleep');show('v-wait');
+  mood('sleep');show('v-wait');
   setTimeout(()=>firstRun('ok'),2600);
 }
 /* 日常:快速苏醒 0.6s */
 function wake(){
-  bot.classList.add('docked');mood('sleep');setMain('ok');show('v-main');greet();
+  mood('sleep');setMain('ok');show('v-main');greet();
   setTimeout(()=>mood('idle'),600);
 }
-function wakeProblem(kind){bot.classList.add('docked');greet();fixMode=(kind==='out');setMain(kind);show('v-main')}
+function wakeProblem(kind){greet();fixMode=(kind==='out');setMain(kind);show('v-main')}
 /* 主面板三变体 */
 function setMain(kind){
   mainState=kind;
@@ -453,8 +491,8 @@ function fixAuth(){
   fixMode=false;showSuccess();
 }
 function pickWifi(el){
-  el.style.borderColor='var(--accent)';
-  setTimeout(()=>{mood('sad');show('v-login')},450);
+  el.classList.add('on');
+  setTimeout(()=>{mood('sad');show('v-login')},550);
 }
 function openSettings(){show('v-settings')}
 function backFromSettings(){show(prev)}
@@ -465,11 +503,14 @@ function toggleFallback(){
   p.style.display=sw.classList.contains('on')?'block':'none';
 }
 document.querySelectorAll('.sel-pick').forEach(el=>el.addEventListener('click',()=>{
-  document.querySelectorAll('.sel-pick').forEach(e=>e.classList.remove('on'));
+  document.querySelectorAll('.sel-pick').forEach(e=>{
+    e.classList.remove('on');
+    const q=e.querySelector('.q');
+    if(q&&q.dataset.orig)q.textContent=q.dataset.orig;   // 先全部还原,防「已选·已选」
+  });
   el.classList.add('on');
   const q=el.querySelector('.q');
-  document.querySelectorAll('.sel-pick .q').forEach(x=>{if(x.dataset.orig)x.textContent=x.dataset.orig});
-  if(q){if(!q.dataset.orig)q.dataset.orig=q.textContent;q.textContent=q.dataset.orig+' · 已选'}
+  if(q&&q.dataset.orig)q.textContent=q.dataset.orig+' · 已选';
 }));
 /* 窗口化 */
 function minimize(){$('pill-text').textContent='桂桂在后台静默运行 · 点击打开';hideWin()}
