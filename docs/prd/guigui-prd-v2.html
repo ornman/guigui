@@ -183,9 +183,10 @@ input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--a
 .row .t{font-size:14.5px}
 .row .d{font-size:12px;color:var(--ink-3);margin-top:1px;font-family:Inter,"PingFang SC",sans-serif}
 .sw{width:38px;height:22px;flex-shrink:0;position:relative;cursor:pointer;border-radius:11px;
-  background:oklch(60% 0.01 295 / 0.30);transition:background .2s}
+  background:oklch(88% 0.008 295);transition:background .2s}
 .sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
-  background:oklch(100% 0 0);box-shadow:0 1px 3px oklch(23% 0.015 295/.25);transition:transform .2s ease-out}
+  background:var(--ink);box-shadow:0 1px 3px oklch(23% 0.015 295/.25);transition:transform .2s ease-out,background .2s}
+.sw.on::after{background:oklch(100% 0 0)}
 .sw.on{background:var(--accent)}
 .sw.on::after{transform:translateX(16px)}
 
@@ -287,7 +288,7 @@ body.backdrop-black .taskbar{display:none}
       <div class="boot-cap" id="boot-cap">桂桂伸了个懒腰,正在检查网络…</div>
     </div>
 
-    <!-- 首次配置页 -->
+    <!-- 首次配置页:一键开启,密码事后温柔补 -->
     <div class="v" id="v-ok">
       <div class="greet">
         <div class="g-bot bot" data-mood="happy" onclick="mood(this,'happy')">
@@ -303,20 +304,15 @@ body.backdrop-black .taskbar{display:none}
           <p class="tagline">校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好</p>
         </div>
       </div>
-      <p class="lede">校园网已经连上啦。把密码交给桂桂,以后这件事你不用再管:</p>
-      <div class="status ok"><span class="dot"></span><span>Campus-WiFi · 已认证</span></div>
-      <div class="micro-line">✓ 学号:2025…7209(从登录会话识别) &nbsp;✓ WiFi:Campus-WiFi &nbsp;✓ 服务器:10.1.2.3</div>
-      <div id="cred" style="display:none">
-        <div class="f"><label>学号(已自动识别,无需填写)</label><input value="2025000000001" readonly></div>
-        <div class="f"><label>密码(唯一需要你填的)</label><input type="password" placeholder="密码"></div>
-      </div>
-      <button class="btn" id="btn-enable" onclick="enableDaily()">开启每日自动登录</button>
-      <button class="link" onclick="show('v-settings')">高级设置</button>
+      <div class="status ok"><span class="dot"></span><span>Campus-WiFi · 已认证 · 学号已识别 ✓</span></div>
+      <button class="btn" onclick="enableDaily()">开启每日自动登录</button>
+      <div class="micro-line">一键开启,无需任何设置 · 密码以后随时补</div>
+      <button class="link" onclick="openDetail('v-settings')">高级设置</button>
     </div>
 
     <!-- 登录表单 -->
     <div class="v" id="v-login">
-      <button class="back" onclick="backHome()">‹ 返回</button>
+      <button class="back" onclick="backFrom('v-login')">‹ 返回</button>
       <h1 style="font-size:22px">登录校园网。</h1>
       <p class="lede">连上了校园网,还没登录。填一次,以后每天都是桂桂的事:</p>
       <div class="status warn"><span class="dot"></span><span>Campus-WiFi · 未认证</span></div>
@@ -337,16 +333,14 @@ body.backdrop-black .taskbar{display:none}
       </div>
       <h1 style="text-align:center">网,已经帮你连好啦</h1>
       <p class="lede" style="text-align:center">明早 07:00,桂桂会提前替你登好 —<br>你只管睡到自然醒。</p>
-      <div class="micro-line" style="text-align:center">
-        校园网 06:50 开门 · 桂桂 07:00 准时出手 · 登上就停,不重复折腾<br>
-        ✓ 现在就可以关闭窗口,桂桂在后台守着
-      </div>
-      <button class="link" style="margin:0 auto;display:block" onclick="show('v-settings')">高级设置</button>
+      <div class="micro-line" style="text-align:center">✓ 现在就可以关闭窗口,桂桂在后台守着</div>
+      <button class="btn" style="max-width:220px;margin:16px auto 0" onclick="backFrom('v-success')">完成,回主页</button>
+      <button class="link" style="margin:10px auto 0;display:block" onclick="openDetail('v-settings')">高级设置</button>
     </div>
 
     <!-- 不可达引导 -->
     <div class="v" id="v-guide">
-      <button class="back" onclick="backHome()">‹ 返回</button>
+      <button class="back" onclick="backFrom('v-guide')">‹ 返回</button>
       <h1 style="font-size:22px">这条路今天不通。</h1>
       <p class="lede">到认证服务器的路连不上,桂桂帮你查:</p>
       <div class="status warn"><span class="dot"></span><span>10.1.2.3 · 不可达</span></div>
@@ -355,7 +349,7 @@ body.backdrop-black .taskbar{display:none}
       <div class="ssid" onclick="pickWifi(this)"><span class="n">Campus-5G</span><span class="q">信号中</span></div>
       <div class="ssid" onclick="pickWifi(this)"><span class="n">eduroam</span><span class="q">信号弱</span></div>
       <div class="micro-line" style="margin-top:10px">② 已是校园网仍不通?可能维护中,<a href="javascript:void(0)" onclick="bootWait()" style="color:inherit">重新检测</a></div>
-      <button class="link" onclick="show('v-login')">③ 先填资料,连上后桂桂自动帮你登录</button>
+      <button class="link" onclick="openDetail('v-login')">③ 先填资料,连上后桂桂自动帮你登录</button>
     </div>
 
     <!-- 日常主页:体检卡 -->
@@ -381,8 +375,13 @@ body.backdrop-black .taskbar{display:none}
       <div class="check-row"><span class="k">下次行动</span><span class="v2">明天 07:00 · 窗口 06:30–07:30</span></div>
       <div class="check-row"><span class="k">最近心跳</span><span class="v2" style="font-family:Inter,sans-serif;font-size:12.5px">07:00:02 成功 · 1/6 次即停</span></div>
 
-      <button class="btn" id="main-btn" onclick="mainAction()">立即重新登录</button>
-      <button class="link" onclick="show('v-settings')">高级设置</button>
+      <div class="micro-line" id="pwd-prompt" style="display:none;background:oklch(58% 0.15 295 / 0.07);padding:10px 12px;border-radius:10px;line-height:1.7">
+        还差一步:桂桂还没拿到密码,掉线时没法自动帮登。
+        <a href="javascript:void(0)" onclick="openDetail('v-login')" style="color:var(--accent);font-weight:600">现在补上</a>
+      </div>
+
+      <button class="btn quiet" id="main-btn" onclick="quickLogin()">立即重新登录</button>
+      <button class="link" onclick="openDetail('v-settings')">高级设置</button>
 
       <div class="log">
         <div><span class="ts">07:00:01</span><span class="ok">[OK]</span> 网络可达</div>
@@ -391,28 +390,25 @@ body.backdrop-black .taskbar{display:none}
       </div>
     </div>
 
-    <!-- 高级设置 -->
+    <!-- 高级设置(按使用频率排序:核心 → 保底 → 系统 → 进阶) -->
     <div class="v" id="v-settings">
-      <button class="back" onclick="backHome()">‹ 返回</button>
+      <button class="back" onclick="backFrom('v-settings')">‹ 返回</button>
       <h1 style="font-size:22px">高级设置</h1>
 
       <div class="tiny-label">每日自动登录</div>
       <div class="times times-pick">
-        <button class="off" title="校园网还没开门,登不上">06:30</button><button class="off" title="校园网还没开门,登不上">06:45</button><button class="on">07:00</button><button>07:15</button>
-        <button>07:30</button><button>07:45</button><button>08:00</button><button>自定义</button>
+        <button>06:30</button><button>06:45</button><button class="on">07:00</button><button>07:15</button>
+        <button>07:30</button><button>07:45</button><button>08:00</button><button id="btn-custom">自定义</button>
       </div>
-      <div class="micro-line">校园网默认 06:50 开门 · 置灰 = 还没开门 · 到点前 30 分钟开始,试 6 次,登上就停</div>
+      <div class="f" id="custom-time" style="display:none;max-width:160px;margin-top:8px">
+        <input type="time" id="ct" value="07:30">
+      </div>
+      <div class="micro-line">校园网 06:50 开门 · 到点前 30 分钟开始,试 6 次,登上就停</div>
+      <div class="row"><div><div class="t">开机时补登录</div><div class="d">开机或重新登录系统时,桂桂顺手登一次</div></div>
+        <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
       <div class="row"><div><div class="t">窗口内重试间隔</div><div class="d">登上就停,不浪费探测</div></div>
         <div class="dd"><button class="dd-btn"><span class="dd-label">5 分钟</span><span class="car">▼</span></button>
           <div class="dd-menu"><button class="on">5 分钟 <span class="ck">✓</span></button><button>10 分钟 <span class="ck">✓</span></button><button>15 分钟 <span class="ck">✓</span></button></div></div></div>
-      <div class="row"><div><div class="t">开机时补登录</div><div class="d">开机或重新登录系统时,桂桂顺手登一次</div></div>
-        <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
-      <div class="row"><div><div class="t">登录失败重试</div><div class="d">单轮登录失败后,再试几回</div></div>
-        <div class="dd"><button class="dd-btn"><span class="dd-label">3 次</span><span class="car">▼</span></button>
-          <div class="dd-menu"><button>1 次 <span class="ck">✓</span></button><button class="on">3 次 <span class="ck">✓</span></button><button>5 次 <span class="ck">✓</span></button></div></div></div>
-      <div class="row"><div><div class="t">重试间隔</div><div class="d">每次失败后歇一歇再试</div></div>
-        <div class="dd"><button class="dd-btn"><span class="dd-label">5 秒</span><span class="car">▼</span></button>
-          <div class="dd-menu"><button class="on">5 秒 <span class="ck">✓</span></button><button>10 秒 <span class="ck">✓</span></button><button>30 秒 <span class="ck">✓</span></button></div></div></div>
 
       <div class="tiny-label">保底机制</div>
       <div class="row"><div><div class="t">WiFi 兜底</div><div class="d">认证服务器连不上时,自动切到下面选的网络</div></div>
@@ -436,10 +432,18 @@ body.backdrop-black .taskbar{display:none}
       <div class="tiny-label">系统</div>
       <div class="row"><div><div class="t">弹通知</div><div class="d">断网恢复、登录失败时才说,平时不打扰</div></div>
         <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
-      <div class="row"><div><div class="t">后台自动化</div><div class="d">总开关:关掉后桂桂就退休,不再自动登录</div></div>
-        <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
       <div class="row"><div><div class="t">显示桂桂</div><div class="d">关掉后主页不再显示小桂桂,功能不受影响</div></div>
         <div class="sw on" id="sw-gui" onclick="toggleGui(this)"></div></div>
+      <div class="row"><div><div class="t">后台自动化</div><div class="d">总开关:关掉后桂桂就退休,不再自动登录</div></div>
+        <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+
+      <div class="tiny-label">进阶</div>
+      <div class="row"><div><div class="t">登录失败重试</div><div class="d">单轮登录失败后,再试几回</div></div>
+        <div class="dd"><button class="dd-btn"><span class="dd-label">3 次</span><span class="car">▼</span></button>
+          <div class="dd-menu"><button>1 次 <span class="ck">✓</span></button><button class="on">3 次 <span class="ck">✓</span></button><button>5 次 <span class="ck">✓</span></button></div></div></div>
+      <div class="row"><div><div class="t">重试间隔</div><div class="d">每次失败后歇一歇再试</div></div>
+        <div class="dd"><button class="dd-btn"><span class="dd-label">5 秒</span><span class="car">▼</span></button>
+          <div class="dd-menu"><button class="on">5 秒 <span class="ck">✓</span></button><button>10 秒 <span class="ck">✓</span></button><button>30 秒 <span class="ck">✓</span></button></div></div></div>
       <div style="height:8px"></div>
     </div>
 
@@ -483,11 +487,15 @@ body.backdrop-black .taskbar{display:none}
 const win=document.getElementById('win');
 const $=id=>document.getElementById(id);
 const views=['v-boot','v-ok','v-login','v-success','v-guide','v-main','v-settings'];
-let mainState='ok';
+let mainState='ok',configured=false,hasPwd=false;
+const origin={};   /* 详情视图来路:返回必回原处 */
 
 /* 通用 mood:任意 .bot 元素 */
 function mood(el,m){el.dataset.mood=m;el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop')}
+function currentView(){return views.find(v=>$(v).classList.contains('on'))||'v-main'}
 function show(id){views.forEach(v=>$(v).classList.remove('on'));$(id).classList.add('on')}
+function openDetail(id){origin[id]=currentView();show(id)}
+function backFrom(id){show(origin[id]||'v-main');greet()}
 function greet(){const h=new Date().getHours();const g=h<11?'早上好':(h<18?'下午好':'晚上好');
   document.querySelectorAll('.g').forEach(e=>e.textContent=g+'。')}
 
@@ -508,34 +516,48 @@ function bootWait(){
   setTimeout(()=>{mood(b,'idle');b.classList.add('awake')},1300);
   setTimeout(()=>{$('boot-cap').textContent='桂桂伸了个懒腰,正在检查网络…';goSetup()},2600);
 }
-function goSetup(){$('v-ok').dataset && 0;show('v-ok');greet()}
-/* 日常主页 */
-function goDaily(){show('v-main');greet()}
-function wakeProblem(kind){
-  mainState=kind;show('v-main');greet();
-  if(kind==='out'){mood(document.querySelector('#v-main .g-bot'),'sad');
+function goSetup(){show('v-ok');greet()}
+/* 日常主页:渲染当前状态 + 密码补填提示 */
+function goDaily(){renderMain();show('v-main');greet()}
+function renderMain(){
+  const gb=document.querySelector('#v-main .g-bot');
+  $('pwd-prompt').style.display=(!hasPwd)?'block':'none';
+  if(mainState==='ok'){mood(gb,'idle');
+    $('main-lede').textContent='一切正常,放心去忙。';
+    $('main-net').textContent='已登录 ✓ · Campus-WiFi';$('main-btn').textContent='立即重新登录'}
+  else if(mainState==='out'){mood(gb,'sad');
     $('main-lede').textContent='刚才掉线了,桂桂没赶上。';
     $('main-net').textContent='校园网 · 未认证';$('main-btn').textContent='立即登录'}
-  else{mood(document.querySelector('#v-main .g-bot'),'cry');
+  else{mood(gb,'cry');
     $('main-lede').textContent='连不上校园网。';
     $('main-net').textContent='10.1.2.3 · 不可达';$('main-btn').textContent='去排查'}
 }
+function wakeProblem(kind){mainState=kind;goDaily()}
 function mainAction(){
-  if(mainState==='ok'){loginNow()}
-  else if(mainState==='out'){show('v-login')}
-  else{show('v-guide')}
+  if(mainState==='ok'){quickLogin()}
+  else if(mainState==='out'){openDetail('v-login')}
+  else{openDetail('v-guide')}
 }
-function backHome(){goDaily()}
+/* 主页上的重登:就地反馈,不跳庆祝页(庆祝只属于首次/修复成功) */
+function quickLogin(){
+  const gb=document.querySelector('#v-main .g-bot');
+  mood(gb,'happy');
+  $('main-lede').textContent='刚刚帮你重新登录了一次 ✓';
+}
 /* 流程动作 */
-function enableDaily(){
-  const c=$('cred');
-  if(c.style.display==='none'){c.style.display='block';return}
-  loginNow();
-}
-function loginNow(){$('login-err').style.display='none';show('v-success');party()}
+function enableDaily(){configured=true;hasPwd=false;showSuccess()}  /* 一键即开,密码事后补 */
+function loginNow(){hasPwd=true;$('login-err').style.display='none';showSuccess()}
 function pickWifi(el){
   el.classList.add('on');
-  setTimeout(()=>{show('v-login')},550);
+  setTimeout(()=>{openDetail('v-login')},550);
+}
+/* 登录失败:内联提示(不再单独占一页) */
+function loginError(){openDetail('v-login');greet();$('login-err').style.display='block'}
+/* 桂桂 = 主页按钮:任何视图点击回日常页;主页/首次页内点击 = 弹跳彩蛋 */
+function botClick(){
+  if($('v-boot').classList.contains('on')||$('v-success').classList.contains('on'))return;
+  if($('v-main').classList.contains('on')||$('v-ok').classList.contains('on')){mood(document.querySelector('.g-bot'),'happy');return}
+  goDaily();
 }
 /* 庆祝粒子:canvas-confetti 颜文字模式;画布在卡片内,CDN 失败静默降级 */
 function party(){
@@ -592,6 +614,10 @@ document.querySelectorAll('.dd').forEach(dd=>{
   }));
 });
 document.addEventListener('click',()=>document.querySelectorAll('.dd.open').forEach(o=>o.classList.remove('open')));
+/* 自定义时间:点「自定义」展开 HH:MM 输入 */
+document.getElementById('btn-custom').addEventListener('click',()=>{
+  $('custom-time').style.display='block';
+});
 /* 窗口化 */
 function minimize(){$('pill-text').textContent='桂桂在后台静默运行 · 点击打开';hideWin()}
 function closeWin(){$('pill-text').textContent='桂桂已退出前台 · 后台仍每天登录 · 点击打开';hideWin()}
