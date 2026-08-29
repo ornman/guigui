@@ -49,6 +49,7 @@ body{
     inset 0 1px 0 oklch(100% 0 0 / 0.8),
     inset 0 -1px 0 oklch(100% 0 0 / 0.25);
   transition:transform .45s cubic-bezier(.3,1.2,.4,1),opacity .35s;
+  overflow:hidden; /* 特效/动画一律裁剪在卡片内 */
 }
 .window.minimized{transform:scale(.1) translateY(60vh);opacity:0;pointer-events:none}
 
@@ -56,6 +57,8 @@ body{
   border-bottom:1px solid oklch(100% 0 0 / 0.45)}
 .titlebar .name{font-family:Inter,"PingFang SC",sans-serif;font-size:11px;font-weight:600;
   letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.titlebar .tag{font-family:Inter,"PingFang SC",sans-serif;font-size:10px;color:var(--ink-3);
+  opacity:.65;margin-left:10px;letter-spacing:.06em}
 .titlebar .spacer{flex:1}
 .tbtn{width:26px;height:26px;border:none;border-radius:8px;background:transparent;
   color:var(--ink-3);font-family:Inter,sans-serif;font-size:13px;line-height:1;cursor:pointer;
@@ -64,6 +67,8 @@ body{
 
 .body{position:relative;height:calc(100% - 44px);padding:28px 36px 26px;
   overflow-y:auto;overflow-x:hidden}
+/* 庆祝粒子画布:固定在卡片内部,粒子不会飞出窗口 */
+#fx{position:absolute;inset:0;z-index:15;pointer-events:none;border-radius:22px}
 .v{display:none;animation:fadein .3s ease-out}
 .v.on{display:block}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -72,12 +77,15 @@ body{
 .bot{position:absolute;z-index:5;width:104px;height:104px;
   left:calc(50% - 52px);top:calc(50% - 70px);
   transition:all .75s cubic-bezier(.3,1.45,.4,1)}
-.bot.docked{width:58px;height:58px;left:28px;top:32px}
+.bot.docked{width:58px;height:58px;left:30px;top:76px;cursor:pointer}
+.bot.docked:hover svg{animation:wiggle .5s ease-in-out}
+@keyframes wiggle{0%,100%{transform:rotate(0)}30%{transform:rotate(-7deg)}70%{transform:rotate(7deg)}}
+/* 停靠在问候块(标题+副标题)左侧,两行文字对齐同一条左线;bot 与整块垂直居中 */
+.window.bot-docked .v.on h1,.window.bot-docked .v.on .lede,.window.bot-docked .v.on .tagline{margin-left:66px}
+.tagline{font-size:12.5px;color:var(--accent);font-family:Inter,"PingFang SC",sans-serif;
+  font-weight:600;margin:-4px 0 14px;letter-spacing:.02em}
 .bot.big{width:116px;height:116px;left:calc(50% - 58px);top:22px}
 .bot.hidden{opacity:0;pointer-events:none}
-/* 停靠在问候标题左侧时,文字整体让位 */
-.window.bot-docked .v.on h1{margin-left:72px;transition:margin-left .5s cubic-bezier(.3,1.2,.4,1)}
-.window.bot-docked .v.on .lede{margin-left:72px}
 /* 成功页:bot 恢复首次仪式级大尺寸,内容下移让位 */
 .window.bot-big #v-success{padding-top:124px}
 .bot svg{width:100%;height:100%;display:block}
@@ -124,8 +132,6 @@ input,select{width:100%;padding:11px 14px;border:1px solid oklch(60% 0.01 295 / 
   border-radius:12px;background:oklch(100% 0 0 / 0.6);font:15px/1.5 inherit;font-family:inherit;
   color:var(--ink);transition:border-color .18s,box-shadow .18s}
 input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.mini-select{width:auto;padding:6px 10px;border-radius:8px;
-  font-family:Inter,"PingFang SC",sans-serif;font-size:12px}
 
 .btn{display:block;width:100%;padding:12px;margin-top:10px;border:none;border-radius:12px;
   background:var(--ink);color:oklch(97% 0.005 295);font:600 14.5px/1.4 inherit;font-family:inherit;
@@ -224,13 +230,14 @@ input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 
 <div class="window" id="win">
   <div class="titlebar">
     <span class="name">桂桂 / GuiGui</span>
+    <span class="tag">自动登录校园网</span>
     <span class="spacer"></span>
     <button class="tbtn" onclick="minimize()" title="后台静默">–</button>
     <button class="tbtn" onclick="closeWin()" title="后台静默">×</button>
   </div>
 
-  <!-- Bot(窗口层级:初始化居中 → 停靠标题栏左侧、桂桂名字旁) -->
-  <div class="bot" id="bot" data-mood="sleep">
+  <!-- Bot(家 = 主页问候左侧;点击任意视图回主页) -->
+  <div class="bot" id="bot" data-mood="sleep" title="点我回主页" onclick="botClick()">
     <svg viewBox="0 0 120 120">
       <path class="b-body" d="M60,12 C90,12 106,32 106,62 C106,92 90,108 60,108 C30,108 14,92 14,62 C14,32 30,12 60,12 Z"/>
       <path class="eye e-closed" d="M35,58 Q43,64 51,58 M69,58 Q77,64 85,58"/>
@@ -247,17 +254,13 @@ input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 
 
     <!-- 初始化仪式(只一次) -->
     <div class="v on" id="v-boot">
-      <div class="boot-cap">正在初始化 · 检查网络环境…</div>
-    </div>
-
-    <!-- 边界:开机太快,等网络 -->
-    <div class="v" id="v-wait">
-      <div class="boot-cap">等网络准备好…<br><span style="font-size:11px;opacity:.7">开机后网卡就绪需要几秒,桂桂会自动继续</span></div>
+      <div class="boot-cap" id="boot-cap">正在初始化 · 检查网络环境…</div>
     </div>
 
     <!-- 首次①:已登录 -->
     <div class="v" id="v-ok">
       <h1 class="g">早上好。</h1>
+      <p class="tagline">校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好</p>
       <p class="lede">已经连上啦。桂桂把能认的都认好了:</p>
       <div class="status ok"><span class="dot"></span><span>Campus-WiFi · 已认证</span></div>
       <div class="micro-line">✓ 学号:2025…7209(从登录会话识别) &nbsp;✓ WiFi:Campus-WiFi &nbsp;✓ 服务器:10.1.2.3</div>
@@ -274,6 +277,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 
       <h1 class="g">早上好。</h1>
       <p class="lede">连上了校园网,但还没登录。填一下,以后桂桂每天帮你:</p>
       <div class="status warn"><span class="dot"></span><span>Campus-WiFi · 未认证</span></div>
+      <div class="micro-line" id="login-err" style="display:none"><span style="color:var(--warm)">⚠ 上次登录被拒:密码可能改过了,改下面的密码再点一次</span></div>
       <div class="f"><label>学号</label><input value="2025000000001"></div>
       <div class="f"><label>密码</label><input type="password" value="100001"></div>
       <button class="btn" onclick="loginNow()">立即登录</button>
@@ -305,9 +309,11 @@ input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 
     <!-- 主面板:体检卡 -->
     <div class="v" id="v-main">
       <h1 class="g">早上好。</h1>
+      <p class="tagline">校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好</p>
       <p class="lede" id="main-lede">一切正常,放心去忙。</p>
 
       <div class="tiny-label">今日体检</div>
+      <div class="check-row"><span class="k">自动登录</span><span class="v2"><b>已开启</b> · 每天 07:00</span></div>
       <div class="check-row"><span class="k">网络</span><span class="v2" id="main-net">已登录 ✓ · Campus-WiFi</span></div>
       <div class="check-row"><span class="k">下次行动</span><span class="v2" id="main-next">每天 07:00 · 窗口 06:30–07:30</span></div>
       <div class="check-row"><span class="k">最近心跳</span><span class="v2" style="font-family:Inter,sans-serif;font-size:12.5px">07:00:02 成功(1/6 次即停)</span></div>
@@ -322,23 +328,10 @@ input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 
       </div>
     </div>
 
-    <!-- 边界:密码错误 -->
-    <div class="v" id="v-badauth">
-      <h1>登录被拒绝了。</h1>
-      <p class="lede">服务器说学号或密码不对。改密码了吗?</p>
-      <div class="status warn"><span class="dot"></span><span>Dr.COM · 认证失败 ×3</span></div>
-      <div id="recred" style="display:none">
-        <div class="f"><label>学号</label><input value="2025000000001"></div>
-        <div class="f"><label>新密码</label><input type="password" placeholder="新密码"></div>
-      </div>
-      <button class="btn" id="btn-rec" onclick="fixAuth()">改密码,重新登录</button>
-      <button class="link" onclick="show('v-main');setMain('ok')">稍后再说</button>
-    </div>
-
     <!-- 高级设置(二级,按后端真实业务全量对齐) -->
     <div class="v" id="v-settings">
       <button class="back" onclick="backFromSettings()">‹ 返回</button>
-      <h1 style="font-size:22px;margin-left:0!important">高级设置</h1>
+      <h1 style="font-size:22px">高级设置</h1>
 
       <div class="tiny-label">每日自动登录</div>
       <div class="times times-pick">
@@ -382,6 +375,9 @@ input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 
     </div>
 
   </div>
+
+  <!-- 庆祝粒子画布(裁剪在卡片内) -->
+  <canvas id="fx"></canvas>
 </div>
 
 <!-- 后台胶囊 -->
@@ -412,19 +408,19 @@ input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 
   <button onclick="wakeProblem('out')">日常·掉线了</button>
   <button onclick="wakeProblem('down')">日常·不可达</button>
   <button onclick="bootWait()">开机太快·等网络</button>
-  <button onclick="show('v-badauth');mood('sad')">密码错误</button>
+  <button onclick="loginError()">密码错误</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 <script>
 const bot=document.getElementById('bot'),win=document.getElementById('win');
 const $=id=>document.getElementById(id);
-const views=['v-boot','v-wait','v-ok','v-login','v-success','v-guide','v-main','v-badauth','v-settings'];
+const views=['v-boot','v-ok','v-login','v-success','v-guide','v-main','v-settings'];
 let prev='v-main',mainState='ok',fixMode=false;
 
 /* bot 状态由当前视图驱动:center 初始化 / docked 问候标题左侧 / big 庆祝仪式级 / hidden */
-const botByView={'v-boot':'center','v-wait':'center','v-ok':'docked','v-login':'docked',
-  'v-success':'big','v-guide':'docked','v-main':'docked','v-badauth':'docked','v-settings':'hidden'};
+const botByView={'v-boot':'center','v-ok':'docked','v-login':'docked',
+  'v-success':'big','v-guide':'docked','v-main':'docked','v-settings':'docked'};
 function setBot(state){
   bot.classList.remove('docked','big','hidden');
   win.classList.remove('bot-docked','bot-big');
@@ -458,8 +454,9 @@ function firstRun(which){
 }
 /* 开机太快:等待态 → 自动继续 */
 function bootWait(){
-  mood('sleep');show('v-wait');
-  setTimeout(()=>firstRun('ok'),2600);
+  mood('sleep');show('v-boot');
+  $('boot-cap').innerHTML='等网络准备好…<br><span style="font-size:11px;opacity:.7">开机后网卡就绪需要几秒,桂桂会自动继续</span>';
+  setTimeout(()=>{$('boot-cap').textContent='正在初始化 · 检查网络环境…';firstRun('ok')},2600);
 }
 /* 日常:快速苏醒 0.6s */
 function wake(){
@@ -489,7 +486,7 @@ function enableDaily(){
   if(c.style.display==='none'){c.style.display='block';return}
   showSuccess();
 }
-function loginNow(){showSuccess()}
+function loginNow(){$('login-err').style.display='none';showSuccess()}
 function showSuccess(){
   show('v-success');
   mood('happy');bot.classList.add('sway');
@@ -498,18 +495,25 @@ function showSuccess(){
 /* 庆祝粒子:canvas-confetti 颜文字模式;CDN 失败静默降级 */
 function party(){
   if(typeof confetti!=='function')return;
-  const kao=confetti.shapeFromText({text:'~(￣▽￣)',scalar:2});
-  const heart=confetti.shapeFromText({text:'♥',scalar:1.5});
+  const cv=document.getElementById('fx');
+  cv.width=win.clientWidth;cv.height=win.clientHeight;
+  const fx=confetti.create(cv,{resize:false,useWorker:false});   // 画布在卡片内,粒子不出窗
+  const kao=fx.shapeFromText({text:'~(￣▽￣)',scalar:2});
+  const heart=fx.shapeFromText({text:'♥',scalar:1.5});
   const base={shapes:[kao,heart],colors:['#7c3aed','#c4b5fd','#f0abfc'],
-    scalar:1.8,spread:65,startVelocity:38,ticks:160,zIndex:30};
-  confetti({...base,particleCount:16,angle:60,origin:{x:.42,y:.4}});
-  confetti({...base,particleCount:16,angle:120,origin:{x:.58,y:.4}});
-  setTimeout(()=>confetti({...base,particleCount:10,spread:100,origin:{x:.5,y:.3}}),350);
+    scalar:1.8,spread:65,startVelocity:38,ticks:160};
+  fx({...base,particleCount:16,angle:60,origin:{x:.38,y:.42}});
+  fx({...base,particleCount:16,angle:120,origin:{x:.62,y:.42}});
+  setTimeout(()=>fx({...base,particleCount:10,spread:100,origin:{x:.5,y:.32}}),350);
 }
-function fixAuth(){
-  const c=$('recred');
-  if(c.style.display==='none'){c.style.display='block';$('btn-rec').textContent='保存并重新登录';return}
-  fixMode=false;showSuccess();
+/* 登录失败:内联提示(不再单独占一页) */
+function loginError(){show('v-login');greet();$('login-err').style.display='block';mood('sad')}
+/* 桂桂 = 主页按钮:任何视图点击回日常页;主页/首次页内点击 = 弹跳彩蛋 */
+function botClick(){
+  if($('v-boot').classList.contains('on'))return;
+  if($('v-main').classList.contains('on')){mood('happy');return}
+  if($('v-ok').classList.contains('on')){mood('happy');return}
+  setMain(mainState);show('v-main');greet();
 }
 function pickWifi(el){
   el.classList.add('on');
