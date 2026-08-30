@@ -40,3 +40,4 @@
 - **imagegen-frontend-web 与 image-to-code 都假设"先出图再写码"**——ZCode 本环境无生图工具,这两条目前产出会落到"图描述 + 设计规范",图本身得另做。
 - **imagegen-frontend-web 强制每 section 一独立横图**,不适合密集短 section 共用背景的页面——那种需求需要先放宽这条。
 - **严格遵循 AGENTS.md 的 Git 规范**:新增/修改了 skill 引用说明后,立即 `git add` + `git commit`。
+- **产品主原型(8 视图 / 表单 / 设置 / 日志)不在 design-taste-frontend 的「适用」范围**(见该 skill §13 — NOT for dense product UI / dashboards)。它针对的是 marketing landing 与 portfolio。**产品原型阶段的修复只用其「哨兵」子集**:§9.G em-dash 全禁 / §6.B prefers-reduced-motion 全清 / §6.A 只动 transform+opacity / §4.5 button contrast / §9.A 禁纯黑纯白 / §9.F 禁版本号徽标 / §9.F 禁 scroll cue / §4.4 shape consistency。**跳过**:Hero 适配 / bento / GSAP sticky-stack / logo wall / serif discipline / premium-consumer palette(那些针对 marketing 页)。2026-08-31 PRD bot 拆分(commit dae62fd ~ 0ccf93e)即按此口径自检通过。
