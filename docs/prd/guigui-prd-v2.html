@@ -90,27 +90,27 @@ body{
 .bot svg{display:block;overflow:visible;width:100%;height:100%}
 
 /* 首次仪式:bot 居中 140px + 归位到左上角问候块左侧(58px) */
-.bot-boot{width:140px;height:140px;position:relative;
-  animation:botSettle 1.4s cubic-bezier(.22,1,.36,1) forwards;
-  transform-origin:50% 50%}
+/* boot-bot 容器:始终 fixed 58x58 在左上角(归宿),firstRun 时 JS 加 .centered
+   临时切到中央 140x140,归位时移除 .centered 走 dock-in 动画缩放回 58 */
+#boot-bot{position:fixed;left:36px;top:84px;width:58px;height:58px;z-index:10;
+  transform-origin:50% 50%;transition:none}
+/* 仪式态:.centered 切到中央 140x140,左 50% top 50% translate(-50%,-50%) */
+#boot-bot.centered{left:50%;top:50%;width:140px;height:140px;transform:translate(-50%,-50%);
+  animation:botSettle 1.4s cubic-bezier(.22,1,.36,1) forwards}
 @keyframes botSettle{
-  0%{opacity:0;transform:scale(.78) translateY(20px)}
-  35%{opacity:1;transform:scale(1.04) translateY(-4px)}
-  100%{opacity:1;transform:scale(1) translateY(0)}
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.78) translateY(20px)}
+  35%{opacity:1;transform:translate(-50%,-50%) scale(1.04) translateY(-4px)}
+  100%{opacity:1;transform:translate(-50%,-50%) scale(1) translateY(0)}
 }
-/* 归位:scale 0-80% 飞起来,translate 25-100% 落定(异步让眼睛看到加速感)
-   速度曲线 ease-out-quint 决定性快跳出 */
-#boot-bot.settled{animation:botDock .9s cubic-bezier(.22,1,.36,1) forwards;z-index:5}
+/* 归位动画:.centered 移除后用 dock-in 从中央→左上角 58x58,ease-out-quint */
+#boot-bot.dock-in{animation:botDock .9s cubic-bezier(.22,1,.36,1) forwards}
 @keyframes botDock{
-  0%{transform:scale(1) translate(0,0)}
-  20%{transform:scale(0.78) translate(-30px,-8px)}     /* 先飞起来 */
-  55%{transform:scale(0.55) translate(-90px,-32px)}    /* 减速 */
-  80%{transform:scale(0.45) translate(-128px,-50px)}   /* 即将落定 */
-  100%{transform:scale(0.414) translate(-148px,-58px)}  /* 落定 */
+  0%{transform:translate(-50%,-50%) scale(1)}
+  20%{transform:translate(-50%,-50%) scale(0.78) translateY(-8px)}
+  55%{transform:translate(-50%,-50%) scale(0.55) translateY(-32px)}
+  80%{transform:translate(-50%,-50%) scale(0.45) translateY(-50px)}
+  100%{transform:none scale(0.414)}
 }
-/* boot 容器归位后避免点击事件落到原 v-ok g-bot 上,临时隐藏它,1s 后显示 */
-#v-ok .g-bot{opacity:1;transition:opacity .3s}
-#v-ok.ghost-on .g-bot{opacity:0;pointer-events:none}
 /* 庆祝页大 bot(固定大尺寸,无归位) */
 .bot-success{width:140px;height:140px;margin:0 auto 10px}
 /* v-success 内容层:卡片光晕脉冲 + bot 弹入 + 4 行文字逐行浮入 + 背景渐显
@@ -145,9 +145,9 @@ body{
 
 /* 主页问候行:内嵌 bot + 标题,flex 垂直居中,永不错位 */
 .greet{display:flex;align-items:center;gap:14px;margin-bottom:2px}
-.greet .g-bot{width:58px;height:58px;flex-shrink:0;cursor:pointer}
-.greet .g-bot:hover{filter:brightness(1.06)}
-body.hide-gui .greet .g-bot{display:none}
+.greet #boot-bot{width:58px;height:58px;flex-shrink:0;cursor:pointer}
+.greet #boot-bot:hover{filter:brightness(1.06)}
+body.hide-gui .greet #boot-bot{display:none}
 
 /* pop 反馈(用户点击桂桂时) */
 @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.1,.9)}70%{transform:scale(.95,1.05)}100%{transform:scale(1)}}
@@ -162,10 +162,10 @@ body.hide-gui .greet .g-bot{display:none}
 @keyframes idle-breath{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
 
 /* 排除 boot-boot 与 bot-success 容器,让它们各自的 dock/bounce 规则生效 */
-.g-bot[data-state=idle],.g-bot[data-mood=idle]{animation-name:idle-breath;animation-duration:2.4s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
-.g-bot[data-state=complete],.g-bot[data-mood=happy]{animation-name:happy-sway;animation-duration:1.6s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 90%}
-.g-bot[data-state=thinking],.g-bot[data-mood=sad]{animation-name:sad-droop;animation-duration:2.2s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 50%}
-.g-bot[data-state=angry],.g-bot[data-mood=cry]{animation-name:cry-shake;animation-duration:.5s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+#boot-bot[data-state=idle],#boot-bot[data-mood=idle]{animation-name:idle-breath;animation-duration:2.4s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+#boot-bot[data-state=complete],#boot-bot[data-mood=happy]{animation-name:happy-sway;animation-duration:1.6s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 90%}
+#boot-bot[data-state=thinking],#boot-bot[data-mood=sad]{animation-name:sad-droop;animation-duration:2.2s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 50%}
+#boot-bot[data-state=angry],#boot-bot[data-mood=cry]{animation-name:cry-shake;animation-duration:.5s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
 /* 庆祝页大 bot(独立容器,自己 bounce)— 自身已挂 .bot-success happy 状态
    注意:此规则被 .v-success-stage.in .bot-success 覆盖(那个有更高特异性) */
 .v-success-stage.in .bot-success[data-state=complete]{animation-name:botIn, happy-bounce;animation-duration:.55s, .9s;animation-delay:0s, .55s;animation-timing-function:cubic-bezier(.22,1,.36,1), ease-in-out;animation-iteration-count:1, infinite;animation-fill-mode:both, none;transform-origin:50% 50%}
@@ -400,14 +400,13 @@ body.backdrop-black .taskbar{display:none}
 
     <!-- 开机仪式(首次/等网络共用) -->
     <div class="v on" id="v-boot">
-      <div class="bot bot-boot" id="boot-bot" data-state="sleep" data-size="140"></div>
+      <div class="bot bot-boot" id="boot-bot" data-state="sleep" data-size="140" onclick="mood(this,'happy')" style="cursor:pointer"></div>
       <div class="boot-cap" id="boot-cap">桂桂伸了个懒腰,正在检查网络…</div>
     </div>
 
     <!-- 首次配置页:一键开启,密码事后温柔补 -->
     <div class="v" id="v-ok">
       <div class="greet">
-        <div class="g-bot bot" data-state="complete" data-size="58"></div>
         <div>
           <h1 class="g">早上好。</h1>
           <p class="tagline">校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好</p>
@@ -468,10 +467,9 @@ body.backdrop-black .taskbar{display:none}
       <button class="link" onclick="openDetail('v-login')">③ 先填资料,连上后桂桂自动帮你登录</button>
     </div>
 
-    <!-- 日常主页:体检卡 -->
+    <!-- 日常主页:体检卡(无 bot,共用 boot-bot) -->
     <div class="v" id="v-main">
       <div class="greet">
-        <div class="g-bot bot" data-state="idle" data-size="58"></div>
         <div>
           <h1 class="g" id="main-h1">早上好。</h1>
           <p class="say" id="main-lede">网的事交给我,你放心忙~</p>
@@ -690,6 +688,7 @@ function firstRun(state){
   document.body.classList.add('setup');
   const b=$('boot-bot');
   $('boot-cap').textContent='桂桂伸了个懒腰,正在检查网络…';
+  b.classList.add('centered');
   b.classList.remove('awake');b.dataset.mood='sleep';
   show('v-boot');
   setTimeout(()=>{mood(b,mainState==='ok'?'idle':(mainState==='out'?'sad':'cry'));b.classList.add('awake')},1300);
@@ -699,6 +698,7 @@ function firstRun(state){
 function bootWait(){
   mainState='ok';document.body.classList.remove('setup');
   const b=$('boot-bot');
+  b.classList.add('centered');
   b.classList.remove('awake');b.dataset.mood='sleep';
   $('boot-cap').innerHTML='校园网 06:50 才开门,桂桂在门口等着…<br><span style="font-size:11px;opacity:.7">每 30 秒看一次,开了就替你登好</span>';
   show('v-boot');
@@ -710,23 +710,30 @@ function goSetup(){
   else if(mainState==='down')show('v-guide');
   else show('v-ok');
   greet();
-  /* 仪式结束,触发 boot-bot 归位到 v-ok 问候块左侧;v-ok 自带 g-bot 临时隐藏避免重叠 */
+  /* 仪式结束:boot-bot 从 v-boot 中央 fixed→左上角 fixed(0.9s ease-out-quint 缩放曲线) */
   const b=$('boot-bot');if(b){
-    b.classList.add('settled');
-    const vok=$('v-ok');
-    if(vok)vok.classList.add('ghost-on');
-    setTimeout(()=>{if(vok)vok.classList.remove('ghost-on')},1100);
+    b.classList.remove('centered');
+    b.classList.remove('dock-in');void b.offsetWidth;
+    b.classList.add('dock-in');
+    /* dock-in 完成后清掉 class,避免重放 */
+    setTimeout(()=>{b.classList.remove('dock-in')},1000);
   }
 }
 /* 日常主页:渲染当前状态 + 密码补填提示 */
 function goDaily(){
   document.body.classList.remove('setup');
-  const b=$('boot-bot');if(b)b.classList.add('settled');
+  const b=$('boot-bot');
+  if(b){
+    b.classList.remove('centered');
+    b.classList.remove('dock-in');void b.offsetWidth;
+    b.classList.add('dock-in');
+    setTimeout(()=>{b.classList.remove('dock-in')},1000);
+  }
   renderMain();show('v-main');greet();
 }
 /* 状态即标题:出问题时,页面最大的字直接说这件事(不靠装饰条) */
 function renderMain(){
-  const gb=document.querySelector('#v-main .g-bot');
+  const gb=document.querySelector('#boot-bot');
   const vm=$('v-main');
   vm.classList.toggle('st-warn',mainState==='out');
   vm.classList.toggle('st-down',mainState==='down');
@@ -752,7 +759,7 @@ function setAuto(on){
   const d=$('auto-desc');
   if(d)d.textContent=on?'明早 07:00 替你登 · 到点前 30 分钟开始试':'已关 · 想让我开工随时说';
   if($('v-main').classList.contains('on')){
-    mood(document.querySelector('#v-main .g-bot'),on?'idle':'sleep');
+    mood(document.querySelector('#boot-bot'),on?'idle':'sleep');
     $('main-lede').textContent=on?'网的事交给我,你放心忙~':'好,我先歇着,想我了再开。';
   }
 }
@@ -784,7 +791,7 @@ function mainAction(){
 }
 /* 主页上的重登:就地反馈,不跳庆祝页(庆祝只属于首次/修复成功) */
 function quickLogin(){
-  const gb=document.querySelector('#v-main .g-bot');
+  const gb=document.querySelector('#boot-bot');
   mood(gb,'happy');
   $('main-lede').textContent='刚刚把网帮你接回来啦 ✓';
 }
