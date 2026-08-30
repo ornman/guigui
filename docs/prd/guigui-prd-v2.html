@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <title>桂桂 / GuiGui · 一主页四态 + 详情</title>
+<!-- ⚠ 本原型为 PRD 演示,所有学号/密码为占位示例(2025000000001 / 100001)。
+     生产代码严禁预填账密:账密必须经用户输入或从 OS keychain 读取。
+     输入框已加 autocomplete="new-password" 防浏览器回填真实凭据。 -->
 <style>
 /* 色彩纪律:按钮纯黑单色 / 唯一强调紫(状态点/开关/聚焦/选中态) / 唯一暖色例外(不可达点) / 中性色紫染
    例外:选中态允许紫→粉渐变描边(用户指定)
@@ -343,6 +346,9 @@ input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--a
 .back{display:inline-flex;align-items:center;gap:6px;background:none;border:none;padding:0;
   font:500 12.5px/1 Inter,"PingFang SC",sans-serif;color:var(--ink-3);cursor:pointer;margin-bottom:14px}
 .back:hover{color:var(--ink)}
+/* 首装密码空警告:与 .login-err 同档暖色块,不破裸表单极简 */
+.pwd-warn{display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px 12px;border-radius:10px;
+  background:oklch(72% 0.12 70 / 0.10);font:500 12px/1.5 Inter,"PingFang SC",sans-serif;color:var(--warm)}
 
 /* 庆祝粒子画布:固定在卡片内部,粒子不出窗 */
 #fx{position:absolute;inset:0;z-index:15;pointer-events:none;border-radius:22px}
@@ -415,14 +421,14 @@ body.backdrop-black .taskbar{display:none}
         </div>
       </div>
       <div class="status ok"><span class="dot"></span><span>Campus-WiFi · 已连上 · 学号已识别 ✓</span></div>
-      <div class="f"><label>学号</label><input id="f-sid" value="2025000000001" placeholder="请输入学号"></div>
+      <div class="f"><label>学号</label><input id="f-sid" value="2025000000001" placeholder="请输入学号" autocomplete="username"></div>
       <div class="f"><label>密码</label>
-        <div class="pw-wrap"><input type="password" id="f-pwd" placeholder="请输入密码">
+        <div class="pw-wrap"><input type="password" id="f-pwd" placeholder="请输入密码" autocomplete="new-password">
           <button type="button" class="pw-eye" onclick="togglePw('f-pwd',this)" title="显示 / 隐藏密码">
             <svg class="i-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
             <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><path d="M4 4l16 16"/></svg>
           </button></div>
-        <div class="micro-line" id="pwd-warn" style="display:none;color:var(--warm)">密码还没填呢</div></div>
+        <div class="pwd-warn" id="pwd-warn" style="display:none"><span>⚠</span><span>密码还没填呢</span></div></div>
       <button class="btn" onclick="enableDaily()">开启每日自动登录</button>
     </div>
 
@@ -433,9 +439,9 @@ body.backdrop-black .taskbar{display:none}
       <p class="lede">连上了校园网,还没登录。填一次,以后每天都是桂桂的事:</p>
       <div class="status warn"><span class="dot"></span><span>Campus-WiFi · 未认证</span></div>
       <div class="micro-line" id="login-err" style="display:none"><span style="color:var(--warm)">⚠ 上次登录被拒:密码可能改过了,改下面的密码再点一次</span></div>
-      <div class="f"><label>学号</label><input value="2025000000001"></div>
+      <div class="f"><label>学号</label><input value="2025000000001" autocomplete="username"></div>
       <div class="f"><label>密码</label>
-        <div class="pw-wrap"><input type="password" id="f-pwd-login" value="100001">
+        <div class="pw-wrap"><input type="password" id="f-pwd-login" value="100001" autocomplete="new-password">
           <button type="button" class="pw-eye" onclick="togglePw('f-pwd-login',this)" title="显示 / 隐藏密码">
             <svg class="i-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
             <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><path d="M4 4l16 16"/></svg>
@@ -448,7 +454,7 @@ body.backdrop-black .taskbar{display:none}
       <div class="v-success-stage">
         <div class="bot bot-success" data-state="complete" data-size="140"></div>
         <h1 class="s-line s-1">网,已经帮你连好啦</h1>
-        <p class="lede s-line s-2">明早 07:00,桂桂会提前替你登好<br>你只管睡到自然醒。</p>
+        <p class="lede s-line s-2" id="success-time">明早 07:00,桂桂会提前替你登好<br>你只管睡到自然醒。</p>
         <div class="micro-line s-line s-3">✓ 现在就可以关闭窗口,桂桂在后台守着</div>
         <button class="btn s-line s-4" style="max-width:220px;margin:16px auto 0" onclick="backFrom('v-success')">完成,回主页</button>
         <button class="link s-line s-5" style="display:block;width:fit-content;margin:10px auto 0" onclick="openDetail('v-settings')">高级设置</button>
@@ -635,6 +641,13 @@ const $=id=>document.getElementById(id);
 const views=['v-boot','v-ok','v-login','v-success','v-guide','v-main','v-settings','v-log'];
 let mainState='ok',configured=false,hasPwd=false;
 const origin={};   /* 详情视图来路:返回必回原处 */
+/* 触发时间:从 v-settings 时间输入/药丸同步,主页 desc 与庆祝页 lede 都读这个值(报告 1.4) */
+let currentTriggerTime='07:00';
+function formatTriggerTime(h,m){return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
+function renderTriggerTime(){
+  const h=parseInt($('ct-h').value,10),m=parseInt($('ct-m').value,10);
+  if(!isNaN(h)&&!isNaN(m))currentTriggerTime=formatTriggerTime(h,m);
+}
 
 /* 桂桂 bot 状态映射:5 状态 → noteai 的内部状态机
    sleep↔sleep / idle↔idle / happy↔complete(眯弯月+心跳消失) / sad↔thinking / cry↔angry(哭) */
@@ -758,7 +771,7 @@ function wakeProblem(kind){mainState=kind;goDaily()}
 function setAuto(on){
   ['sw-auto','sw-auto-set'].forEach(id=>{const s=$(id);if(s)s.classList.toggle('on',on)});
   const d=$('auto-desc');
-  if(d)d.textContent=on?'明早 07:00 替你登 · 到点前 30 分钟开始试':'已关 · 想让我开工随时说';
+  if(d)d.textContent=on?'明早 '+currentTriggerTime+' 替你登 · 到点前 30 分钟开始试':'已关 · 想让我开工随时说';
   if($('v-main').classList.contains('on')){
     mood(document.querySelector('#boot-bot-greet-main'),on?'idle':'sleep');
     $('main-lede').textContent=on?'网的事交给我,你放心忙~':'好,我先歇着,想我了再开。';
@@ -770,21 +783,9 @@ function togglePw(id,btn){
   const inp=$(id);const showPw=inp.type==='password';
   inp.type=showPw?'text':'password';btn.classList.toggle('off',!showPw);
 }
-/* 自定义时间:两位一格直接键入,自动跳格 + 范围约束(比滚轮快,比原生控件美) */
-['ct-h','ct-m'].forEach((id,i,arr)=>{
-  const el=$(id);
-  el.addEventListener('input',()=>{
-    el.value=el.value.replace(/\D/g,'').slice(0,2);
-    el.classList.remove('err');
-    if(el.value.length===2&&i<arr.length-1)$(arr[i+1]).focus();
-  });
-  el.addEventListener('blur',()=>{
-    if(!el.value)return;
-    const max=i===0?23:59;let v=parseInt(el.value,10);
-    if(isNaN(v)||v>max){v=Math.min(isNaN(v)?0:v,max);el.classList.add('err')}
-    el.value=String(v).padStart(2,'0');
-  });
-});
+/* 自定义时间:两位一格直接键入,自动跳格 + 范围约束(比滚轮快,比原生控件美)
+   注:同一份监听器在文件下方"自定义时间"段又重复注册了一次(原代码遗留),已合并到单点;
+   这里仅保留 mainAction,详见下方唯一一份 ct-h/ct-m 监听。 */
 function mainAction(){
   if(mainState==='ok'){quickLogin()}
   else if(mainState==='out'){openDetail('v-login')}
@@ -799,6 +800,9 @@ function quickLogin(){
 /* 流程动作 */
 /* 庆祝页入场:重新给 stage 加 .in class 触发 CSS animation(display:none→block 不会自动重启动画) */
 function showSuccess(){
+  renderTriggerTime();   /* 同步最新触发时间,避免 lede 写死 07:00 */
+  const lede=$('success-time');
+  if(lede)lede.innerHTML='明早 '+currentTriggerTime+',桂桂会提前替你登好<br>你只管睡到自然醒。';
   show('v-success');
   const stage=document.querySelector('#v-success .v-success-stage');
   if(stage){
@@ -888,6 +892,8 @@ document.querySelectorAll('.preset').forEach(b=>b.addEventListener('click',()=>{
   b.classList.add('on');
   const t=b.dataset.t.split(':');
   $('ct-h').value=t[0];$('ct-m').value=t[1];
+  currentTriggerTime=b.dataset.t;   /* 同步给主页 desc 与庆祝页 lede(报告 1.4) */
+  setAuto($('sw-auto').classList.contains('on'));
 }));
 ['ct-h','ct-m'].forEach((id,i,arr)=>{
   const el=$(id);
@@ -896,6 +902,8 @@ document.querySelectorAll('.preset').forEach(b=>b.addEventListener('click',()=>{
     el.classList.remove('err');
     document.querySelectorAll('.preset').forEach(x=>x.classList.remove('on'));
     if(el.value.length===2&&i<arr.length-1)$(arr[i+1]).focus();
+    renderTriggerTime();
+    setAuto($('sw-auto').classList.contains('on'));
   });
   el.addEventListener('blur',()=>{
     if(!el.value)return;
@@ -904,11 +912,18 @@ document.querySelectorAll('.preset').forEach(b=>b.addEventListener('click',()=>{
     el.value=String(v).padStart(2,'0');
   });
 });
-/* 窗口化 */
+/* 窗口化:最小化/关闭时记录当前视图,恢复时回原处(报告 1.3) */
+let lastViewBeforeHide=null;
 function minimize(){$('pill-text').textContent='桂桂在后台静默运行 · 点击打开';hideWin()}
 function closeWin(){$('pill-text').textContent='桂桂已退出前台 · 后台仍每天登录 · 点击打开';hideWin()}
-function hideWin(){win.classList.add('minimized');$('pill').classList.add('on')}
-function restore(){$('pill').classList.remove('on');win.classList.remove('minimized')}
+function hideWin(){lastViewBeforeHide=currentView();win.classList.add('minimized');$('pill').classList.add('on')}
+function restore(){
+  const dest=lastViewBeforeHide&&lastViewBeforeHide!=='v-main'?lastViewBeforeHide:null;
+  $('pill').classList.remove('on');win.classList.remove('minimized');
+  if(dest){show(dest);greet()}
+  else{goDaily()}
+  lastViewBeforeHide=null;
+}
 /* 背景舞台 + 时钟 */
 function setBackdrop(m){document.body.className=(m==='black')?'backdrop-black':'backdrop-win11'}
 function clockTick(){const d=new Date();
