@@ -197,9 +197,11 @@ section.sc > canvas.scene{
 .hero h1 .em{font-weight:500;background:linear-gradient(120deg,#6D4DE8,#D946EF);-webkit-background-clip:text;background-clip:text;color:transparent}
 .hero .lede{margin-top:24px;position:relative;z-index:1}
 .hero .cta-row{display:flex;align-items:center;gap:34px;margin-top:38px;flex-wrap:wrap;position:relative;z-index:1}
+/* meta 的父级 .wrap 才是 grid 项,跨满两列 */
+.hero > .wrap:last-child{grid-column:1 / -1}
 .hero .hero-meta{
   display:grid;grid-template-columns:repeat(3,1fr);gap:36px;
-  padding:26px 32px;margin-top:60px;border-radius:18px;position:relative;z-index:1;
+  padding:26px 32px;margin-top:56px;border-radius:18px;position:relative;z-index:1;
 }
 .hero .hero-meta .cell .fig-label{margin-bottom:8px}
 .hero .hero-meta .cell p{font-family:var(--serif);font-size:14.5px;color:var(--ink-2);line-height:1.65}
@@ -481,9 +483,9 @@ section.sc > canvas.scene{
 <nav class="nav" aria-label="主导航">
   <a href="#top" class="brand">桂桂<i>/ GuiGui</i></a>
   <div class="links">
-    <a href="#fig-01">01 场景</a>
-    <a href="#fig-02">02 触发器</a>
-    <a href="#fig-03">03 信号</a>
+    <a href="#fig-01">01 信号</a>
+    <a href="#fig-02">02 场景</a>
+    <a href="#fig-03">03 触发器</a>
     <a href="#fig-04">04 问答</a>
     <a href="#fig-05">05 下载</a>
   </div>
@@ -512,7 +514,7 @@ section.sc > canvas.scene{
           <span class="arr-c">→</span>
           <span class="shine" aria-hidden="true"></span>
         </a>
-        <a class="btn-text" href="#fig-01">看怎么用</a>
+        <a class="btn-text" href="#fig-02">看怎么用</a>
       </div>
     </div>
 
@@ -576,12 +578,33 @@ section.sc > canvas.scene{
   </div>
 </section>
 
-<!-- ═══ Fig.01 场景 · 背景交互:竖向信号丝(光标推开弯曲) ═══ -->
-<section class="sc" id="fig-01" data-scene="threads">
+<!-- ═══ Fig.01 电磁波 · 炫酷全案:光标调频调幅(用户点名提到最前) ═══ -->
+<section class="sc" id="fig-01">
+  <div class="wrap">
+    <div class="sig rv">
+      <canvas id="em-canvas" aria-hidden="true"></canvas>
+      <div class="inner">
+        <div class="fig-label"><b>Fig. 01</b> — Signal · 电磁场</div>
+        <h2>不是一根信号柱,<br>是一道<span class="em">被调好的波</span>。</h2>
+        <p class="lede">校园网不是「信号格」的问题,是「信号准时到达」的问题。桂桂做的事,是在你还在刷牙时,把这道波调到正好。</p>
+        <div class="hint"><span class="cur" aria-hidden="true">✛</span>移动光标 · 横向调频率 · 纵向调幅度</div>
+        <div class="specs">
+          <div class="cell"><div class="fig-label">Retry</div><b>6 次 / 窗口</b></div>
+          <div class="cell"><div class="fig-label">Interval</div><b>5 min</b></div>
+          <div class="cell"><div class="fig-label">Avg Login</div><b>15 ms</b></div>
+          <div class="cell"><div class="fig-label">Server Opens</div><b>06:50</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Fig.02 场景 · 背景交互:竖向信号丝(光标推开弯曲) ═══ -->
+<section class="sc" id="fig-02" data-scene="threads">
   <canvas class="scene" aria-hidden="true"></canvas>
   <div class="wrap">
     <div class="sec-head">
-      <div class="fig-label"><b>Fig. 01</b><br>Scenarios<br>· 3 视图</div>
+      <div class="fig-label"><b>Fig. 02</b><br>Scenarios<br>· 3 视图</div>
       <div>
         <h2 class="rv">起床、到实验室、回家,<br>都按节奏来。</h2>
         <p class="lede rv">三种最常见的桂航学子上网场景。不求覆盖所有可能,只求覆盖你 95% 的日子。</p>
@@ -619,11 +642,11 @@ section.sc > canvas.scene{
 </section>
 
 <!-- ═══ Fig.02 触发器 · 背景交互:方格矩阵(光标点亮+点击涟漪) ═══ -->
-<section class="sc" id="fig-02" data-scene="squares">
+<section class="sc" id="fig-03" data-scene="squares">
   <canvas class="scene" aria-hidden="true"></canvas>
   <div class="wrap">
     <div class="sec-head">
-      <div class="fig-label"><b>Fig. 02</b><br>Methods<br>· 8 触发器</div>
+      <div class="fig-label"><b>Fig. 03</b><br>Methods<br>· 8 触发器</div>
       <div>
         <h2 class="rv">不靠一个触发器,靠一摞。</h2>
         <p class="lede rv">单一时间点会漏。多层叠加保底,总有一层替你兜住。</p>
@@ -639,27 +662,6 @@ section.sc > canvas.scene{
         <div class="ft-row"><div class="fig-label"><b>06</b> Policy</div><span class="t">假期静默</span><span class="d">连续 48 小时不可达,心跳降为每天 1 次且不通知。回校自动恢复。</span></div>
         <div class="ft-row"><div class="fig-label"><b>07</b> UX</div><span class="t">关窗即静</span><span class="d">关闭窗口无托盘图标,只留一枚胶囊浮标,点一下还原。</span></div>
         <div class="ft-row"><div class="fig-label"><b>08</b> UX</div><span class="t">系统通知</span><span class="d">成败都走 Win11 通知中心,失败 3 次内自动去重不刷屏。</span></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══ Fig.03 电磁波 · 炫酷全案:光标调频调幅 ═══ -->
-<section class="sc" id="fig-03">
-  <div class="wrap">
-    <div class="sig rv">
-      <canvas id="em-canvas" aria-hidden="true"></canvas>
-      <div class="inner">
-        <div class="fig-label"><b>Fig. 03</b> — Signal · 电磁场</div>
-        <h2>不是一根信号柱,<br>是一道<span class="em">被调好的波</span>。</h2>
-        <p class="lede">校园网不是「信号格」的问题,是「信号准时到达」的问题。桂桂做的事,是在你还在刷牙时,把这道波调到正好。</p>
-        <div class="hint"><span class="cur" aria-hidden="true">✛</span>移动光标 · 横向调频率 · 纵向调幅度</div>
-        <div class="specs">
-          <div class="cell"><div class="fig-label">Retry</div><b>6 次 / 窗口</b></div>
-          <div class="cell"><div class="fig-label">Interval</div><b>5 min</b></div>
-          <div class="cell"><div class="fig-label">Avg Login</div><b>15 ms</b></div>
-          <div class="cell"><div class="fig-label">Server Opens</div><b>06:50</b></div>
-        </div>
       </div>
     </div>
   </div>
