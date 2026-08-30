@@ -454,9 +454,9 @@ body.backdrop-black .taskbar{display:none}
     <div class="v" id="v-success">
       <div class="v-success-stage">
         <div class="bot bot-success" data-state="complete" data-size="140"></div>
-        <h1 class="s-line s-1">网,已经帮你连好啦</h1>
-        <p class="lede s-line s-2" id="success-time">明早 07:00,桂桂会提前替你登好<br>你只管睡到自然醒。</p>
-        <div class="micro-line s-line s-3">✓ 现在就可以关闭窗口,桂桂在后台守着</div>
+        <h1 class="s-line s-1">以后每天都会自动帮你登好。</h1>
+        <p class="lede s-line s-2" id="success-time">明早 07:00 开始。现在关掉就行。</p>
+        <div class="micro-line s-line s-3">到点就登，你不用管。</div>
         <button class="btn s-line s-4" style="max-width:220px;margin:16px auto 0" onclick="backFrom('v-success')">完成,回主页</button>
         <button class="link s-line s-5" style="display:block;width:fit-content;margin:10px auto 0" onclick="openDetail('v-settings')">高级设置</button>
       </div>
@@ -804,7 +804,7 @@ function quickLogin(){
 function showSuccess(){
   renderTriggerTime();   /* 同步最新触发时间,避免 lede 写死 07:00 */
   const lede=$('success-time');
-  if(lede)lede.innerHTML='明早 '+currentTriggerTime+',桂桂会提前替你登好<br>你只管睡到自然醒。';
+  if(lede)lede.innerHTML='明早 '+currentTriggerTime+' 开始。现在关掉就行。';
   show('v-success');
   const stage=document.querySelector('#v-success .v-success-stage');
   if(stage){
