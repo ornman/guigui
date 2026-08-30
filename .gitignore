@@ -36,3 +36,7 @@ docs/screenshots/
 
 # Claude session
 .claude/
+
+# local tooling artifacts
+.coverage
+.zcode/
