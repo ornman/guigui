@@ -135,17 +135,6 @@ h1{font-size:27px;font-weight:600;letter-spacing:-.01em;line-height:1.3}
 .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--ink-3)}
 .status.ok .dot{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .status.warn .dot{background:var(--warm)}
-/* 问题状态:掉线=品牌紫(自己能修),不可达=琥珀(外部问题),一眼可辨但不刺眼 */
-.status.warn{background:oklch(58% 0.15 295 / 0.06);border-radius:10px;padding:10px 12px;margin:12px 0 4px}
-.status.danger .dot{background:var(--warm);animation:pulse 1.4s ease-in-out infinite}
-.status.danger{background:oklch(72% 0.12 70 / 0.1);border-radius:10px;padding:10px 12px;margin:12px 0 4px}
-/* 状态条:内容顶部 4px,掉线紫/不可达琥珀 */
-.statebar{display:none;height:4px;border-radius:99px;margin:0 0 16px}
-#v-main.st-warn .statebar{display:block;background:var(--accent)}
-#v-main.st-down .statebar{display:block;background:var(--warm)}
-#v-main.st-warn #main-btn{border-color:var(--accent);color:var(--accent)}
-#v-main.st-down #main-btn{border-color:oklch(60% 0.11 70);color:oklch(52% 0.11 70)}
-#v-main.st-down .say{color:oklch(50% 0.09 70)}
 .micro-line{font-size:12px;color:var(--ink-3);font-family:Inter,"PingFang SC",sans-serif;
   margin:0 0 16px;line-height:1.8}
 
@@ -408,7 +397,7 @@ body.backdrop-black .taskbar{display:none}
       <p class="lede" style="text-align:center">明早 07:00,桂桂会提前替你登好 —<br>你只管睡到自然醒。</p>
       <div class="micro-line" style="text-align:center">✓ 现在就可以关闭窗口,桂桂在后台守着</div>
       <button class="btn" style="max-width:220px;margin:16px auto 0" onclick="backFrom('v-success')">完成,回主页</button>
-      <button class="link" style="display:block;width:fit-content;margin:10px auto 0" onclick="openDetail('v-settings')">高级设置</button>
+      <button class="link" style="margin:10px auto 0;display:block" onclick="openDetail('v-settings')">高级设置</button>
     </div>
 
     <!-- 不可达引导 -->
@@ -427,7 +416,6 @@ body.backdrop-black .taskbar{display:none}
 
     <!-- 日常主页:体检卡 -->
     <div class="v" id="v-main">
-      <div class="statebar"></div>
       <div class="greet">
         <div class="g-bot bot" data-mood="idle" onclick="mood(this,'happy')">
           <svg viewBox="0 0 120 120">
@@ -441,7 +429,6 @@ body.backdrop-black .taskbar{display:none}
           <p class="say" id="main-lede">网的事交给我,你放心忙~</p>
         </div>
       </div>
-      <div class="status warn" id="main-status" style="display:none"><span class="dot"></span><span id="main-status-text"></span></div>
 
       <div style="height:10px"></div>
       <div class="row"><div><div class="t">自动登录</div>
@@ -453,7 +440,7 @@ body.backdrop-black .taskbar{display:none}
         <div class="d">07:00 第一次就登好了 ✓</div></div></div>
 
       <button class="btn quiet" id="main-btn" onclick="quickLogin()">立即重新登录</button>
-      <button class="link" style="display:block;width:fit-content;margin-top:10px;font-size:12px" onclick="openDetail('v-settings')">高级设置</button>
+      <button class="link" style="display:block;text-align:left;margin-top:10px;font-size:12px" onclick="openDetail('v-settings')">高级设置</button>
 
       <div class="log">
         <div><span class="ts">07:00:01</span><span class="ok">[OK]</span> 网络可达</div>
@@ -578,9 +565,7 @@ body.backdrop-black .taskbar{display:none}
   <div class="cap">演示 · 仅原型脚手架</div>
   <button onclick="setBackdrop('win11')">背景·Win11</button>
   <button onclick="setBackdrop('black')">背景·纯黑</button>
-  <button onclick="firstRun('ok')">首次仪式</button>
-  <button onclick="firstRun('out')">首次·掉线</button>
-  <button onclick="firstRun('down')">首次·不可达</button>
+  <button onclick="firstRun()">首次仪式</button>
   <button onclick="bootWait()">开机太快·等网络</button>
   <button onclick="goDaily()">日常主页</button>
   <button onclick="wakeProblem('out')">日常·掉线了</button>
@@ -605,41 +590,28 @@ function backFrom(id){const dest=origin[id]||'v-main';if(dest==='v-main')renderM
 function greet(){const h=new Date().getHours();const g=h<11?'早上好':(h<18?'下午好':'晚上好');
   document.querySelectorAll('.g').forEach(e=>e.textContent=g+'。')}
 
-/* 首次仪式:完整苏醒典礼;结束后按网络状态三分流(与日常状态同源) */
-function firstRun(state){
-  mainState=state||'ok';
+/* 首次/开机仪式(等网络并入:只换字幕) */
+function firstRun(){
   const b=$('boot-bot');
   $('boot-cap').textContent='桂桂伸了个懒腰,正在检查网络…';
   b.classList.remove('awake');b.dataset.mood='sleep';
   show('v-boot');
-  setTimeout(()=>{mood(b,mainState==='ok'?'idle':(mainState==='out'?'sad':'cry'));b.classList.add('awake')},1300);
-  setTimeout(goSetup,2100);
+  setTimeout(()=>{mood(b,'idle');b.classList.add('awake')},1300);
+  setTimeout(()=>goSetup(),2100);
 }
-/* 开机等网络:无典礼,桂桂睡着在门口等;就绪后直接落日常主页(已配置用户的开机归宿) */
 function bootWait(){
   const b=$('boot-bot');
   b.classList.remove('awake');b.dataset.mood='sleep';
-  $('boot-cap').innerHTML='校园网 06:50 才开门,桂桂在门口等着…<br><span style="font-size:11px;opacity:.7">每 30 秒看一次,开了就替你登好</span>';
+  $('boot-cap').innerHTML='网络还没睡醒,桂桂再等等…<br><span style="font-size:11px;opacity:.7">开机后网卡就绪需要几秒,会自动继续</span>';
   show('v-boot');
-  setTimeout(()=>{$('boot-cap').textContent='门开了,桂桂进去了…';goDaily()},3000);
+  setTimeout(()=>{mood(b,'idle');b.classList.add('awake')},1300);
+  setTimeout(()=>{$('boot-cap').textContent='桂桂伸了个懒腰,正在检查网络…';goSetup()},2600);
 }
-function goSetup(){
-  if(mainState==='out')show('v-login');
-  else if(mainState==='down')show('v-guide');
-  else show('v-ok');
-  greet();
-}
+function goSetup(){show('v-ok');greet()}
 /* 日常主页:渲染当前状态 + 密码补填提示 */
 function goDaily(){renderMain();show('v-main');greet()}
 function renderMain(){
   const gb=document.querySelector('#v-main .g-bot');
-  const vm=$('v-main');
-  vm.classList.toggle('st-warn',mainState==='out');
-  vm.classList.toggle('st-down',mainState==='down');
-  const st=$('main-status');
-  st.style.display=mainState==='ok'?'none':'flex';
-  st.className='status '+(mainState==='down'?'danger':'warn');
-  $('main-status-text').textContent=mainState==='out'?'校园网 · 刚刚掉线了':'认证服务器 · 不可达';
   if(mainState==='ok'){mood(gb,'idle');
     $('main-lede').textContent='网的事交给我,你放心忙~';
     $('main-net').textContent='已连上 Campus-WiFi ✓';$('main-btn').textContent='立即重新登录'}
