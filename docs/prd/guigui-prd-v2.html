@@ -79,6 +79,9 @@ body{
 .log::-webkit-scrollbar-thumb{border-radius:99px;background:oklch(97% 0.005 295 / 0.25)}
 .v{display:none;animation:fadein .3s ease-out}
 .v.on{display:block}
+/* 日常页:日志钉底,中部留白是呼吸感不是空缺 */
+#v-main.on{display:flex;flex-direction:column;min-height:100%}
+#v-main .log{margin-top:auto}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* ═══ Bot:各视图内嵌,零位移零飞行(杜绝"乱飞/出界") ═══ */
@@ -142,6 +145,23 @@ input{width:100%;padding:11px 14px;border:1px solid oklch(60% 0.01 295 / 0.35);
   border-radius:12px;background:oklch(100% 0 0 / 0.6);font:15px/1.5 inherit;font-family:inherit;
   color:var(--ink);transition:border-color .18s,box-shadow .18s}
 input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+/* 密码框小眼睛:明文/隐藏切换(类名避开 bot 的 .eye 眼睛路径) */
+.pw-wrap{position:relative}
+.pw-wrap input{padding-right:46px}
+.pw-eye{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:34px;height:34px;
+  display:flex;align-items:center;justify-content:center;border:none;border-radius:9px;
+  background:transparent;color:var(--ink-3);cursor:pointer;transition:background .15s,color .15s}
+.pw-eye:hover{background:oklch(58% 0.15 295 / 0.08);color:var(--ink)}
+.pw-eye svg{width:18px;height:18px}
+.pw-eye .i-off{display:none}
+.pw-eye.off .i-on{display:none}
+.pw-eye.off .i-off{display:block}
+/* 自定义时间:两位一格直接键入,自动跳格 */
+.time-input{display:flex;align-items:center;gap:7px}
+.time-input input{width:56px;padding:10px 6px;text-align:center;font:600 19px/1 Inter,sans-serif;
+  letter-spacing:.05em;border-radius:11px}
+.time-input .colon{font:600 16px Inter,sans-serif;color:var(--ink-3)}
+.time-input input.err{border-color:var(--warm);box-shadow:0 0 0 3px oklch(72% 0.12 70 / .16)}
 
 .btn{display:block;width:100%;padding:12px;margin-top:10px;border:none;border-radius:12px;
   background:var(--ink);color:oklch(97% 0.005 295);font:600 14.5px/1.4 inherit;font-family:inherit;
@@ -320,7 +340,12 @@ body.backdrop-black .taskbar{display:none}
       </div>
       <div class="status ok"><span class="dot"></span><span>Campus-WiFi · 已连上 · 学号我认出来了 ✓</span></div>
       <div class="f"><label>学号(我帮你认出来的)</label><input id="f-sid" value="2025000000001"></div>
-      <div class="f"><label>密码 · 只存在你电脑里</label><input type="password" id="f-pwd" placeholder="填一次,以后每天桂桂替你登">
+      <div class="f"><label>密码 · 只存在你电脑里</label>
+        <div class="pw-wrap"><input type="password" id="f-pwd" placeholder="填一次,以后每天桂桂替你登">
+          <button type="button" class="pw-eye" onclick="togglePw('f-pwd',this)" title="显示 / 隐藏密码">
+            <svg class="i-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
+            <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><path d="M4 4l16 16"/></svg>
+          </button></div>
         <div class="micro-line" id="pwd-warn" style="display:none;color:var(--warm)">密码还没填呢 — 不急,也可以先开着,随时再补</div></div>
       <button class="btn" onclick="enableDaily()">开启每日自动登录</button>
       <div class="micro-line">点一下就生效 · <a href="javascript:void(0)" onclick="deferDaily()" style="color:var(--accent);font-weight:600">先不填,以后随时补</a></div>
@@ -335,7 +360,12 @@ body.backdrop-black .taskbar{display:none}
       <div class="status warn"><span class="dot"></span><span>Campus-WiFi · 未认证</span></div>
       <div class="micro-line" id="login-err" style="display:none"><span style="color:var(--warm)">⚠ 上次登录被拒:密码可能改过了,改下面的密码再点一次</span></div>
       <div class="f"><label>学号</label><input value="2025000000001"></div>
-      <div class="f"><label>密码</label><input type="password" value="100001"></div>
+      <div class="f"><label>密码</label>
+        <div class="pw-wrap"><input type="password" id="f-pwd-login" value="100001">
+          <button type="button" class="pw-eye" onclick="togglePw('f-pwd-login',this)" title="显示 / 隐藏密码">
+            <svg class="i-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
+            <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><path d="M4 4l16 16"/></svg>
+          </button></div></div>
       <button class="btn" onclick="loginNow()">立即登录</button>
     </div>
 
@@ -386,11 +416,9 @@ body.backdrop-black .taskbar{display:none}
       </div>
 
       <div style="height:10px"></div>
-      <div class="check-row"><span class="k">自动登录</span>
-        <span class="v2" style="display:flex;align-items:center;gap:10px">
-          <span><b id="auto-state">开着</b> · <span id="auto-desc">明早 07:00 替你登</span></span>
-          <span class="sw on" id="sw-auto" onclick="toggleAuto()"></span>
-        </span></div>
+      <div class="row"><div><div class="t">自动登录</div>
+        <div class="d" id="auto-desc">明早 07:00 替你登 · 到点前 30 分钟开始试</div></div>
+        <span class="sw on" id="sw-auto" onclick="toggleAuto()"></span></div>
       <div class="check-row"><span class="k">网络</span><span class="v2" id="main-net">已连上 Campus-WiFi ✓</span></div>
       <div class="check-row"><span class="k">昨晚</span><span class="v2">第一次就登好了 ✓</span></div>
 
@@ -420,13 +448,13 @@ body.backdrop-black .taskbar{display:none}
         <button>07:30</button><button>07:45</button><button>08:00</button><button id="btn-custom">自定义</button>
       </div>
       <div class="f" id="custom-time" style="display:none;margin-top:10px">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <div class="dd"><button class="dd-btn"><span class="dd-label">07</span><span class="car">▼</span></button>
-            <div class="dd-menu"><button>05</button><button>06</button><button class="on">07 <span class="ck">✓</span></button><button>08</button><button>09</button><button>10</button></div></div>
-          <span style="font:600 14px Inter,sans-serif;color:var(--ink-3)">:</span>
-          <div class="dd"><button class="dd-btn"><span class="dd-label">30</span><span class="car">▼</span></button>
-            <div class="dd-menu"><button>00</button><button>05</button><button>10</button><button>15</button><button>20</button><button>25</button><button class="on">30 <span class="ck">✓</span></button><button>35</button><button>40</button><button>45</button><button>50</button><button>55</button></div></div>
-          <span style="font:400 12px Inter,'PingFang SC',sans-serif;color:var(--ink-3)">到点前 30 分钟,桂桂开始试</span>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div class="time-input">
+            <input id="ct-h" inputmode="numeric" maxlength="2" value="07" aria-label="小时">
+            <span class="colon">:</span>
+            <input id="ct-m" inputmode="numeric" maxlength="2" value="30" aria-label="分钟">
+          </div>
+          <span style="font:400 12px Inter,'PingFang SC',sans-serif;color:var(--ink-3)">直接输入就行 · 到点前 30 分钟,桂桂开始试</span>
         </div>
       </div>
       <div class="micro-line">校园网 06:50 开门 · 到点前 30 分钟开始,试 6 次,登上就停</div>
@@ -559,18 +587,37 @@ function renderMain(){
     $('main-net').textContent='10.1.2.3 · 连不上';$('main-btn').textContent='去排查'}
 }
 function wakeProblem(kind){mainState=kind;goDaily()}
-/* 自动登录总开关:主页与设置页双向同步,关=桂桂睡觉 */
+/* 自动登录总开关:主页与设置页双向同步,关=桂桂睡觉(状态由开关自己表达,文字只讲服务) */
 function setAuto(on){
   ['sw-auto','sw-auto-set'].forEach(id=>{const s=$(id);if(s)s.classList.toggle('on',on)});
-  const st=$('auto-state'),d=$('auto-desc');
-  if(st)st.textContent=on?'开着':'歇着';
-  if(d)d.textContent=on?'明早 07:00 替你登':'想让我开工随时说';
+  const d=$('auto-desc');
+  if(d)d.textContent=on?'明早 07:00 替你登 · 到点前 30 分钟开始试':'已关 · 想让我开工随时说';
   if($('v-main').classList.contains('on')){
     mood(document.querySelector('#v-main .g-bot'),on?'idle':'sleep');
     $('main-lede').textContent=on?'网的事交给我,你放心忙~':'好,我先歇着,想我了再开。';
   }
 }
 function toggleAuto(){setAuto(!$('sw-auto').classList.contains('on'))}
+/* 密码小眼睛:明文核对 */
+function togglePw(id,btn){
+  const inp=$(id);const showPw=inp.type==='password';
+  inp.type=showPw?'text':'password';btn.classList.toggle('off',!showPw);
+}
+/* 自定义时间:两位一格直接键入,自动跳格 + 范围约束(比滚轮快,比原生控件美) */
+['ct-h','ct-m'].forEach((id,i,arr)=>{
+  const el=$(id);
+  el.addEventListener('input',()=>{
+    el.value=el.value.replace(/\D/g,'').slice(0,2);
+    el.classList.remove('err');
+    if(el.value.length===2&&i<arr.length-1)$(arr[i+1]).focus();
+  });
+  el.addEventListener('blur',()=>{
+    if(!el.value)return;
+    const max=i===0?23:59;let v=parseInt(el.value,10);
+    if(isNaN(v)||v>max){v=Math.min(isNaN(v)?0:v,max);el.classList.add('err')}
+    el.value=String(v).padStart(2,'0');
+  });
+});
 function mainAction(){
   if(mainState==='ok'){quickLogin()}
   else if(mainState==='out'){openDetail('v-login')}
