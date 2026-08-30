@@ -89,15 +89,25 @@ body{
 .bot{position:relative;display:flex;align-items:center;justify-content:center}
 .bot svg{display:block;overflow:visible;width:100%;height:100%}
 
-/* 首次仪式:bot 居中 140px,苏醒 + 归位到左上角问候块左侧(58px) */
-.bot-boot{width:140px;height:140px;margin:18vh auto 16px;
-  animation:botSettle 1.4s cubic-bezier(.4,.6,.2,1) both;
+/* 首次仪式:bot 居中 140px + 归位到左上角问候块左侧(58px) */
+.bot-boot{width:140px;height:140px;position:relative;
+  animation:botSettle 1.4s cubic-bezier(.4,.6,.2,1) forwards;
   transform-origin:50% 50%}
 @keyframes botSettle{
   0%{opacity:0;transform:scale(.78) translateY(20px)}
   35%{opacity:1;transform:scale(1.04) translateY(-4px)}
   100%{opacity:1;transform:scale(1) translateY(0)}
 }
+/* 归位:从中央滑到 v-ok 问候块左侧(58px 缩放,左 36px 上 84px)
+   特异性提到 (0,2,1) 用 :where() 的 :not() 不够,用 id+class 强制最高 */
+#boot-bot.settled{animation:botDock .8s cubic-bezier(.5,0,.2,1) forwards;z-index:5}
+@keyframes botDock{
+  0%{transform:scale(1) translate(0,0)}
+  100%{transform:scale(.414) translate(-148px,-58px)}
+}
+/* boot 容器归位后避免点击事件落到原 v-ok g-bot 上,临时隐藏它,1s 后显示 */
+#v-ok .g-bot{opacity:1;transition:opacity .3s}
+#v-ok.ghost-on .g-bot{opacity:0;pointer-events:none}
 /* 庆祝页大 bot(固定大尺寸,无归位) */
 .bot-success{width:140px;height:140px;margin:36px auto 10px}
 
@@ -110,16 +120,33 @@ body.hide-gui .greet .g-bot{display:none}
 /* pop 反馈(用户点击桂桂时) */
 @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.1,.9)}70%{transform:scale(.95,1.05)}100%{transform:scale(1)}}
 .bot.pop{animation:pop .55s cubic-bezier(.34,1.56,.64,1)}
+
+/* 各状态微动作:CSS 辅助库的 spring — 给 div 加 transform,不干扰库内部 SVG 动画
+   boot-bot 单独类(它走 .settled 归位),不挂这些 micro 动画 */
+@keyframes happy-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes happy-sway{0%,100%{transform:rotate(-3deg) translateY(0)}50%{transform:rotate(3deg) translateY(-3px)}}
+@keyframes sad-droop{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(-6deg)}}
+@keyframes cry-shake{0%,100%{transform:translateY(0)}25%{transform:translateY(-1px)}75%{transform:translateY(1px)}}
+@keyframes idle-breath{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+
+/* 排除 boot-boot 与 bot-success 容器,让它们各自的 dock/bounce 规则生效 */
+.g-bot[data-state=idle],.g-bot[data-mood=idle]{animation-name:idle-breath;animation-duration:2.4s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+.g-bot[data-state=complete],.g-bot[data-mood=happy]{animation-name:happy-sway;animation-duration:1.6s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 90%}
+.g-bot[data-state=thinking],.g-bot[data-mood=sad]{animation-name:sad-droop;animation-duration:2.2s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 50%}
+.g-bot[data-state=angry],.g-bot[data-mood=cry]{animation-name:cry-shake;animation-duration:.5s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+/* 庆祝页大 bot(独立容器,自己 bounce)— 自身已挂 .bot-success happy 状态 */
+.bot-success[data-state=complete]{animation-name:happy-bounce;animation-duration:.9s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
 .tagline{font:600 13px/1.6 Inter,"PingFang SC",sans-serif;color:var(--ink-2);
   letter-spacing:.02em;margin:0}
 .tagline b{color:var(--accent)}
 /* 桂桂的口吻行:衬线,像她本人在说话 */
 .say{font:400 14px/1.7 "Source Han Serif SC","Noto Serif SC",Georgia,serif;color:var(--ink-2);margin:2px 0 0}
 
-/* 开机仪式:bot 内嵌于视图,居中 */
-#v-boot{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100%}
-#v-boot.on{display:flex}
-#v-boot .bot{width:104px;height:104px}
+/* 开机仪式:bot 完美居中(grid 强制);仪式期间 visible,归位后透明但保留布局 */
+#v-boot{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;transition:opacity .3s}
+#v-boot:not(.on){opacity:0}
+#v-boot.on{opacity:1}
+#v-boot .boot-cap{position:absolute;bottom:14%;left:0;right:0;text-align:center;pointer-events:none;color:var(--ink-3)}
 
 .boot-cap{margin-top:22px;text-align:center;font-size:13.5px;color:var(--ink-3);
   font-family:Inter,"PingFang SC",sans-serif;animation:pulse 1.4s ease-in-out infinite}
@@ -589,7 +616,7 @@ function initBot(el,opts){
   const size=parseInt(el.dataset.size||'64',10);
   const state=el.dataset.state||'idle';
   const inst=new XJ(el,{
-    size,state,followPointer:false,motionScale:0.9,
+    size,state,followPointer:true,motionScale:1.4,
     faceTop:BOT_PALETTE.faceTop,faceBottom:BOT_PALETTE.faceBottom,
     eyes:BOT_PALETTE.eyes,pulse:BOT_PALETTE.pulse
   });
@@ -644,9 +671,20 @@ function goSetup(){
   else if(mainState==='down')show('v-guide');
   else show('v-ok');
   greet();
+  /* 仪式结束,触发 boot-bot 归位到 v-ok 问候块左侧;v-ok 自带 g-bot 临时隐藏避免重叠 */
+  const b=$('boot-bot');if(b){
+    b.classList.add('settled');
+    const vok=$('v-ok');
+    if(vok)vok.classList.add('ghost-on');
+    setTimeout(()=>{if(vok)vok.classList.remove('ghost-on')},1100);
+  }
 }
 /* 日常主页:渲染当前状态 + 密码补填提示 */
-function goDaily(){document.body.classList.remove('setup');renderMain();show('v-main');greet()}
+function goDaily(){
+  document.body.classList.remove('setup');
+  const b=$('boot-bot');if(b)b.classList.add('settled');
+  renderMain();show('v-main');greet();
+}
 /* 状态即标题:出问题时,页面最大的字直接说这件事(不靠装饰条) */
 function renderMain(){
   const gb=document.querySelector('#v-main .g-bot');
@@ -811,8 +849,26 @@ function clockTick(){const d=new Date();
 clockTick();setInterval(clockTick,10000);
 /* 进场:实例化所有 .bot 容器(XiaojiangMotion 注入 SVG) */
 function initAllBots(){document.querySelectorAll('.bot').forEach(el=>initBot(el))}
+/* 随机 gaze 调度:每 3-6 秒给所有 bot 注入一个随机 (x,y) 方向,持续 1.5s 后撤回,
+   配合库自带的 idle 呼吸 + blink,bot 看起来"活的" */
+let gazeHandle=null;
+function startRandomGaze(){
+  if(gazeHandle)return;
+  function tick(){
+    const bts=Object.values(bots);
+    if(bts.length){
+      const x=(Math.random()-0.5)*1.6;  // ±0.8(归一化 [-0.5,0.5])
+      const y=(Math.random()-0.5)*1.0;  // ±0.5
+      const dir=[x,y];
+      bts.forEach(b=>{try{b.setGaze&&b.setGaze(...dir)}catch(e){b.motion&&b.motion.gazeX&&(b.motion.gazeX.target=dir[0],b.motion.gazeY&&(b.motion.gazeY.target=dir[1]))}});
+    }
+    gazeHandle=setTimeout(tick,3000+Math.random()*3000);
+  }
+  tick();
+}
 firstRun();
 initAllBots();
+startRandomGaze();
 </script>
 </body>
 </html>
