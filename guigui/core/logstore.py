@@ -18,6 +18,8 @@ LEVELS = ("ok", "note", "fail", "silent")
 MAX_DAYS = 90
 DEFAULT_DAYS = 14
 
+_now = dt.datetime.now  # 测试可注入(与 ensure 的模拟时钟共用)
+
 
 def _day_path(date: dt.date):
     return paths.logs_dir() / f"{date:%Y-%m-%d}.jsonl"
@@ -27,7 +29,7 @@ def append(level: str, text: str, when: dt.datetime | None = None) -> dict:
     """追加一行(就地返回该 entry,供事件推送复用)。"""
     if level not in LEVELS:
         raise ValueError(f"unknown level: {level}")
-    when = when or dt.datetime.now()
+    when = when or _now()
     entry = {"ts": when.strftime("%H:%M:%S"), "level": level, "text": text}
     p = _day_path(when.date())
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -75,7 +77,7 @@ def query(days: int = DEFAULT_DAYS, level: str | None = None) -> list[dict]:
     days = max(1, min(days, MAX_DAYS))
     if level and level not in LEVELS:
         level = None
-    today = dt.date.today()
+    today = _now().date()
     out = []
     for i in range(days):
         date = today - dt.timedelta(days=i)

@@ -1,0 +1,183 @@
+"""ensure:收工幂等/等门/被拒×3/假期静默/L4 兜底/恢复通知(全 mock + 固定时钟)。"""
+
+import datetime as dt
+
+from guigui.core import config, ensure, logstore
+
+FIXED = dt.datetime(2026, 8, 31, 7, 0, 1)
+
+
+class Harness:
+    """按场景组装 mock:probe 序列 / login 序列 / wifi / 通知。"""
+
+    def __init__(self, monkeypatch, *, cfg_over=None, probe_seq=None,
+                 login_seq=None, connect_ok=True, password="pw123"):
+        over = {"uid": "2025000000001"}
+        over.update(cfg_over or {})
+        self.cfg = config.save(dict(config.DEFAULTS, **over))
+        self.probes = list(probe_seq or [{"state": "logged_in"}])
+        self.logins = list(login_seq or [("success", "")])
+        self.connect_calls = []
+        self.gate_calls = []
+        self.sent = []
+
+        monkeypatch.setattr(ensure, "_now", lambda: self.now)
+        monkeypatch.setattr(logstore, "_now", lambda: self.now)
+        self.now = FIXED
+        monkeypatch.setattr(ensure.vault, "get_password", lambda uid: password)
+        monkeypatch.setattr(ensure.detect, "probe", lambda cfg=None: self._pop(self.probes))
+        monkeypatch.setattr(ensure.detect, "wait_for_gate",
+                            lambda *a, **k: self.gate_calls.append(1) or True)
+        monkeypatch.setattr(ensure.drcom, "login",
+                            lambda *a, **k: self._pop(self.logins))
+        monkeypatch.setattr(ensure.time, "sleep", lambda s: None)
+        monkeypatch.setattr(ensure.wifictl, "connect",
+                            lambda ssid, timeout=90, progress=None:
+                            self.connect_calls.append(ssid) or connect_ok)
+        monkeypatch.setattr(ensure.notify, "send",
+                            lambda t, m, launch=None: self.sent.append((t, launch)))
+
+    @staticmethod
+    def _pop(seq):
+        return seq.pop(0) if len(seq) > 1 else seq[0]
+
+    def run(self):
+        return ensure.run()
+
+    def today_entries(self):
+        for day in logstore.query(1):
+            if day["label"] == "今天":
+                return day["entries"]
+        return []
+
+
+def test_master_off_skips_everything(monkeypatch):
+    h = Harness(monkeypatch, cfg_over={"master": False})
+    called = []
+    monkeypatch.setattr(ensure.detect, "probe", lambda cfg=None: called.append(1))
+    assert h.run() == 0
+    assert not called
+
+
+def test_no_credentials_skips(monkeypatch):
+    h = Harness(monkeypatch, cfg_over={"uid": ""}, password=None)
+    assert h.run() == 0
+
+
+def test_settle_writes_three_rows_and_state(monkeypatch):
+    h = Harness(monkeypatch)
+    assert h.run() == 0
+    texts = [e["text"] for e in h.today_entries()]
+    assert texts == ["网络可达", "已登录 · 2025…0001", "今天到这就下班啦 ☕"]
+    state = ensure.load_state()
+    assert state["last_settle_date"] == "2026-08-31"
+    assert state["last_net_state"] == "up"
+    assert state["last_result"]["outcome"] == "ok"
+    assert h.sent == []                      # 首跑在线不通知
+
+
+def test_settle_idempotent_same_day(monkeypatch):
+    h = Harness(monkeypatch)
+    h.run()
+    h.run()                                  # 同日第二拍:秒退
+    assert len(h.today_entries()) == 3
+
+
+def test_early_success_uses_open_door_line(monkeypatch):
+    h = Harness(monkeypatch, cfg_over={"trigger_time": "09:00"})  # 07:00 成功 < 09:00
+    h.run()
+    assert h.today_entries()[-1]["text"] == "开门即试,一次登好 ✓"
+
+
+def test_rejected_three_runs_notify_once(monkeypatch):
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("rejected", "密码错误")])
+    for _ in range(3):
+        h.run()
+    state = ensure.load_state()
+    assert state["consecutive_fail"] == 3
+    assert state["fail_notify_sent"] is True
+    assert len(h.sent) == 1 and h.sent[0][1] == "guigui://creds"
+    assert h.today_entries()[-1]["text"] == "登录被拒:密码可能改过了"
+    # 第 4 拍:锁存不再发
+    h.run()
+    assert len(h.sent) == 1
+    assert state["last_result"]["outcome"] == "fail"
+
+
+def test_success_resets_fail_counters(monkeypatch):
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("rejected", "x")])
+    h.run()
+    h.probes = [{"state": "not_logged_in"}]
+    h.logins = [("success", "")]
+    h.run()
+    state = ensure.load_state()
+    assert state["consecutive_fail"] == 0 and state["fail_notify_sent"] is False
+
+
+def test_waiting_then_gate_opens_then_settle(monkeypatch):
+    h = Harness(monkeypatch, probe_seq=[{"state": "waiting"}, {"state": "logged_in"}])
+    h.run()
+    assert h.gate_calls                                # 等门被触发
+    assert len(h.today_entries()) == 3                 # 开门即登,收工
+
+
+def test_vacation_silence_two_days(monkeypatch):
+    h = Harness(monkeypatch, probe_seq=[{"state": "unreachable"}])
+    h.run()                                             # 第 1 天:普通不可达
+    day1 = [e["text"] for e in h.today_entries()]
+    assert day1 == ["连不上校园网"]
+    assert ensure.load_state()["unreachable_streak"] == 1
+    # 第 2 天(昨天有不可达记录)→ streak=2 → 静默
+    h.now = FIXED + dt.timedelta(days=1)
+    h.run()
+    assert ensure.load_state()["silent"] is True
+    days = logstore.query(2)
+    labels = [d["label"] for d in days]
+    assert any(l.endswith("· 假期静默") for l in labels)
+    # 同日第 2 拍:不再记日志
+    n_before = len([e for d in logstore.query(2) for e in d["entries"]])
+    h.run()
+    n_after = len([e for d in logstore.query(2) for e in d["entries"]])
+    assert n_before == n_after
+
+
+def test_silence_recovers_on_reachable(monkeypatch):
+    h = Harness(monkeypatch, probe_seq=[{"state": "unreachable"}])
+    h.run()
+    h.now = FIXED + dt.timedelta(days=1)
+    h.run()                                             # 进入静默
+    assert ensure.load_state()["silent"] is True
+    h.probes = [{"state": "logged_in"}]                 # 回校
+    h.run()
+    state = ensure.load_state()
+    assert state["silent"] is False and state["unreachable_streak"] == 0
+
+
+def test_recovered_notify_once_per_day(monkeypatch):
+    h = Harness(monkeypatch, probe_seq=[{"state": "unreachable"}])
+    h.run()                                             # down,无通知
+    assert h.sent == []
+    h.probes = [{"state": "logged_in"}]
+    h.run()                                             # 断→通:通知一次
+    assert len(h.sent) == 1 and h.sent[0][1] == "guigui://main"
+    h.run()                                             # 同日:不再
+    assert len(h.sent) == 1
+
+
+def test_l4_fallback_connects_then_settles(monkeypatch):
+    h = Harness(monkeypatch, cfg_over={"wifi_fallback_enabled": True,
+                                       "wifi_fallback_ssid": "Campus-5G"},
+                probe_seq=[{"state": "unreachable"}, {"state": "logged_in"}])
+    h.run()
+    assert h.connect_calls == ["Campus-5G"]
+    texts = [e["text"] for e in h.today_entries()]
+    assert "服务器不可达,切到兜底网络 Campus-5G" in texts
+    assert "已登录 · 2025…0001" in texts
+
+
+def test_l4_disabled_by_default(monkeypatch):
+    h = Harness(monkeypatch, probe_seq=[{"state": "unreachable"}])
+    h.run()
+    assert h.connect_calls == []

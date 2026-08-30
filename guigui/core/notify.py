@@ -1,0 +1,126 @@
+"""通知 — Windows Toast(PowerShell WinRT)+ guigui:// 协议激活 + 决策去重纯函数。
+
+- 通道移植 v1 src/notify.py(ShellExperienceHost AppId,零依赖生产验证);
+  升级:toast 带 activationType=protocol,点击按路由唤起 GUI(技术方案 §9)。
+- decide_notify 是纯函数:v1 ensure.py:23-46 的状态翻转去重 + 连败×3 + 每日一次。
+"""
+
+from __future__ import annotations
+
+import logging
+import subprocess
+import sys
+from pathlib import Path
+
+log = logging.getLogger(__name__)
+
+RECOVERED = "recovered"
+FAILED = "failed"
+
+LAUNCH_MAIN = "guigui://main"
+LAUNCH_CREDS = "guigui://creds"
+
+
+def _xml_escape(text: str) -> str:
+    """XML 实体转义 + 高位字符转 &#xHH;(防 Toast 模板注入与乱码,v1 移植)。"""
+    text = (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&apos;")
+    )
+    return "".join(f"&#x{ord(c):X};" if ord(c) > 127 else c for c in text)
+
+
+def send(title: str, message: str, launch: str = LAUNCH_MAIN) -> None:
+    """发 Toast;超时/失败只记日志,永不抛异常(v1 行为)。"""
+    t, m, lc = _xml_escape(title), _xml_escape(message), _xml_escape(launch)
+    ps = (
+        "[Windows.UI.Notifications.ToastNotificationManager,"
+        " Windows.UI.Notifications, ContentType=WindowsRuntime]|Out-Null;"
+        "[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom,"
+        " ContentType=WindowsRuntime]|Out-Null;"
+        f'$t=\'<toast activationType="protocol" launch="{lc}" duration="long">'
+        "<visual><binding template=\"ToastGeneric\">"
+        f"<text>{t}</text><text>{m}</text>"
+        '</binding></visual></toast>\';'
+        "$x=New-Object Windows.Data.Xml.Dom.XmlDocument;"
+        "$x.LoadXml($t);"
+        "$toast=[Windows.UI.Notifications.ToastNotification]::new($x);"
+        '[Windows.UI.Notifications.ToastNotificationManager]'
+        '::CreateToastNotifier("Microsoft.Windows.ShellExperienceHost_cw5n1h2txyewy!App")'
+        ".Show($toast)"
+    )
+    try:
+        r = subprocess.run(
+            ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps],
+            capture_output=True, text=True, timeout=10,
+        )
+        if r.returncode != 0:
+            log.warning("notify: 发送失败(rc=%d): %s", r.returncode, r.stderr.strip()[:120])
+    except Exception as e:
+        log.warning("notify: 发送异常: %s", e)
+
+
+# ── 去重决策(纯函数,AC-04)──────────────────────────────
+
+
+def decide_notify(prev_state: str | None, *, connected: bool,
+                  login_attempted: bool, login_succeeded: bool,
+                  consecutive_fail: int, fail_notify_sent: bool,
+                  last_recovered_date: str | None, today: str,
+                  ) -> tuple[str | None, dict]:
+    """根据上次持久化状态与本次结果,决定通知种类与状态更新。
+
+    Returns:
+        (notify_kind, updates):kind ∈ recovered | failed | None;
+        updates 为需要合并进 ensure_state 的键值(last_net_state 等)。
+    """
+    if connected:
+        updates = {"last_net_state": "up"}
+        kind = None
+        if prev_state in ("down", "failed"):
+            # 断→通:每天只报一次;同日已报过只记状态
+            if last_recovered_date != today:
+                kind = RECOVERED
+                updates["last_recovered_notify_date"] = today
+        return kind, updates
+    if login_attempted and not login_succeeded:
+        updates = {"last_net_state": "failed"}
+        kind = None
+        if consecutive_fail >= 3 and not fail_notify_sent:
+            kind = FAILED
+            updates["fail_notify_sent"] = True
+        return kind, updates
+    # 不可达(未尝试登录):只记 down,不通知(防刷屏,v1 行为)
+    return None, {"last_net_state": "down"}
+
+
+# ── guigui:// 协议注册(HKCU,免管理员)─────────────────
+
+
+def register_protocol() -> bool:
+    """注册 guigui:// URL 协议到当前用户;失败只记日志。"""
+    try:
+        import winreg
+    except ImportError:
+        return False
+    if getattr(sys, "frozen", False):
+        cmd = f'"{sys.executable}" "%1"'
+    else:
+        entry = Path(__file__).resolve().parent.parent / "__main__.py"
+        cmd = f'"{sys.executable}" "{entry}" "%1"'
+    try:
+        key = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER,
+                                 r"Software\Classes\guigui", 0, winreg.KEY_WRITE)
+        with key:
+            winreg.SetValueEx(key, None, 0, winreg.REG_SZ, "URL:guigui protocol")
+            winreg.SetValueEx(key, "URL Protocol", 0, winreg.REG_SZ, "")
+            sub = winreg.CreateKeyEx(key, r"shell\open\command", 0, winreg.KEY_WRITE)
+            with sub:
+                winreg.SetValueEx(sub, None, 0, winreg.REG_SZ, cmd)
+        return True
+    except OSError as e:
+        log.warning("notify: 协议注册失败: %s", e)
+        return False
