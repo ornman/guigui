@@ -66,7 +66,17 @@ body{
 .tbtn:hover{background:oklch(100% 0 0 / 0.55);color:var(--ink)}
 
 .body{position:relative;height:calc(100% - 44px);padding:28px 36px 26px;
-  overflow-y:auto;overflow-x:hidden}
+  overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;
+  scrollbar-color:oklch(23% 0.015 295 / 0.22) transparent}
+/* 滚动条按设计系统自制:细、圆、半透明墨色,不要系统白底滑块 */
+.body::-webkit-scrollbar,.dd-menu::-webkit-scrollbar{width:5px}
+.body::-webkit-scrollbar-track,.dd-menu::-webkit-scrollbar-track{background:transparent}
+.body::-webkit-scrollbar-thumb,.dd-menu::-webkit-scrollbar-thumb{border-radius:99px;background:oklch(23% 0.015 295 / 0.22)}
+.body::-webkit-scrollbar-thumb:hover,.dd-menu::-webkit-scrollbar-thumb:hover{background:oklch(23% 0.015 295 / 0.38)}
+/* 深色日志面板内的滚动条用浅色 */
+.log::-webkit-scrollbar{width:5px}
+.log::-webkit-scrollbar-track{background:transparent}
+.log::-webkit-scrollbar-thumb{border-radius:99px;background:oklch(97% 0.005 295 / 0.25)}
 .v{display:none;animation:fadein .3s ease-out}
 .v.on{display:block}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -170,7 +180,9 @@ input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--a
 .dd-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:18;min-width:120px;
   background:oklch(100% 0 0 / 0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
   border:1px solid oklch(100% 0 0 / 0.6);border-radius:12px;padding:5px;
-  box-shadow:0 12px 32px oklch(23% 0.015 295/.18);display:none}
+  box-shadow:0 12px 32px oklch(23% 0.015 295/.18);display:none;
+  max-height:190px;overflow-y:auto;scrollbar-width:thin;
+  scrollbar-color:oklch(23% 0.015 295 / 0.22) transparent}
 .dd.open .dd-menu{display:block;animation:fadein .2s ease-out}
 .dd-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;
   padding:8px 10px;border:none;border-radius:8px;background:transparent;
@@ -306,9 +318,12 @@ body.backdrop-black .taskbar{display:none}
           <p class="tagline">校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好</p>
         </div>
       </div>
-      <div class="status ok"><span class="dot"></span><span>Campus-WiFi · 已认证 · 学号已识别 ✓</span></div>
+      <div class="status ok"><span class="dot"></span><span>Campus-WiFi · 已连上 · 学号我认出来了 ✓</span></div>
+      <div class="f"><label>学号(我帮你认出来的)</label><input id="f-sid" value="2025000000001"></div>
+      <div class="f"><label>密码 · 只存在你电脑里</label><input type="password" id="f-pwd" placeholder="填一次,以后每天桂桂替你登">
+        <div class="micro-line" id="pwd-warn" style="display:none;color:var(--warm)">密码还没填呢 — 不急,也可以先开着,随时再补</div></div>
       <button class="btn" onclick="enableDaily()">开启每日自动登录</button>
-      <div class="micro-line">一键开启,无需任何设置 · 密码以后随时补</div>
+      <div class="micro-line">点一下就生效 · <a href="javascript:void(0)" onclick="deferDaily()" style="color:var(--accent);font-weight:600">先不填,以后随时补</a></div>
       <button class="link" onclick="openDetail('v-settings')">高级设置</button>
     </div>
 
@@ -371,7 +386,11 @@ body.backdrop-black .taskbar{display:none}
       </div>
 
       <div style="height:10px"></div>
-      <div class="check-row"><span class="k">自动登录</span><span class="v2"><b>开着</b> · 明早 07:00 替你登</span></div>
+      <div class="check-row"><span class="k">自动登录</span>
+        <span class="v2" style="display:flex;align-items:center;gap:10px">
+          <span><b id="auto-state">开着</b> · <span id="auto-desc">明早 07:00 替你登</span></span>
+          <span class="sw on" id="sw-auto" onclick="toggleAuto()"></span>
+        </span></div>
       <div class="check-row"><span class="k">网络</span><span class="v2" id="main-net">已连上 Campus-WiFi ✓</span></div>
       <div class="check-row"><span class="k">昨晚</span><span class="v2">第一次就登好了 ✓</span></div>
 
@@ -400,8 +419,15 @@ body.backdrop-black .taskbar{display:none}
         <button>06:30</button><button>06:45</button><button class="on">07:00</button><button>07:15</button>
         <button>07:30</button><button>07:45</button><button>08:00</button><button id="btn-custom">自定义</button>
       </div>
-      <div class="f" id="custom-time" style="display:none;max-width:160px;margin-top:8px">
-        <input type="time" id="ct" value="07:30">
+      <div class="f" id="custom-time" style="display:none;margin-top:10px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <div class="dd"><button class="dd-btn"><span class="dd-label">07</span><span class="car">▼</span></button>
+            <div class="dd-menu"><button>05</button><button>06</button><button class="on">07 <span class="ck">✓</span></button><button>08</button><button>09</button><button>10</button></div></div>
+          <span style="font:600 14px Inter,sans-serif;color:var(--ink-3)">:</span>
+          <div class="dd"><button class="dd-btn"><span class="dd-label">30</span><span class="car">▼</span></button>
+            <div class="dd-menu"><button>00</button><button>05</button><button>10</button><button>15</button><button>20</button><button>25</button><button class="on">30 <span class="ck">✓</span></button><button>35</button><button>40</button><button>45</button><button>50</button><button>55</button></div></div>
+          <span style="font:400 12px Inter,'PingFang SC',sans-serif;color:var(--ink-3)">到点前 30 分钟,桂桂开始试</span>
+        </div>
       </div>
       <div class="micro-line">校园网 06:50 开门 · 到点前 30 分钟开始,试 6 次,登上就停</div>
       <div class="row"><div><div class="t">开机时补登录</div><div class="d">开机或重新登录系统时,桂桂顺手登一次</div></div>
@@ -434,8 +460,8 @@ body.backdrop-black .taskbar{display:none}
         <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
       <div class="row"><div><div class="t">显示桂桂</div><div class="d">关掉后主页不再显示小桂桂,功能不受影响</div></div>
         <div class="sw on" id="sw-gui" onclick="toggleGui(this)"></div></div>
-      <div class="row"><div><div class="t">后台自动化</div><div class="d">总开关:关掉后桂桂就退休,不再自动登录</div></div>
-        <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="row"><div><div class="t">后台自动化</div><div class="d">总开关:关掉后桂桂就退休,不再自动登录(与主页开关同步)</div></div>
+        <div class="sw on" id="sw-auto-set" onclick="toggleAuto()"></div></div>
 
       <div class="tiny-label">进阶</div>
       <div class="row"><div><div class="t">登录失败重试</div><div class="d">单轮登录失败后,再试几回</div></div>
@@ -495,7 +521,7 @@ function mood(el,m){el.dataset.mood=m;el.classList.remove('pop');void el.offsetW
 function currentView(){return views.find(v=>$(v).classList.contains('on'))||'v-main'}
 function show(id){views.forEach(v=>$(v).classList.remove('on'));$(id).classList.add('on')}
 function openDetail(id){origin[id]=currentView();show(id)}
-function backFrom(id){show(origin[id]||'v-main');greet()}
+function backFrom(id){const dest=origin[id]||'v-main';if(dest==='v-main')renderMain();show(dest);greet()}
 function greet(){const h=new Date().getHours();const g=h<11?'早上好':(h<18?'下午好':'晚上好');
   document.querySelectorAll('.g').forEach(e=>e.textContent=g+'。')}
 
@@ -533,6 +559,18 @@ function renderMain(){
     $('main-net').textContent='10.1.2.3 · 连不上';$('main-btn').textContent='去排查'}
 }
 function wakeProblem(kind){mainState=kind;goDaily()}
+/* 自动登录总开关:主页与设置页双向同步,关=桂桂睡觉 */
+function setAuto(on){
+  ['sw-auto','sw-auto-set'].forEach(id=>{const s=$(id);if(s)s.classList.toggle('on',on)});
+  const st=$('auto-state'),d=$('auto-desc');
+  if(st)st.textContent=on?'开着':'歇着';
+  if(d)d.textContent=on?'明早 07:00 替你登':'想让我开工随时说';
+  if($('v-main').classList.contains('on')){
+    mood(document.querySelector('#v-main .g-bot'),on?'idle':'sleep');
+    $('main-lede').textContent=on?'网的事交给我,你放心忙~':'好,我先歇着,想我了再开。';
+  }
+}
+function toggleAuto(){setAuto(!$('sw-auto').classList.contains('on'))}
 function mainAction(){
   if(mainState==='ok'){quickLogin()}
   else if(mainState==='out'){openDetail('v-login')}
@@ -546,7 +584,12 @@ function quickLogin(){
 }
 /* 流程动作 */
 function showSuccess(){show('v-success');greet();party()}
-function enableDaily(){configured=true;hasPwd=false;showSuccess()}  /* 一键即开,密码事后补 */
+/* 交钥匙即开启:密码必填(为空给温柔提醒);「先不填」走安静退路,主页再催补 */
+function enableDaily(){
+  if(!$('f-pwd').value.trim()){$('pwd-warn').style.display='block';return}
+  configured=true;hasPwd=true;showSuccess()
+}
+function deferDaily(){configured=true;hasPwd=false;showSuccess()}
 function loginNow(){hasPwd=true;$('login-err').style.display='none';showSuccess()}
 function pickWifi(el){
   el.classList.add('on');
