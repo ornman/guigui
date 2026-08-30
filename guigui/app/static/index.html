@@ -435,7 +435,7 @@ html.in-app body{padding:0}
           <p class="tagline">校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好</p>
         </div>
       </div>
-      <div class="status ok"><span class="dot"></span><span>Campus-WiFi · 已连上 · 学号已识别 ✓</span></div>
+      <div class="status ok"><span class="dot"></span><span id="ok-status">…</span></div>
       <div class="f"><label>学号</label><input id="f-sid" value="" placeholder="请输入学号" autocomplete="username"></div>
       <div class="f"><label>密码</label>
         <div class="pw-wrap"><input type="password" id="f-pwd" placeholder="请输入密码" autocomplete="new-password">
@@ -452,9 +452,9 @@ html.in-app body{padding:0}
       <button class="back" onclick="backFrom('v-login')">‹ 返回</button>
       <h1 style="font-size:22px">登录校园网。</h1>
       <p class="lede">连上了校园网,还没登录。填一次,以后每天都是桂桂的事:</p>
-      <div class="status warn"><span class="dot"></span><span>Campus-WiFi · 未认证</span></div>
+      <div class="status warn"><span class="dot"></span><span id="login-status">…</span></div>
       <div class="micro-line" id="login-err" style="display:none"><span style="color:var(--warm)">⚠ 上次登录被拒:密码可能改过了,改下面的密码再点一次</span></div>
-      <div class="f"><label>学号</label><input value="" autocomplete="username"></div>
+      <div class="f"><label>学号</label><input id="f-sid-login" value="" autocomplete="username"></div>
       <div class="f"><label>密码</label>
         <div class="pw-wrap"><input type="password" id="f-pwd-login" value="" autocomplete="new-password">
           <button type="button" class="pw-eye" onclick="togglePw('f-pwd-login',this)" title="显示 / 隐藏密码">
@@ -481,12 +481,10 @@ html.in-app body{padding:0}
       <button class="back" onclick="backFrom('v-guide')">‹ 返回</button>
       <h1 style="font-size:22px">这条路今天不通。</h1>
       <p class="lede">到认证服务器的路连不上,桂桂帮你查:</p>
-      <div class="status warn"><span class="dot"></span><span>10.1.2.3 · 不可达</span></div>
-      <div class="micro-line">① 当前连的是「iphone17 pro max」,像热点。挑一个校园网:</div>
-      <div class="ssid" onclick="pickWifi(this)"><span class="n">Campus-WiFi</span><span class="q">信号强</span></div>
-      <div class="ssid" onclick="pickWifi(this)"><span class="n">Campus-5G</span><span class="q">信号中</span></div>
-      <div class="ssid" onclick="pickWifi(this)"><span class="n">eduroam</span><span class="q">信号弱</span></div>
-      <div class="micro-line" style="margin-top:10px">② 已是校园网仍不通?可能维护中,<a href="javascript:void(0)" onclick="bootWait()" style="color:inherit">重新检测</a></div>
+      <div class="status warn"><span class="dot"></span><span id="guide-server">…</span></div>
+      <div class="micro-line" id="guide-cur">① …</div>
+      <div id="guide-wifi"></div>
+      <div class="micro-line" style="margin-top:10px">② 已是校园网仍不通?可能维护中,<a href="javascript:void(0)" onclick="reProbe()" style="color:inherit">重新检测</a></div>
       <button class="link" onclick="openDetail('v-login')">③ 先填资料,连上后桂桂自动帮你登录</button>
     </div>
 
@@ -508,15 +506,13 @@ html.in-app body{padding:0}
       <div class="row"><div><div class="t">网络</div>
         <div class="d" id="main-net">已连上 Campus-WiFi ✓</div></div></div>
       <div class="row"><div><div class="t">昨晚</div>
-        <div class="d">07:00 第一次就登好了 ✓</div></div></div>
+        <div class="d" id="main-last">…</div></div></div>
 
       <button class="btn quiet" id="main-btn" onclick="quickLogin()">立即重新登录</button>
       <button class="link" style="display:block;width:fit-content;margin-top:10px;font-size:12px" onclick="openDetail('v-settings')">高级设置</button>
 
       <div class="log">
-        <div><span class="ts">07:00:01</span><span class="ok">[OK]</span> 网络可达</div>
-        <div><span class="ts">07:00:02</span><span class="ok">[OK]</span> 已登录 · 2025…7209</div>
-        <div><span class="ts">07:00:03</span>今天到这就下班啦 ☕</div>
+        <div id="main-log-entries"></div>
         <div class="hist"><a href="javascript:void(0)" onclick="openDetail('v-log')">历史日志 →</a></div>
       </div>
     </div>
@@ -526,24 +522,7 @@ html.in-app body{padding:0}
       <button class="back" onclick="backFrom('v-log')">‹ 返回</button>
       <h1 style="font-size:22px">历史日志。</h1>
       <p class="lede">桂桂每天做了什么,都在这里:</p>
-      <div class="day"><div class="day-h">今天</div>
-        <div class="log">
-          <div><span class="ts">07:00:01</span><span class="ok">[OK]</span> 网络可达</div>
-          <div><span class="ts">07:00:02</span><span class="ok">[OK]</span> 已登录 · 2025…7209</div>
-          <div><span class="ts">07:00:03</span>今天到这就下班啦 ☕</div>
-        </div></div>
-      <div class="day"><div class="day-h">昨天 · 8月29日</div>
-        <div class="log">
-          <div><span class="ts">06:55:02</span><span class="ok">[OK]</span> 开门即试,一次登好 ✓</div>
-        </div></div>
-      <div class="day"><div class="day-h">8月28日 · 假期静默</div>
-        <div class="log">
-          <div><span class="ts">07:00:01</span>连不上,今天先不打扰,明天再试一次</div>
-        </div></div>
-      <div class="day"><div class="day-h">8月27日 · 假期静默</div>
-        <div class="log">
-          <div><span class="ts">07:00:01</span>连不上,今天先不打扰,明天再试一次</div>
-        </div></div>
+      <div id="log-days"></div>
     </div>
 
     <!-- 高级设置(按使用频率排序:核心 → 保底 → 系统 → 进阶) -->
@@ -567,33 +546,28 @@ html.in-app body{padding:0}
       </div>
       <div class="micro-line">直接输入,或点常用时间 · 校园网 06:50 才开门 · 我提前 30 分钟开始试,登好就收工</div>
       <div class="row"><div><div class="t">开机时补登录</div><div class="d">开机或重新登录系统时,桂桂顺手登一次</div></div>
-        <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="sw on" data-cfg="boot_login" onclick="toggleCfg(this)"></div></div>
       <div class="row"><div><div class="t">窗口内重试间隔</div><div class="d">登上就停,不浪费探测</div></div>
-        <div class="dd"><button class="dd-btn"><span class="dd-label">5 分钟</span><span class="car">▼</span></button>
-          <div class="dd-menu"><button class="on">5 分钟 <span class="ck">✓</span></button><button>10 分钟 <span class="ck">✓</span></button><button>15 分钟 <span class="ck">✓</span></button></div></div></div>
+        <div class="dd" data-cfg-key="heartbeat_minutes"><button class="dd-btn"><span class="dd-label">5 分钟</span><span class="car">▼</span></button>
+          <div class="dd-menu"><button class="on" data-v="5">5 分钟 <span class="ck">✓</span></button><button data-v="10">10 分钟 <span class="ck">✓</span></button><button data-v="15">15 分钟 <span class="ck">✓</span></button></div></div></div>
 
       <div class="tiny-label">保底机制</div>
       <div class="row"><div><div class="t">WiFi 兜底</div><div class="d">认证服务器连不上时,自动切到下面选的网络</div></div>
         <div class="sw" id="sw-fallback" onclick="toggleFallback()"></div></div>
-      <div id="fallback-pick" style="display:none;padding:6px 0 2px">
-        <div class="ssid sel-pick on"><span class="n">Campus-WiFi</span><span class="q" data-orig="信号强">信号强</span></div>
-        <div class="ssid sel-pick"><span class="n">Campus-5G</span><span class="q" data-orig="信号中">信号中</span></div>
-        <div class="ssid sel-pick"><span class="n">eduroam</span><span class="q" data-orig="信号弱">信号弱</span></div>
-        <div class="micro-line">扫到的网络点一下即选,不用手填名字</div>
-      </div>
+      <div id="fallback-pick" style="display:none;padding:6px 0 2px"></div>
       <div class="row"><div><div class="t">白天巡逻</div><div class="d">白天意外断网时,自动悄悄重连</div></div>
-        <div class="sw" onclick="this.classList.toggle('on')"></div></div>
+        <div class="sw" data-cfg="patrol_enabled" onclick="toggleCfg(this)"></div></div>
       <div class="row"><div><div class="t">巡逻间隔</div><div class="d">断网后每 N 分钟试一次</div></div>
-        <div class="dd"><button class="dd-btn"><span class="dd-label">30 分钟</span><span class="car">▼</span></button>
-          <div class="dd-menu"><button>15 分钟 <span class="ck">✓</span></button><button class="on">30 分钟 <span class="ck">✓</span></button><button>60 分钟 <span class="ck">✓</span></button></div></div></div>
+        <div class="dd" data-cfg-key="patrol_minutes"><button class="dd-btn"><span class="dd-label">30 分钟</span><span class="car">▼</span></button>
+          <div class="dd-menu"><button data-v="15">15 分钟 <span class="ck">✓</span></button><button class="on" data-v="30">30 分钟 <span class="ck">✓</span></button><button data-v="60">60 分钟 <span class="ck">✓</span></button></div></div></div>
       <div class="row"><div><div class="t">睡眠唤醒补登录</div><div class="d">合盖再打开 30 秒后补一次(笔记本推荐)</div></div>
-        <div class="sw" onclick="this.classList.toggle('on')"></div></div>
+        <div class="sw" data-cfg="wake_login" onclick="toggleCfg(this)"></div></div>
       <div class="row"><div><div class="t">假期静默</div><div class="d">连续 2 天连不上(放假回家了?),自动降为每天 1 次、不打扰</div></div>
-        <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="sw on" data-cfg="vacation_silence" onclick="toggleCfg(this)"></div></div>
 
       <div class="tiny-label">系统</div>
       <div class="row"><div><div class="t">弹通知</div><div class="d">断网恢复、登录失败时才说,平时不打扰</div></div>
-        <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="sw on" data-cfg="notifications" onclick="toggleCfg(this)"></div></div>
       <div class="row"><div><div class="t">显示桂桂</div><div class="d">关掉后主页不再显示小桂桂,功能不受影响</div></div>
         <div class="sw on" id="sw-gui" onclick="toggleGui(this)"></div></div>
       <div class="row"><div><div class="t">后台自动化</div><div class="d">总开关:关掉后桂桂就退休,不再自动登录(与主页开关同步)</div></div>
@@ -601,11 +575,11 @@ html.in-app body{padding:0}
 
       <div class="tiny-label">进阶</div>
       <div class="row"><div><div class="t">登录失败重试</div><div class="d">单轮登录失败后,再试几回</div></div>
-        <div class="dd"><button class="dd-btn"><span class="dd-label">3 次</span><span class="car">▼</span></button>
-          <div class="dd-menu"><button>1 次 <span class="ck">✓</span></button><button class="on">3 次 <span class="ck">✓</span></button><button>5 次 <span class="ck">✓</span></button></div></div></div>
+        <div class="dd" data-cfg-key="login_retries"><button class="dd-btn"><span class="dd-label">3 次</span><span class="car">▼</span></button>
+          <div class="dd-menu"><button data-v="1">1 次 <span class="ck">✓</span></button><button class="on" data-v="3">3 次 <span class="ck">✓</span></button><button data-v="5">5 次 <span class="ck">✓</span></button></div></div></div>
       <div class="row"><div><div class="t">重试间隔</div><div class="d">每次失败后歇一歇再试</div></div>
-        <div class="dd"><button class="dd-btn"><span class="dd-label">5 秒</span><span class="car">▼</span></button>
-          <div class="dd-menu"><button class="on">5 秒 <span class="ck">✓</span></button><button>10 秒 <span class="ck">✓</span></button><button>30 秒 <span class="ck">✓</span></button></div></div></div>
+        <div class="dd" data-cfg-key="retry_seconds"><button class="dd-btn"><span class="dd-label">5 秒</span><span class="car">▼</span></button>
+          <div class="dd-menu"><button class="on" data-v="5">5 秒 <span class="ck">✓</span></button><button data-v="10">10 秒 <span class="ck">✓</span></button><button data-v="30">30 秒 <span class="ck">✓</span></button></div></div></div>
       <div style="height:8px"></div>
     </div>
 
@@ -686,8 +660,8 @@ function show(id){
   }else{next.classList.add('on')}
 }
 /* 来路栈:首次进入时记录,返回后清除(报告 5.5);不再每次覆盖 */
-function openDetail(id){if(!(id in origin))origin[id]=currentView();show(id)}
-function backFrom(id){const dest=origin[id]||'v-main';delete origin[id];if(dest==='v-main')renderMain();show(dest);greet();document.body.classList.remove('setup')}
+function openDetail(id){if(!(id in origin))origin[id]=currentView();show(id);if(id==='v-settings')loadSettings();if(id==='v-log')loadLogs();if(id==='v-guide')renderGuide();if(id==='v-login')fillLoginLanding()}
+function backFrom(id){const dest=origin[id]||'v-main';delete origin[id];if(dest==='v-main'){renderMain();renderMainData()}show(dest);greet();document.body.classList.remove('setup')}
 function greetText(){const h=new Date().getHours();return h<11?'早上好':(h<18?'下午好':'晚上好')}
 function greet(){const g=greetText()+'。';
   document.querySelectorAll('.g').forEach(e=>{if(e.id!=='main-h1')e.textContent=g})}
@@ -708,6 +682,7 @@ async function firstRun(){
   const p=await GG.api.probe();
   const el=Date.now()-t0;
   if(p.ok){
+    lastNet=p.data.net;
     configured=!!p.data.configured;
     const s=p.data.net.state;
     mainState=s==='logged_in'?'ok':(s==='not_logged_in'?'out':'down');
@@ -735,13 +710,14 @@ function goSetup(){
   else if(mainState==='down')show('v-guide');
   else show('v-ok');
   greet();
+  fillLanding();
   /* 不再做 .centered/.dock-in 归位动画 — 目标视图的 greet-bot 已在 .greet 内自然显示
      v-boot 走 .leaving 自动隐藏,目标 view 走 .on 触发 fadein */
 }
 /* 日常主页:渲染当前状态 + 密码补填提示 */
 function goDaily(){
   document.body.classList.remove('setup');
-  renderMain();show('v-main');greet();
+  renderMain();renderMainData();show('v-main');greet();
 }
 /* 状态即标题:出问题时,页面最大的字直接说这件事(不靠装饰条) */
 function renderMain(){
@@ -756,13 +732,13 @@ function renderMain(){
   $('main-status-text').textContent=mainState==='out'?'校园网 · 刚刚掉线了':'认证服务器 · 不可达';
   if(mainState==='ok'){mood(gb,'idle');
     $('main-lede').textContent='网的事交给我,你放心忙~';
-    $('main-net').textContent='已连上 Campus-WiFi ✓';$('main-btn').textContent='立即重新登录'}
+    $('main-net').textContent=netText(lastNet);$('main-btn').textContent='立即重新登录'}
   else if(mainState==='out'){mood(gb,'sad');
     $('main-lede').textContent='刚才网断了一下,别担心,登一下就回来。';
     $('main-net').textContent='校园网 · 还没登录';$('main-btn').textContent='立即登录'}
   else{mood(gb,'cry');
     $('main-lede').textContent='现在够不着校园网,我陪你查查看。';
-    $('main-net').textContent='10.1.2.3 · 连不上';$('main-btn').textContent='去排查'}
+    $('main-net').textContent=((lastNet&&lastNet.server)||'10.1.2.3')+' · 连不上';$('main-btn').textContent='去排查'}
 }
 function wakeProblem(kind){mainState=kind;goDaily()}
 /* 自动登录总开关:主页与设置页双向同步,关=桂桂睡觉(状态由开关自己表达,文字只讲服务) */
@@ -830,9 +806,12 @@ async function loginNow(){
   if(r.code==='AUTH_REJECTED'){$('login-err').style.display='block';return}
   if(r.code==='NET_UNREACHABLE'){openDetail('v-guide');return}
 }
-function pickWifi(el){
+async function pickWifi(el){
   el.classList.add('on');
-  setTimeout(()=>{openDetail('v-login')},550);
+  const ssid=el.querySelector('.n').textContent;
+  const r=await GG.api.connectWifi({ssid:ssid});
+  if(!r.ok){el.classList.remove('on');return}
+  /* 连上后 net:state 事件负责路由(未认证 → v-login) */
 }
 /* 庆祝粒子:canvas-confetti 颜文字模式;画布在卡片内,vendor 本地加载(不依赖网络) */
 /* 庆祝粒子:canvas-confetti 颜文字模式,3 波分散在 1.1s 内 */
@@ -864,13 +843,19 @@ function party(){
 function toggleFallback(){
   const sw=$('sw-fallback'),p=$('fallback-pick');
   sw.classList.toggle('on');
-  p.style.display=sw.classList.contains('on')?'block':'none';
+  const on=sw.classList.contains('on');
+  p.style.display=on?'block':'none';
+  if(on&&!p.childElementCount){GG.api.scanWifi().then(s=>{if(s.ok)renderWifiList(p,s.data.networks,{pick:true,selected:curCfg&&curCfg.wifi_fallback_ssid})})}
+  GG.api.saveConfig({wifi_fallback_enabled:on});
 }
 function toggleGui(sw){
   sw.classList.toggle('on');
   document.body.classList.toggle('hide-gui',!sw.classList.contains('on'));
+  GG.api.saveConfig({show_gui:sw.classList.contains('on')});
 }
-document.querySelectorAll('.sel-pick').forEach(el=>el.addEventListener('click',()=>{
+/* WiFi 兜底选择:事件委托(行由 scanWifi 动态渲染)+ 即存 */
+document.addEventListener('click',ev=>{
+  const el=ev.target.closest('.sel-pick');if(!el)return;
   document.querySelectorAll('.sel-pick').forEach(e=>{
     e.classList.remove('on');
     const q=e.querySelector('.q');
@@ -879,7 +864,8 @@ document.querySelectorAll('.sel-pick').forEach(el=>el.addEventListener('click',(
   el.classList.add('on');
   const q=el.querySelector('.q');
   if(q&&q.dataset.orig)q.textContent=q.dataset.orig+' · 已选';
-}));
+  GG.api.saveConfig({wifi_fallback_ssid:el.querySelector('.n').textContent});
+});
 /* 自绘下拉 */
 document.querySelectorAll('.dd').forEach(dd=>{
   dd.querySelector('.dd-btn').addEventListener('click',e=>{
@@ -893,6 +879,8 @@ document.querySelectorAll('.dd').forEach(dd=>{
     b.classList.add('on');
     dd.querySelector('.dd-label').textContent=b.textContent.replace('✓','').trim();
     dd.classList.remove('open');
+    const key=dd.dataset.cfgKey;
+    if(key)GG.api.saveConfig({[key]:parseInt(b.dataset.v,10)});
   }));
 });
 document.addEventListener('click',()=>document.querySelectorAll('.dd.open').forEach(o=>o.classList.remove('open')));
@@ -903,6 +891,7 @@ document.querySelectorAll('.preset').forEach(b=>b.addEventListener('click',()=>{
   const t=b.dataset.t.split(':');
   $('ct-h').value=t[0];$('ct-m').value=t[1];
   currentTriggerTime=b.dataset.t;   /* 同步给主页 desc 与庆祝页 lede(报告 1.4) */
+  GG.api.saveConfig({trigger_time:currentTriggerTime});
   setAuto($('sw-auto').classList.contains('on'));
 }));
 ['ct-h','ct-m'].forEach((id,i,arr)=>{
@@ -920,17 +909,136 @@ document.querySelectorAll('.preset').forEach(b=>b.addEventListener('click',()=>{
     const max=i===0?23:59;let v=parseInt(el.value,10);
     if(isNaN(v)||v>max){v=Math.min(isNaN(v)?0:v,max);el.classList.add('err')}
     el.value=String(v).padStart(2,'0');
+    renderTriggerTime();
+    GG.api.saveConfig({trigger_time:currentTriggerTime});
   });
 });
 /* 后端事件(契约 §3):开门/网态变化重渲;外部调度变更同步开关 */
 GG.on('net:state',e=>{
   if(!e||!e.state)return;
+  lastNet=Object.assign({},lastNet||{server:'10.1.2.3'},e);
   if(currentView()==='v-boot'&&configured){$('boot-cap').textContent='门开了,桂桂进去了…';setTimeout(goDaily,900);return}
+  if(currentView()==='v-guide'&&e.state==='not_logged_in'){setTimeout(()=>{openDetail('v-login')},550);return}
   if(currentView()==='v-main'){
     mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
-    renderMain()}
+    renderMain();renderMainData()}
 });
 GG.on('schedule:changed',e=>{if(e&&typeof e.master==='boolean')setAuto(e.master)});
+/* ═══ F3 数据渲染层:硬编码内容 → 契约数据;生成的标记与 PRD 原型逐字节一致 ═══ */
+const SIGNAL_TXT={strong:'信号强',medium:'信号中',weak:'信号弱'};
+let lastNet=null,curCfg=null;
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function netText(n){return n&&n.state==='logged_in'?('已连上 '+n.ssid+' ✓'):(n&&n.state==='not_logged_in'?((n.ssid||'校园网')+' · 还没登录'):(((n&&n.server)||'10.1.2.3')+' · 连不上'))}
+function lastText(r){
+  if(!r||r.outcome==='none')return '还没有记录';
+  if(r.outcome==='silent')return '假期静默,没打扰你';
+  if(r.outcome==='fail')return (r.time||'')+' 没能登上,白天巡逻会补';
+  return (r.time||'')+(r.tries===1?' 第一次就登好了 ✓':' 第 '+r.tries+' 次登好 ✓');
+}
+function logLineHTML(e){
+  return '<div><span class="ts">'+esc(e.ts)+'</span>'+(e.level==='ok'?'<span class="ok">[OK]</span> ':'')+esc(e.text)+'</div>';
+}
+function renderWifiList(box,networks,opts){
+  opts=opts||{};
+  box.innerHTML=(networks||[]).map(n=>{
+    const sig=SIGNAL_TXT[n.signal]||'';
+    const sel=opts.pick&&opts.selected===n.ssid;
+    return '<div class="ssid'+(opts.pick?' sel-pick':'')+(sel?' on':'')+'"'+(opts.pick?'':' onclick="pickWifi(this)"')+
+      '><span class="n">'+esc(n.ssid)+'</span><span class="q"'+(opts.pick?' data-orig="'+sig+'"':'')+'>'+sig+(sel?' · 已选':'')+'</span></div>';
+  }).join('');
+}
+async function fillLoginLanding(){
+  const net=lastNet||{};
+  $('login-status').textContent=(net.ssid||'校园网')+' · 未认证';
+  const id=await GG.api.identify();
+  if(id.ok&&id.data.uid&&!$('f-sid-login').value)$('f-sid-login').value=id.data.uid;
+}
+async function fillLanding(){
+  const net=lastNet||{};
+  if(mainState==='ok'){
+    $('ok-status').textContent=(net.ssid||'校园网')+' · 已连上';
+    const id=await GG.api.identify();
+    if(id.ok&&id.data.uid){
+      const f=$('f-sid');if(!f.value)f.value=id.data.uid;
+      $('ok-status').textContent=(net.ssid||'校园网')+' · 已连上 · 学号已识别 ✓';
+    }
+  }else if(mainState==='out'){
+    fillLoginLanding();
+  }else if(mainState==='down'){
+    renderGuide();
+  }
+}
+async function renderGuide(){
+  const net=lastNet||{};
+  $('guide-server').textContent=(net.server||'10.1.2.3')+' · 不可达';
+  $('guide-cur').textContent='① 当前连的是「'+(net.ssid||'')+'」,像热点。挑一个校园网:';
+  const s=await GG.api.scanWifi();
+  if(s.ok)renderWifiList($('guide-wifi'),s.data.networks);
+}
+async function reProbe(){
+  const p=await GG.api.probe();
+  if(p.ok){
+    lastNet=p.data.net;
+    mainState=lastNet.state==='logged_in'?'ok':(lastNet.state==='not_logged_in'?'out':'down');
+    if(mainState!=='down'){goDaily();return}
+  }
+  renderGuide();
+}
+async function renderMainData(){
+  const [c,l,g]=await Promise.all([GG.api.getConfig(),GG.api.recentResult(),GG.api.logs({days:1})]);
+  if(c.ok){
+    curCfg=c.data;
+    if(curCfg.trigger_time&&curCfg.trigger_time!==currentTriggerTime){
+      currentTriggerTime=curCfg.trigger_time;
+      const t=currentTriggerTime.split(':');
+      $('ct-h').value=t[0];$('ct-m').value=t[1];
+      document.querySelectorAll('.preset').forEach(x=>x.classList.toggle('on',x.dataset.t===currentTriggerTime));
+    }
+    setAuto(curCfg.master);
+    document.body.classList.toggle('hide-gui',curCfg.show_gui===false);
+    $('sw-gui').classList.toggle('on',curCfg.show_gui!==false);
+  }
+  if(lastNet)$('main-net').textContent=netText(lastNet);
+  if(l.ok)$('main-last').textContent=lastText(l.data);
+  if(g.ok&&g.data.days[0])$('main-log-entries').innerHTML=g.data.days[0].entries.map(logLineHTML).join('');
+}
+async function loadLogs(){
+  const g=await GG.api.logs({days:14});
+  if(!g.ok)return;
+  $('log-days').innerHTML=g.data.days.map(d=>
+    '<div class="day"><div class="day-h">'+esc(d.label)+'</div><div class="log">'+d.entries.map(logLineHTML).join('')+'</div></div>').join('');
+}
+async function loadSettings(){
+  const c=await GG.api.getConfig();
+  if(!c.ok)return;
+  curCfg=c.data;
+  const t=(curCfg.trigger_time||'07:00').split(':');
+  $('ct-h').value=t[0];$('ct-m').value=t[1];currentTriggerTime=curCfg.trigger_time||'07:00';
+  document.querySelectorAll('.preset').forEach(x=>x.classList.toggle('on',x.dataset.t===currentTriggerTime));
+  document.querySelectorAll('#v-settings .sw[data-cfg]').forEach(sw=>sw.classList.toggle('on',!!curCfg[sw.dataset.cfg]));
+  $('sw-auto-set').classList.toggle('on',!!curCfg.master);setAuto(!!curCfg.master);
+  $('sw-gui').classList.toggle('on',curCfg.show_gui!==false);
+  $('sw-fallback').classList.toggle('on',!!curCfg.wifi_fallback_enabled);
+  $('fallback-pick').style.display=curCfg.wifi_fallback_enabled?'block':'none';
+  document.querySelectorAll('#v-settings .dd[data-cfg-key]').forEach(dd=>{
+    const v=String(curCfg[dd.dataset.cfgKey]);
+    dd.querySelectorAll('.dd-menu button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+    const ob=dd.querySelector('.dd-menu button.on');
+    dd.querySelector('.dd-label').textContent=ob?ob.textContent.replace('✓','').trim():'';
+  });
+  if(curCfg.wifi_fallback_enabled){
+    const s=await GG.api.scanWifi();
+    if(s.ok)renderWifiList($('fallback-pick'),s.data.networks,{pick:true,selected:curCfg.wifi_fallback_ssid});
+  }
+}
+function toggleCfg(el){el.classList.toggle('on');GG.api.saveConfig({[el.dataset.cfg]:el.classList.contains('on')})}
+/* 日志追加事件:主页内嵌 + 历史页今天组同步追加 */
+GG.on('log:appended',e=>{
+  if(!e||!e.entry)return;
+  const m=$('main-log-entries');if(m)m.insertAdjacentHTML('beforeend',logLineHTML(e.entry));
+  const d=document.querySelector('#log-days .day:first-child .log');
+  if(d)d.insertAdjacentHTML('beforeend',logLineHTML(e.entry));
+});
 /* 窗口控制:GG.win —— 真最小化 / 真退出(GUI 非常驻,自动化由任务计划继续) */
 function minimize(){GG.win('minimize')}
 function closeWin(){GG.win('close')}

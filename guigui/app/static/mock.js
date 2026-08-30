@@ -62,6 +62,7 @@ window.GGMock={
   async identify(){
     await delay(250);
     if(S.net.state==='logged_in')return OK({uid:UID,source:'chkstatus'});
+    if(S.configured)return OK({uid:UID,source:'config'});
     return OK({uid:null,source:'none'});
   },
   async login(a){
