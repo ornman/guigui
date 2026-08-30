@@ -1,0 +1,5 @@
+# 桂桂 v2 运行依赖(--ensure 与 GUI 共用;打包见 guigui.spec)
+pywebview>=6.0
+keyring>=24.0
+
+# 开发/构建(pytest、pyinstaller 由 build_guigui.bat 单独安装,不进运行时)
