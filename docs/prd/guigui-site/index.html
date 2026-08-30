@@ -338,19 +338,16 @@ section.sc > canvas.scene{
 /* ── 帧内组件:全部按 PRD 原样式缩小 ── */
 /* 标题栏(PRD .titlebar) */
 .pw-bar{display:flex;align-items:center;gap:7px;height:28px;margin:-2px -4px 10px;padding:0 4px;border-bottom:1px solid oklch(100% 0 0 / 0.45)}
+.pw-bar .bar-bot{width:18px;height:18px;flex-shrink:0}
 .pw-bar .nm{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:oklch(60% 0.010 295)}
 .pw-bar .sp{flex:1}
 .pw-bar .b{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:oklch(60% 0.010 295)}
 .pw-bar .b.hot{color:oklch(58% 0.15 295);box-shadow:0 0 0 2.5px oklch(58% 0.15 295 / 0.18)}
-/* 独立标题/副文(帧 02/04) */
-.pw-h{font-family:var(--serif);font-size:18px;font-weight:600;letter-spacing:-.01em}
-.pw-say{font-family:var(--serif);font-size:11px;color:oklch(45% 0.012 295);margin-top:2px}
-/* 大号时间槽(PRD .slot) */
-.pw-time{
-  font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:-.01em;
-  padding:2px 12px;border-radius:9px;align-self:flex-start;margin-top:10px;
-  border:1px solid oklch(58% 0.15 295 / 0.45);background:oklch(58% 0.15 295 / 0.08);
-}
+/* 问候行(PRD .greet) */
+.pw-greet{display:flex;align-items:center;gap:10px}
+.pw-greet .g-bot{width:38px;height:38px;flex-shrink:0}
+.pw-greet h4{font-family:var(--serif);font-size:17px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
+.pw-greet .say{font-family:var(--serif);font-size:10.5px;color:oklch(45% 0.012 295);margin-top:2px}
 /* 输入框(PRD input:紫染边+半透明白底+placeholder 灰) */
 .pw-in{
   display:block;width:100%;padding:9px 12px;
@@ -389,17 +386,11 @@ section.sc > canvas.scene{
 .pw-log .ts{color:#7A7294;margin-right:6px}
 /* 成功页居中(PRD v-success) */
 .pw-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
+.pw-center .c-bot{width:64px;height:64px}
 .pw-center h4{font-family:var(--serif);font-size:15px;font-weight:600;letter-spacing:-.01em}
 .pw-center .sub{font-family:var(--serif);font-size:10.5px;color:oklch(45% 0.012 295)}
-/* 帧1 下载:桂 mark(PRD 纯黑)+ 进度条 + 打开 */
-.f1-mark{
-  width:40px;height:40px;border-radius:12px;margin:0 auto;
-  background:oklch(23% 0.015 295);color:oklch(97% 0.005 295);
-  font-family:var(--serif);font-size:18px;font-weight:600;
-  display:flex;align-items:center;justify-content:center;
-}
-.f1-nm{font-family:var(--mono);font-size:9.5px;color:oklch(60% 0.010 295);letter-spacing:.05em;text-align:center}
-.f1-body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:13px}
+/* 帧1 下载:进度条 + 打开(PRD 同语言) */
+.f1-body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:14px}
 .f1-progress{height:7px;border-radius:99px;background:oklch(23% 0.015 295 / 0.10);overflow:hidden}
 .f1-progress i{display:block;height:100%;width:100%;border-radius:99px;background:oklch(58% 0.15 295)}
 .f1-row{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:9.5px;color:oklch(60% 0.010 295)}
@@ -690,11 +681,16 @@ section.sc > canvas.scene{
 
       <div class="frame rv">
         <div class="frame-win">
+          <div class="pw-bar">
+            <div class="bar-bot bot" data-size="18" aria-hidden="true"></div>
+            <span class="nm">GuiGui-Setup</span>
+            <span class="sp"></span>
+            <span class="b" aria-hidden="true">–</span>
+            <span class="b" aria-hidden="true">×</span>
+          </div>
           <div class="f1-body">
-            <div class="f1-mark" aria-hidden="true">桂</div>
-            <div class="f1-nm">GuiGui-Setup.exe · 32 MB</div>
             <div class="f1-progress" aria-hidden="true"><i></i></div>
-            <div class="f1-row"><span>已校验</span><span class="f1-open">打开</span></div>
+            <div class="f1-row"><span>32 MB · 已校验</span><span class="f1-open">打开</span></div>
           </div>
           <span class="cur" style="left:50%;top:62%" aria-hidden="true"><svg viewBox="0 0 20 27" fill="none"><path d="M3 2 L3 19.5 L7.6 15.8 L10.2 23 L13.2 21.7 L10.1 14.9 L16.6 14.9 Z" fill="#fff" stroke="#241F33" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
         </div>
@@ -703,8 +699,13 @@ section.sc > canvas.scene{
 
       <div class="frame rv">
         <div class="frame-win">
-          <h4 class="pw-h">早上好。</h4>
-          <div class="pw-say">把账号交给桂桂。</div>
+          <div class="pw-greet">
+            <div class="g-bot bot" data-size="38" aria-hidden="true"></div>
+            <div>
+              <h4>早上好。</h4>
+              <div class="say">把账号交给桂桂。</div>
+            </div>
+          </div>
           <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
             <span class="pw-in">学号</span>
             <span class="pw-in">密码</span>
@@ -718,11 +719,13 @@ section.sc > canvas.scene{
       <div class="frame rv">
         <div class="frame-win">
           <div class="pw-bar">
+            <div class="bar-bot bot" data-size="18" aria-hidden="true"></div>
             <span class="nm">GuiGui</span>
             <span class="sp"></span>
             <span class="b hot" aria-hidden="true">×</span>
           </div>
           <div class="pw-center">
+            <div class="c-bot bot" data-size="64" aria-hidden="true"></div>
             <h4>网,已经帮你连好啦</h4>
             <div class="sub">以后每天都会自动登好。</div>
           </div>
@@ -733,11 +736,24 @@ section.sc > canvas.scene{
 
       <div class="frame rv">
         <div class="frame-win">
-          <h4 class="pw-h">早上好。</h4>
+          <div class="pw-bar">
+            <div class="bar-bot bot" data-size="18" aria-hidden="true"></div>
+            <span class="nm">GuiGui</span>
+            <span class="sp"></span>
+            <span class="b" aria-hidden="true">–</span>
+            <span class="b" aria-hidden="true">×</span>
+          </div>
+          <div class="pw-greet">
+            <div class="g-bot bot" data-size="34" aria-hidden="true"></div>
+            <div>
+              <h4>早上好。</h4>
+              <div class="say">网的事交给我。</div>
+            </div>
+          </div>
           <div class="pw-status"><span class="d"></span>已连接 · <b>07:00:02 登录成功</b></div>
-          <span class="pw-time">07:00</span>
-          <div style="margin-top:6px">
+          <div style="margin-top:4px">
             <div class="pw-row"><div><div class="t">自动登录</div><div class="d">明早 07:00 替你登</div></div><span class="pw-sw" aria-hidden="true"></span></div>
+            <div class="pw-row"><div><div class="t">网络</div><div class="d">已连上 Campus-WiFi ✓</div></div></div>
           </div>
           <div class="pw-log"><span class="ts">07:00:02</span><span class="ok">[OK]</span> 已登录</div>
         </div>
