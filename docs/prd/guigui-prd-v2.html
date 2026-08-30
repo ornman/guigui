@@ -178,9 +178,8 @@ body.hide-gui .bot-greet{display:none}
 
 /* 开机仪式:bot 完美居中(grid 强制);仪式期间 visible,归位后透明但保留布局 */
 /* v-boot:仪式态全屏占位,bot 与 boot-cap 在 grid 中部堆叠;不切渐变,goSetup 后即隐藏 */
-#v-boot{position:absolute;inset:0;display:none;place-items:center;pointer-events:none;
-  grid-template-rows:auto auto;row-gap:18px}
-#v-boot.on{display:grid}
+#v-boot{position:absolute;inset:0;display:none;pointer-events:none}
+#v-boot.on{display:flex;flex-direction:column;justify-content:center;align-items:center;row-gap:18px}
 #v-boot .boot-cap{text-align:center;pointer-events:none;color:var(--ink-3);font:600 13px/1.5 Inter,sans-serif;letter-spacing:.02em;opacity:.85}
 
 .boot-cap{margin-top:22px;text-align:center;font-size:13.5px;color:var(--ink-3);
