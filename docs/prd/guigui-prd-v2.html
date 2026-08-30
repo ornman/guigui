@@ -79,6 +79,8 @@ body{
 .log::-webkit-scrollbar-thumb{border-radius:99px;background:oklch(97% 0.005 295 / 0.25)}
 .v{display:none;animation:fadein .3s ease-out}
 .v.on{display:block}
+.v.leaving{animation:fadeout .25s ease-in forwards}
+@keyframes fadeout{from{opacity:1}to{opacity:0}}
 /* 日常页:日志钉底,中部留白是呼吸感不是空缺 */
 #v-main.on{display:flex;flex-direction:column;min-height:100%}
 #v-main .log{margin-top:auto}
@@ -454,7 +456,7 @@ body.backdrop-black .taskbar{display:none}
       <button class="link" onclick="openDetail('v-login')">③ 先填资料,连上后桂桂自动帮你登录</button>
     </div>
 
-    <!-- 日常主页:体检卡(无 bot,共用 boot-bot) -->
+    <!-- 日常主页:体检卡(bot 在 .greet 内 flex 第一位) -->
     <div class="v" id="v-main">
       <div class="greet">
         <div class="bot bot-greet" id="boot-bot-greet-main" data-state="happy" data-size="58"></div>
@@ -661,7 +663,16 @@ function mood(el,m){
   setBotState(el,MOOD2STATE[m]||'idle');
 }
 function currentView(){return views.find(v=>$(v).classList.contains('on'))||'v-main'}
-function show(id){views.forEach(v=>$(v).classList.remove('on'));$(id).classList.add('on')}
+/* 视图切换:旧 view fadeout(0.25s)→ display:none;新 view 延后 250ms 出现 fadein */
+function show(id){
+  const cur=views.map(v=>$(v)).find(v=>v.classList.contains('on'));
+  const next=$(id);if(cur===next)return;
+  if(cur){
+    cur.classList.add('leaving');
+    setTimeout(()=>cur.classList.remove('on','leaving'),250);
+    setTimeout(()=>{next.classList.add('on')},cur?250:0);
+  }else{next.classList.add('on')}
+}
 function openDetail(id){origin[id]=currentView();show(id)}
 function backFrom(id){const dest=origin[id]||'v-main';if(dest==='v-main')renderMain();show(dest);greet();document.body.classList.remove('setup')}
 function greetText(){const h=new Date().getHours();return h<11?'早上好':(h<18?'下午好':'晚上好')}
@@ -669,38 +680,27 @@ function greet(){const g=greetText()+'。';
   document.querySelectorAll('.g').forEach(e=>{if(e.id!=='main-h1')e.textContent=g})}
 
 /* 首次仪式:完整苏醒典礼;结束时按网络体检三分流(首装单行道,各落地页无返回) */
-/* 首次仪式:bot 居中沉睡 → 睁眼 → 滑动归位到左上角(问候块左侧)
-   整个动作用 CSS keyframes 表达,JS 只切状态和 goto */
+/* 仪式只用 .entering 触发 pop 入场(0.55s) + mood 切换;无 transform 平移、无 .centered、无 reinitBot
+   boot-bot 永远 140x140(grid 居中),greet-bot 在主页 flex 内嵌 58x58 — 互不干扰 */
 function firstRun(state){
   mainState=state||'ok';
   document.body.classList.add('setup');
   const b=$('boot-bot');
-  if(b.parentElement!==$("win"))$("win").appendChild(b);
-  /* 仪式时 data-size=140 让 SVG 渲染为 140x140;goSetup 时改回 58 */
-  b.dataset.size=140;reinitBot(b);
   $('boot-cap').textContent='桂桂伸了个懒腰,正在检查网络…';
-  b.classList.remove('awake');b.dataset.mood='sleep';
-  b.classList.add('centered','entering');
+  b.dataset.mood='sleep';
+  b.classList.add('entering');
   show('v-boot');
-  setTimeout(()=>{b.classList.remove('entering')},1500);
-  setTimeout(()=>{mood(b,mainState==='ok'?'idle':(mainState==='out'?'sad':'cry'));b.classList.add('awake')},1300);
-  setTimeout(goSetup,2100);
+  setTimeout(()=>{b.classList.remove('entering')},900);
+  setTimeout(()=>{mood(b,mainState==='ok'?'idle':(mainState==='out'?'sad':'cry'))},700);
+  setTimeout(goSetup,1500);
 }
-/* 重新初始化 bot(改了 data-size 后重建 SVG) */
-function reinitBot(b){
-  if(b.__xj)b.__xj=null;
-  b.innerHTML='';
-  initBot(b);
-}
+/* reinitBot 已废弃 — 两个 bot 各有独立 DOM,size 在 HTML 写死,不需要中途重建 SVG */
 /* 开机等网络:无典礼(每天开机都走),桂桂睡着在门口等,就绪直接落日常页 */
 function bootWait(){
   mainState='ok';document.body.classList.remove('setup');
   const b=$('boot-bot');
-  if(b.parentElement!==$("win"))$("win").appendChild(b);
-  b.dataset.size=140;reinitBot(b);
-  b.classList.add('centered','entering');
-  setTimeout(()=>{b.classList.remove('entering')},1500);
-  b.classList.remove('awake');b.dataset.mood='sleep';
+  b.dataset.mood='sleep';b.classList.add('entering');
+  setTimeout(()=>{b.classList.remove('entering')},900);
   $('boot-cap').innerHTML='校园网 06:50 才开门,桂桂在门口等着…<br><span style="font-size:11px;opacity:.7">每 30 秒看一次,开了就替你登好</span>';
   show('v-boot');
   setTimeout(()=>$('boot-cap').textContent='门开了,桂桂进去了…',2200);
@@ -711,33 +711,17 @@ function goSetup(){
   else if(mainState==='down')show('v-guide');
   else show('v-ok');
   greet();
-  const b=$('boot-bot');if(b){
-    b.classList.remove('centered');
-    b.classList.remove('dock-in');void b.offsetWidth;
-    b.classList.add('dock-in');
-    /* 仪式后回到 58x58:改 data-size 重新初始化 SVG */
-    b.dataset.size=58;
-    setTimeout(()=>reinitBot(b),950);  /* 等 dock-in 动画接近完成再切 */
-    setTimeout(()=>{b.classList.remove('dock-in')},1000);
-  }
+  /* 不再做 .centered/.dock-in 归位动画 — 目标视图的 greet-bot 已在 .greet 内自然显示
+     v-boot 走 .leaving 自动隐藏,目标 view 走 .on 触发 fadein */
 }
 /* 日常主页:渲染当前状态 + 密码补填提示 */
 function goDaily(){
   document.body.classList.remove('setup');
-  const b=$('boot-bot');
-  if(b){
-    b.classList.remove('centered');
-    b.classList.remove('dock-in');void b.offsetWidth;
-    b.classList.add('dock-in');
-    b.dataset.size=58;
-    setTimeout(()=>reinitBot(b),950);
-    setTimeout(()=>{b.classList.remove('dock-in')},1000);
-  }
   renderMain();show('v-main');greet();
 }
 /* 状态即标题:出问题时,页面最大的字直接说这件事(不靠装饰条) */
 function renderMain(){
-  const gb=document.querySelector('#boot-bot');
+  const gb=document.querySelector('#boot-bot-greet-main');
   const vm=$('v-main');
   vm.classList.toggle('st-warn',mainState==='out');
   vm.classList.toggle('st-down',mainState==='down');
@@ -763,7 +747,7 @@ function setAuto(on){
   const d=$('auto-desc');
   if(d)d.textContent=on?'明早 07:00 替你登 · 到点前 30 分钟开始试':'已关 · 想让我开工随时说';
   if($('v-main').classList.contains('on')){
-    mood(document.querySelector('#boot-bot'),on?'idle':'sleep');
+    mood(document.querySelector('#boot-bot-greet-main'),on?'idle':'sleep');
     $('main-lede').textContent=on?'网的事交给我,你放心忙~':'好,我先歇着,想我了再开。';
   }
 }
@@ -795,7 +779,7 @@ function mainAction(){
 }
 /* 主页上的重登:就地反馈,不跳庆祝页(庆祝只属于首次/修复成功) */
 function quickLogin(){
-  const gb=document.querySelector('#boot-bot');
+  const gb=document.querySelector('#boot-bot-greet-main');
   mood(gb,'happy');
   $('main-lede').textContent='刚刚把网帮你接回来啦 ✓';
 }
