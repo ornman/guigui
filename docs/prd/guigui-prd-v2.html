@@ -81,7 +81,7 @@ body{
 .v.on{display:block}
 /* 日常页:日志钉底,中部留白是呼吸感不是空缺 */
 #v-main.on{display:flex;flex-direction:column;min-height:100%}
-#v-main .log-head{margin-top:auto}
+#v-main .log{margin-top:auto}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* ═══ Bot:各视图内嵌,零位移零飞行(杜绝"乱飞/出界") ═══ */
@@ -181,10 +181,10 @@ input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--a
 .day{margin-bottom:16px}
 .day-h{font-family:Inter,"PingFang SC",sans-serif;font-size:10.5px;font-weight:600;
   letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin:0 0 6px}
-.log-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;
-  font-family:Inter,"PingFang SC",sans-serif;font-size:11px;color:var(--ink-3)}
-.log-head a{color:var(--accent);font-weight:600;cursor:pointer;text-decoration:none}
-.log-head a:hover{text-decoration:underline}
+.log .hist{text-align:right;margin-top:4px}
+.log .hist a{font:600 11px/1 Inter,"PingFang SC",sans-serif;color:oklch(82% 0.05 295);
+  text-decoration:none;cursor:pointer}
+.log .hist a:hover{color:oklch(97% 0.005 295);text-decoration:underline}
 .link{background:none;border:none;padding:0;margin-top:16px;font:500 13px/1.6 inherit;
   font-family:inherit;color:var(--ink-3);cursor:pointer;
   border-bottom:1px solid oklch(60% 0.01 295 / .4);transition:color .15s}
@@ -355,18 +355,16 @@ body.backdrop-black .taskbar{display:none}
           <p class="tagline">校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好</p>
         </div>
       </div>
-      <div class="status ok"><span class="dot"></span><span>Campus-WiFi · 已连上 · 学号我认出来了 ✓</span></div>
-      <div class="f"><label>学号(我帮你认出来的)</label><input id="f-sid" value="2025000000001"></div>
-      <div class="f"><label>密码 · 只存在你电脑里</label>
-        <div class="pw-wrap"><input type="password" id="f-pwd" placeholder="填一次,以后每天桂桂替你登">
+      <div class="status ok"><span class="dot"></span><span>Campus-WiFi · 已连上 · 学号已识别 ✓</span></div>
+      <div class="f"><label>学号</label><input id="f-sid" value="2025000000001"></div>
+      <div class="f"><label>密码</label>
+        <div class="pw-wrap"><input type="password" id="f-pwd">
           <button type="button" class="pw-eye" onclick="togglePw('f-pwd',this)" title="显示 / 隐藏密码">
             <svg class="i-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
             <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><path d="M4 4l16 16"/></svg>
           </button></div>
-        <div class="micro-line" id="pwd-warn" style="display:none;color:var(--warm)">密码还没填呢 — 不急,也可以先开着,随时再补</div></div>
+        <div class="micro-line" id="pwd-warn" style="display:none;color:var(--warm)">密码还没填呢</div></div>
       <button class="btn" onclick="enableDaily()">开启每日自动登录</button>
-      <div class="micro-line">点一下就生效 · <a href="javascript:void(0)" onclick="deferDaily()" style="color:var(--accent);font-weight:600">先不填,以后随时补</a></div>
-      <button class="link" onclick="openDetail('v-settings')">高级设置</button>
     </div>
 
     <!-- 登录表单 -->
@@ -441,19 +439,14 @@ body.backdrop-black .taskbar{display:none}
       <div class="row"><div><div class="t">昨晚</div>
         <div class="d">07:00 第一次就登好了 ✓</div></div></div>
 
-      <div class="micro-line" id="pwd-prompt" style="display:none;background:oklch(58% 0.15 295 / 0.07);padding:10px 12px;border-radius:10px;line-height:1.7">
-        还差一步:桂桂还没拿到密码,掉线时没法自动帮登。
-        <a href="javascript:void(0)" onclick="openDetail('v-login')" style="color:var(--accent);font-weight:600">现在补上</a>
-      </div>
-
       <button class="btn quiet" id="main-btn" onclick="quickLogin()">立即重新登录</button>
-      <button class="link" onclick="openDetail('v-settings')">高级设置</button>
+      <button class="link" style="display:block;text-align:left;margin-top:10px;font-size:12px" onclick="openDetail('v-settings')">高级设置</button>
 
-      <div class="log-head"><span>最近一次运行</span><a href="javascript:void(0)" onclick="openDetail('v-log')">历史日志 →</a></div>
       <div class="log">
         <div><span class="ts">07:00:01</span><span class="ok">[OK]</span> 网络可达</div>
         <div><span class="ts">07:00:02</span><span class="ok">[OK]</span> 已登录 · 2025…7209</div>
         <div><span class="ts">07:00:03</span>[INFO] 窗口心跳结束 · 今日任务完成</div>
+        <div class="hist"><a href="javascript:void(0)" onclick="openDetail('v-log')">历史日志 →</a></div>
       </div>
     </div>
 
@@ -619,7 +612,6 @@ function goSetup(){show('v-ok');greet()}
 function goDaily(){renderMain();show('v-main');greet()}
 function renderMain(){
   const gb=document.querySelector('#v-main .g-bot');
-  $('pwd-prompt').style.display=(!hasPwd)?'block':'none';
   if(mainState==='ok'){mood(gb,'idle');
     $('main-lede').textContent='网的事交给我,你放心忙~';
     $('main-net').textContent='已连上 Campus-WiFi ✓';$('main-btn').textContent='立即重新登录'}
@@ -675,12 +667,11 @@ function quickLogin(){
 }
 /* 流程动作 */
 function showSuccess(){show('v-success');greet();party()}
-/* 交钥匙即开启:密码必填(为空给温柔提醒);「先不填」走安静退路,主页再催补 */
+/* 交钥匙即开启:密码必填,为空只给一句温柔提醒 */
 function enableDaily(){
   if(!$('f-pwd').value.trim()){$('pwd-warn').style.display='block';return}
   configured=true;hasPwd=true;showSuccess()
 }
-function deferDaily(){configured=true;hasPwd=false;showSuccess()}
 function loginNow(){hasPwd=true;$('login-err').style.display='none';showSuccess()}
 function pickWifi(el){
   el.classList.add('on');
