@@ -187,8 +187,13 @@ section.sc > canvas.scene{
 /* ═══ HERO(Fig.00):点阵网格交互 ═══ */
 .hero{
   position:relative;padding:88px 0 44px;
-  display:grid;grid-template-columns:1fr auto;gap:64px;align-items:center;
+  display:flex;flex-direction:column;justify-content:center;
   min-height:calc(100dvh - 90px);
+}
+/* 双栏整体在容器内居中(16:9 不再贴左右边) */
+.hero-grid{
+  display:grid;grid-template-columns:auto auto;justify-content:center;
+  align-items:center;gap:clamp(48px, 6vw, 96px);
 }
 .hero > canvas.scene{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:block}
 .hero .eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:26px;position:relative;z-index:1}
@@ -197,10 +202,8 @@ section.sc > canvas.scene{
 .hero h1 .em{font-weight:500;background:linear-gradient(120deg,#6D4DE8,#D946EF);-webkit-background-clip:text;background-clip:text;color:transparent}
 .hero .lede{margin-top:24px;position:relative;z-index:1}
 .hero .cta-row{display:flex;align-items:center;gap:34px;margin-top:38px;flex-wrap:wrap;position:relative;z-index:1}
-/* meta 的父级 .wrap 才是 grid 项,跨满两列 */
-.hero > .wrap:last-child{grid-column:1 / -1}
 .hero .hero-meta{
-  display:grid;grid-template-columns:repeat(3,1fr);gap:36px;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:36px;
   padding:26px 32px;margin-top:56px;border-radius:18px;position:relative;z-index:1;
 }
 .hero .hero-meta .cell .fig-label{margin-bottom:8px}
@@ -441,7 +444,8 @@ section.sc > canvas.scene{
 
 /* ═══ 响应式 ═══ */
 @media (max-width: 1120px){
-  .hero{grid-template-columns:1fr;gap:52px;padding-top:56px}
+  .hero{padding-top:56px}
+  .hero-grid{grid-template-columns:1fr;gap:48px}
   .win-stage{width:min(468px,100%)}
 }
 @media (max-width: 880px){
@@ -500,14 +504,15 @@ section.sc > canvas.scene{
 <!-- ═══ Fig.00 HERO · 背景交互:点阵网格(光标排斥+点亮) ═══ -->
 <section class="hero sc" id="fig-00" data-scene="dots">
   <canvas class="scene" aria-hidden="true"></canvas>
-  <div class="wrap" style="display:contents">
+  <div class="wrap">
+   <div class="hero-grid">
     <div>
       <div class="eyebrow rv">
         <span class="dot" aria-hidden="true"></span>
         <span class="fig-label"><b>Fig. 00</b> — 桂林航天工业学院 · 校园网助手</span>
       </div>
       <h1 class="rv">每天 7:00,<br><span class="em">网比你先醒。</span></h1>
-      <p class="lede rv">桂桂是一个 Windows 桌面小工具:起床开电脑,网已经替你连好。学号密码只输一次。</p>
+      <p class="lede rv">配置一次,之后<b>全程静默</b>——不用打开桂桂,开电脑就已经在线。学号密码只输一次。</p>
       <div class="cta-row rv">
         <a class="btn-cta" href="#fig-05" data-magnet>
           带走桂桂
@@ -567,10 +572,9 @@ section.sc > canvas.scene{
         </div>
       </div>
     </div>
-  </div>
-
-  <div class="wrap">
+   </div>
     <div class="hero-meta panel rv">
+      <div class="cell"><div class="fig-label"><b>Silent</b></div><p>配置好之后一切后台静默执行——不开界面、不弹窗,无感连上校园网。</p></div>
       <div class="cell"><div class="fig-label"><b>Purpose</b></div><p>替桂航学子把「每天连网」这件事记好,起床即在线。</p></div>
       <div class="cell"><div class="fig-label"><b>Method</b></div><p>五层触发器叠加:心跳、开机、巡逻、WiFi 兜底、唤醒。</p></div>
       <div class="cell"><div class="fig-label"><b>Scope</b></div><p>仅供桂林航天工业学院在校学生,Dr.COM 校园网。</p></div>
