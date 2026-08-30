@@ -91,26 +91,23 @@ body{
 
 /* 首次仪式:bot 居中 140px + 归位到左上角问候块左侧(58px) */
 /* boot-bot 容器:始终 fixed 58x58 在左上角(归宿),firstRun 时 JS 加 .centered
-   临时切到中央 140x140,归位时移除 .centered 走 dock-in 动画缩放回 58 */
+   临时切到中央 140x140(用 transform 平移 + 缩放,left/top 不变,避免跳变) */
 #boot-bot{position:fixed;left:36px;top:84px;width:58px;height:58px;z-index:10;
-  transform-origin:50% 50%;transition:none}
-/* 仪式态:.centered 切到中央 140x140,左 50% top 50% translate(-50%,-50%) */
-#boot-bot.centered{left:50%;top:50%;width:140px;height:140px;transform:translate(-50%,-50%);
-  animation:botSettle 1.4s cubic-bezier(.22,1,.36,1) forwards}
+  transform-origin:50% 50%;transform:translate(0,0) scale(1);transition:transform .4s cubic-bezier(.22,1,.36,1), width .4s, height .4s, left .4s, top .4s}
+/* 仪式态:.centered 切到中央 140x140 — 用 transform 平移 + width/height 一起过渡
+   这样 firstRun 加 .centered 时不会"跳",而是 58x58 → 140x140 平滑放大
+   注:translate(204,232) 是 70% viewport 位置(560x800 时中央) */
+#boot-bot.centered{width:140px;height:140px;left:36px;top:84px;
+  transform:translate(204px,232px) scale(1);transition:transform .4s cubic-bezier(.22,1,.36,1), width .4s, height .4s}
+/* 仪式动画:.entering 阶段执行;不要 forwards/both,让 .centered 的 transform 持续生效 */
+#boot-bot.centered.entering{animation:botSettle 1.4s cubic-bezier(.22,1,.36,1)}
 @keyframes botSettle{
-  0%{opacity:0;transform:translate(-50%,-50%) scale(.78) translateY(20px)}
-  35%{opacity:1;transform:translate(-50%,-50%) scale(1.04) translateY(-4px)}
-  100%{opacity:1;transform:translate(-50%,-50%) scale(1) translateY(0)}
+  0%{opacity:0;transform:translate(204px,252px) scale(.78)}
+  35%{opacity:1;transform:translate(204px,228px) scale(1.04)}
+  100%{opacity:1;transform:translate(204px,232px) scale(1)}
 }
-/* 归位动画:.centered 移除后用 dock-in 从中央→左上角 58x58,ease-out-quint */
-#boot-bot.dock-in{animation:botDock .9s cubic-bezier(.22,1,.36,1) forwards}
-@keyframes botDock{
-  0%{transform:translate(-50%,-50%) scale(1)}
-  20%{transform:translate(-50%,-50%) scale(0.78) translateY(-8px)}
-  55%{transform:translate(-50%,-50%) scale(0.55) translateY(-32px)}
-  80%{transform:translate(-50%,-50%) scale(0.45) translateY(-50px)}
-  100%{transform:none scale(0.414)}
-}
+/* 归位动画:从中央 → 左上角 58x58,过渡 + ease-out-quint */
+#boot-bot.dock-in{transform:translate(0,0) scale(1);transition:transform .9s cubic-bezier(.22,1,.36,1), width .9s, height .9s}
 /* 庆祝页大 bot(固定大尺寸,无归位) */
 .bot-success{width:140px;height:140px;margin:0 auto 10px}
 /* v-success 内容层:卡片光晕脉冲 + bot 弹入 + 4 行文字逐行浮入 + 背景渐显
@@ -687,10 +684,14 @@ function firstRun(state){
   mainState=state||'ok';
   document.body.classList.add('setup');
   const b=$('boot-bot');
+  /* 把 boot-bot 移到 body 下,确保 fixed 定位不被 v-boot display:none 影响 */
+  if(b.parentElement!==document.body)document.body.appendChild(b);
   $('boot-cap').textContent='桂桂伸了个懒腰,正在检查网络…';
-  b.classList.add('centered');
+  /* 加 .centered(过渡到中央)+ .entering(触发 botSettle 仪式弹跳)*/
   b.classList.remove('awake');b.dataset.mood='sleep';
+  b.classList.add('centered','entering');
   show('v-boot');
+  setTimeout(()=>{b.classList.remove('entering')},1500);
   setTimeout(()=>{mood(b,mainState==='ok'?'idle':(mainState==='out'?'sad':'cry'));b.classList.add('awake')},1300);
   setTimeout(goSetup,2100);
 }
@@ -698,7 +699,9 @@ function firstRun(state){
 function bootWait(){
   mainState='ok';document.body.classList.remove('setup');
   const b=$('boot-bot');
-  b.classList.add('centered');
+  if(b.parentElement!==document.body)document.body.appendChild(b);
+  b.classList.add('centered','entering');
+  setTimeout(()=>{b.classList.remove('entering')},1500);
   b.classList.remove('awake');b.dataset.mood='sleep';
   $('boot-cap').innerHTML='校园网 06:50 才开门,桂桂在门口等着…<br><span style="font-size:11px;opacity:.7">每 30 秒看一次,开了就替你登好</span>';
   show('v-boot');
