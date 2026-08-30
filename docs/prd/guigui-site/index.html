@@ -298,106 +298,154 @@ section.sc > canvas.scene{
 .sec-head h2{max-width:24ch}
 .sec-head .lede{margin-top:14px}
 
-/* ═══ Fig.01 用法 · 四帧横向预览(全部用 PRD 原样式手搓,统一窗口容器) ═══ */
-.frames{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
-.frame{position:relative;display:flex;flex-direction:column}
-/* 统一容器 = PRD 窗口原样式(同渐变/同描边/同比列圆角),按列宽缩小 */
+/* ═══ Fig.01 用法 · 大舞台 + 步骤切换(四帧 1:1 PRD 原尺寸,自动轮播) ═══ */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 560px;gap:64px;align-items:center;--dwell:5000ms}
+/* 左:步骤列表(编号 + 标题 + 一句话;激活项带进度线) */
+.stage-steps{display:flex;flex-direction:column}
+.stage-step{
+  position:relative;display:grid;grid-template-columns:46px 1fr;gap:14px;align-items:start;
+  padding:18px 10px 18px 14px;border:none;background:none;cursor:pointer;text-align:left;
+  border-bottom:1px solid var(--line);font-family:inherit;
+  transition:background 220ms ease-out;
+}
+.stage-step:first-child{border-top:1px solid var(--line)}
+.stage-step:hover{background:rgba(109,77,232,0.045)}
+.stage-step .n{font-family:var(--mono);font-size:12px;color:var(--ink-3);padding-top:6px;transition:color 220ms ease-out}
+.stage-step .tt b{display:block;font-family:var(--serif);font-size:20px;font-weight:500;letter-spacing:-.01em;color:var(--ink-2);transition:color 220ms ease-out}
+.stage-step .tt i{display:block;font-style:normal;font-size:12.5px;color:var(--ink-3);margin-top:4px;line-height:1.6}
+.stage-step.on .n{color:var(--accent)}
+.stage-step.on .tt b{color:var(--ink)}
+.stage.live:not(.manual) .stage-step.on::after{
+  content:"";position:absolute;left:14px;right:10px;bottom:-1px;height:2px;background:var(--accent);
+  transform-origin:left;animation:stepprog var(--dwell) linear forwards;
+}
+.stage:hover .stage-step.on::after{animation-play-state:paused}
+@keyframes stepprog{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.stage-note{margin-top:16px;padding-left:14px;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.06em}
+/* 右:舞台窗口(560×640 原尺寸,窄屏整体等比缩放) */
+.stage-col{justify-self:end;width:100%;max-width:560px}
+.stage-win{position:relative;width:100%;height:640px}
+.fslot{
+  position:absolute;inset:0;opacity:0;visibility:hidden;pointer-events:none;
+  transform:translateY(18px) scale(.985);
+  transition:opacity .5s ease,transform .55s cubic-bezier(.22,1,.36,1),visibility 0s .55s;
+}
+.fslot.on{
+  opacity:1;visibility:visible;pointer-events:auto;transform:none;
+  transition:opacity .5s ease,transform .55s cubic-bezier(.22,1,.36,1);
+}
+.stage-tag{margin-top:14px;text-align:center;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.08em}
+.stage-tag b{color:var(--ink-2);font-weight:500}
+/* 窗口 = PRD .window 原样式原尺寸 */
 .frame-win{
-  position:relative;width:100%;height:340px;border-radius:12px;overflow:hidden;
+  width:560px;height:640px;border-radius:22px;overflow:hidden;
+  transform:scale(var(--s,1));transform-origin:top left;
   background:
-    radial-gradient(200px 140px at 14% 0%, oklch(93% 0.05 300 / 0.55), transparent 70%),
-    radial-gradient(220px 160px at 102% 104%, oklch(87% 0.07 330 / 0.45), transparent 70%),
-    radial-gradient(180px 130px at 96% -6%, oklch(91% 0.05 220 / 0.35), transparent 70%),
+    radial-gradient(420px 300px at 14% 0%, oklch(93% 0.05 300 / 0.55), transparent 70%),
+    radial-gradient(460px 340px at 102% 104%, oklch(87% 0.07 330 / 0.45), transparent 70%),
+    radial-gradient(380px 280px at 96% -6%, oklch(91% 0.05 220 / 0.35), transparent 70%),
     linear-gradient(168deg, oklch(92% 0.015 265), oklch(84% 0.025 285));
   border:1px solid oklch(100% 0 0 / 0.55);
-  box-shadow:0 14px 36px oklch(23% 0.015 295 / 0.18), 0 2px 6px oklch(23% 0.015 295 / 0.10),
-             inset 0 1px 0 oklch(100% 0 0 / 0.8);
+  box-shadow:0 24px 70px oklch(23% 0.015 295 / 0.28), 0 2px 8px oklch(23% 0.015 295 / 0.12),
+             inset 0 1px 0 oklch(100% 0 0 / 0.8), inset 0 -1px 0 oklch(100% 0 0 / 0.25);
   color:oklch(23% 0.015 295);
-  padding:12px 14px;
   display:flex;flex-direction:column;
-  transition:transform 300ms cubic-bezier(0.32,0.72,0,1),box-shadow 300ms ease-out;
 }
-.frame:hover .frame-win{transform:translateY(-4px);box-shadow:0 20px 48px oklch(23% 0.015 295 / 0.22), 0 2px 6px oklch(23% 0.015 295 / 0.10), inset 0 1px 0 oklch(100% 0 0 / 0.8)}
-.frame-cap{
-  margin-top:10px;text-align:center;
-  font-family:var(--mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.06em;
-}
-.frame-cap b{color:var(--ink-2);font-weight:500}
+.fw-body{height:calc(100% - 44px);padding:28px 36px 26px;display:flex;flex-direction:column;overflow:hidden}
 /* 箭头光标(尖端为锚点,涟漪从尖端发出) */
-.cur{position:absolute;width:20px;height:27px;z-index:6;pointer-events:none}
+.cur{position:absolute;width:26px;height:35px;z-index:6;pointer-events:none}
 .cur svg{display:block;width:100%;height:100%;filter:drop-shadow(0 3px 8px rgba(36,31,51,0.35))}
 .cur::after{
-  content:"";position:absolute;left:-7px;top:-8px;width:20px;height:20px;border-radius:50%;
+  content:"";position:absolute;left:-9px;top:-10px;width:26px;height:26px;border-radius:50%;
   border:1.5px solid rgba(109,77,232,0.6);
   animation:cur-click 2.2s ease-out infinite;
 }
 @keyframes cur-click{0%{transform:scale(0.5);opacity:0}25%{opacity:1}60%,100%{transform:scale(1.5);opacity:0}}
 .cur.move{animation:cur-move 3.2s cubic-bezier(0.32,0.72,0,1) infinite}
-@keyframes cur-move{0%,18%{transform:translate(0,0)}60%,100%{transform:translate(10px,64px)}}
+@keyframes cur-move{0%,18%{transform:translate(0,0)}60%,100%{transform:translate(30px,96px)}}
+/* 舞台响应式:窄屏步骤横排、窗口等比居中 */
+@media (max-width:1080px){
+  .stage{grid-template-columns:1fr;gap:30px}
+  .stage-col{justify-self:center}
+  .stage-steps{display:grid;grid-template-columns:repeat(4,1fr)}
+  .stage-step{grid-template-columns:1fr;gap:7px;padding:14px 12px;border-bottom:none;border-right:1px solid var(--line)}
+  .stage-step:first-child{border-top:none}
+  .stage-step:last-of-type{border-right:none}
+  .stage-step .n{padding-top:0}
+  .stage-step .tt b{font-size:16.5px}
+  .stage-step .tt i{font-size:11px;margin-top:3px}
+  .stage.live:not(.manual) .stage-step.on::after{left:0;right:0;bottom:0}
+  .stage-note{grid-column:1 / -1;padding:12px 0 0;text-align:center}
+}
+@media (max-width:620px){
+  .stage-steps{grid-template-columns:repeat(2,1fr)}
+  .stage-step{border-bottom:1px solid var(--line)}
+  .stage-step:nth-child(2n){border-right:none}
+  .stage-step:last-of-type{border-bottom:none;border-right:none}
+}
 
-/* ── 帧内组件:全部按 PRD 原样式缩小 ── */
-/* 标题栏(PRD .titlebar) */
-.pw-bar{display:flex;align-items:center;gap:7px;height:28px;margin:-2px -4px 10px;padding:0 4px;border-bottom:1px solid oklch(100% 0 0 / 0.45)}
-.pw-bar .bar-bot{width:18px;height:18px;flex-shrink:0}
-.pw-bar .nm{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:oklch(60% 0.010 295)}
+/* ── 帧内组件:PRD 原值(窗口 560×640 下的真实尺寸) ── */
+/* 标题栏(PRD .titlebar:44px 高,名字居左,窗口控制钮 26×26) */
+.pw-bar{display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;border-bottom:1px solid oklch(100% 0 0 / 0.45)}
+.pw-bar .bar-bot{width:20px;height:20px;flex-shrink:0}
+.pw-bar .nm{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:oklch(60% 0.010 295)}
 .pw-bar .sp{flex:1}
-.pw-bar .b{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:oklch(60% 0.010 295)}
-.pw-bar .b.hot{color:oklch(58% 0.15 295);box-shadow:0 0 0 2.5px oklch(58% 0.15 295 / 0.18)}
-/* 问候行(PRD .greet) */
-.pw-greet{display:flex;align-items:center;gap:10px}
-.pw-greet .g-bot{width:38px;height:38px;flex-shrink:0}
-.pw-greet h4{font-family:var(--serif);font-size:17px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
-.pw-greet .say{font-family:var(--serif);font-size:10.5px;color:oklch(45% 0.012 295);margin-top:2px}
-/* 输入框(PRD input:紫染边+半透明白底+placeholder 灰) */
+.pw-bar .b{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;color:oklch(60% 0.010 295)}
+.pw-bar .b.hot{color:oklch(58% 0.15 295);box-shadow:0 0 0 3px oklch(58% 0.15 295 / 0.18)}
+/* 问候行(PRD .greet:bot 58×58,h1 27px) */
+.pw-greet{display:flex;align-items:center;gap:14px}
+.pw-greet .g-bot{width:58px;height:58px;flex-shrink:0}
+.pw-greet h4{font-family:var(--serif);font-size:27px;font-weight:600;letter-spacing:-.01em;line-height:1.3}
+.pw-greet .say{font-family:var(--serif);font-size:14px;line-height:1.7;color:oklch(45% 0.012 295);margin-top:2px}
+/* 状态行(PRD .status.ok:上下细线,dot 紫染) */
+.pw-status{display:flex;align-items:center;gap:10px;margin:16px 0;padding:11px 0;border-top:1px solid oklch(100% 0 0 / 0.5);border-bottom:1px solid oklch(100% 0 0 / 0.5);font-size:13px;color:oklch(45% 0.012 295)}
+.pw-status .d{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:oklch(58% 0.15 295);box-shadow:0 0 0 3px oklch(58% 0.15 295 / 0.14)}
+.pw-status b{color:oklch(23% 0.015 295);font-weight:500}
+/* 字段(PRD .f:大写小字 label + input 15px) */
+.pw-f{margin-bottom:14px}
+.pw-lab{display:block;font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:oklch(60% 0.010 295);margin-bottom:8px}
 .pw-in{
-  display:block;width:100%;padding:9px 12px;
-  border:1px solid oklch(60% 0.01 295 / 0.35);border-radius:9px;
+  display:block;width:100%;padding:11px 14px;
+  border:1px solid oklch(60% 0.01 295 / 0.35);border-radius:12px;
   background:oklch(100% 0 0 / 0.6);
-  font-family:var(--serif);font-size:11.5px;color:oklch(45% 0.012 295);
+  font-family:var(--serif);font-size:15px;color:oklch(23% 0.015 295);
 }
 /* 主按钮(PRD .btn:纯黑单色,无渐变) */
 .pw-btn{
-  display:block;width:100%;padding:10px;margin-top:10px;
-  border:none;border-radius:10px;
+  display:block;width:100%;padding:12px;margin-top:10px;
+  border:none;border-radius:12px;
   background:oklch(23% 0.015 295);color:oklch(97% 0.005 295);
-  font-family:var(--sans);font-size:12px;font-weight:600;
+  font-family:var(--sans);font-size:14.5px;font-weight:600;
 }
-/* 状态行(PRD .status.ok) */
-.pw-status{
-  display:flex;align-items:center;gap:7px;margin:10px 0 2px;padding:7px 10px;border-radius:8px;
-  background:oklch(58% 0.15 295 / 0.06);
-  font-size:10.5px;color:oklch(45% 0.012 295);
-}
-.pw-status .d{width:6px;height:6px;border-radius:50%;background:oklch(58% 0.15 295);box-shadow:0 0 0 3px oklch(58% 0.15 295 / 0.12)}
-.pw-status b{color:oklch(23% 0.015 295);font-weight:500}
-/* 服务行(PRD .row + .sw 开关) */
-.pw-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid oklch(100% 0 0 / 0.4)}
-.pw-row .t{font-size:11.5px;color:oklch(23% 0.015 295);font-weight:500}
-.pw-row .d{font-size:9.5px;color:oklch(60% 0.010 295);margin-top:1px}
-.pw-sw{width:26px;height:15px;border-radius:99px;position:relative;flex-shrink:0;background:oklch(58% 0.15 295)}
-.pw-sw::after{content:"";position:absolute;top:2px;left:12px;width:11px;height:11px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.25)}
-/* 日志(PRD .log 深底钉底) */
+/* 服务行(PRD .row + .sw:开关 38×22, knob 18 平移 16) */
+.pw-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid oklch(100% 0 0 / 0.4)}
+.pw-row .t{font-size:14.5px;color:oklch(23% 0.015 295);font-weight:500}
+.pw-row .d{font-size:12px;color:oklch(60% 0.010 295);margin-top:1px}
+.pw-sw{width:38px;height:22px;border-radius:11px;position:relative;flex-shrink:0;background:oklch(58% 0.15 295)}
+.pw-sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.25);transform:translateX(16px)}
+/* 日志(PRD .log:深底钉底) */
 .pw-log{
-  margin-top:auto;padding:8px 10px;border-radius:8px;
-  background:#241F33;color:#B9B1D6;
-  font-family:var(--mono);font-size:8.5px;line-height:1.9;
+  margin-top:auto;padding:12px 14px;border-radius:12px;
+  background:oklch(20% 0.015 295 / 0.92);color:#B9B1D6;
+  font-family:var(--mono);font-size:11.5px;line-height:2;
 }
 .pw-log .ok{color:#A99BFF}
-.pw-log .ts{color:#7A7294;margin-right:6px}
-/* 成功页居中(PRD v-success) */
-.pw-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
-.pw-center .c-bot{width:64px;height:64px}
-.pw-center h4{font-family:var(--serif);font-size:15px;font-weight:600;letter-spacing:-.01em}
-.pw-center .sub{font-family:var(--serif);font-size:10.5px;color:oklch(45% 0.012 295)}
+.pw-log .ts{color:#7A7294;margin-right:8px}
+/* 成功页居中(PRD v-success:bot 140×140) */
+.pw-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
+.pw-center .c-bot{width:140px;height:140px}
+.pw-center h4{font-family:var(--serif);font-size:22px;font-weight:600;letter-spacing:-.01em}
+.pw-center .sub{font-family:var(--serif);font-size:14px;color:oklch(45% 0.012 295)}
+.pw-center .micro{font-family:var(--sans);font-size:12px;color:oklch(60% 0.010 295)}
 /* 帧1 下载:进度条 + 打开(PRD 同语言) */
-.f1-body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:14px}
-.f1-progress{height:7px;border-radius:99px;background:oklch(23% 0.015 295 / 0.10);overflow:hidden}
+.f1-body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:18px}
+.f1-progress{height:10px;border-radius:99px;background:oklch(23% 0.015 295 / 0.10);overflow:hidden}
 .f1-progress i{display:block;height:100%;width:100%;border-radius:99px;background:oklch(58% 0.15 295)}
-.f1-row{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:9.5px;color:oklch(60% 0.010 295)}
+.f1-row{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:11.5px;color:oklch(60% 0.010 295)}
 .f1-open{
-  padding:9px 22px;border-radius:10px;border:none;
+  align-self:center;padding:12px 34px;border-radius:12px;border:none;
   background:oklch(23% 0.015 295);color:oklch(97% 0.005 295);
-  font-family:var(--sans);font-size:12px;font-weight:600;
+  font-family:var(--sans);font-size:14.5px;font-weight:600;
 }
 
 /* ═══ Fig.02 触发器(玻璃面板内) ═══ */
@@ -435,6 +483,7 @@ section.sc > canvas.scene{
   background:rgba(109,77,232,0.08);
 }
 .sig .hint .cur{width:12px;height:12px;border-radius:3px;border:1px solid #A78BFA;display:inline-flex;align-items:center;justify-content:center;font-size:8px;color:#C4B5FD}
+.sig .hint .cur::after{display:none}
 .sig .specs{
   display:flex;gap:36px;margin-top:40px;padding-top:24px;flex-wrap:wrap;
   border-top:1px solid rgba(240,238,247,0.14);
@@ -537,7 +586,6 @@ section.sc > canvas.scene{
   .nav{top:10px;gap:16px;padding:12px 22px}
   .nav .links{display:none}
   .sec-head,.dl-head{grid-template-columns:1fr;gap:18px;margin-bottom:32px}
-  .frames{grid-template-columns:repeat(2,1fr)}
   .ft-rows,.faq-wrap{padding:24px 20px}
   .ft-row{grid-template-columns:70px 1fr;gap:14px}
   .ft-row .d{grid-column:2}
@@ -552,8 +600,6 @@ section.sc > canvas.scene{
 }
 @media (max-width: 520px){
   h1{font-size:clamp(36px,11vw,54px)}
-  .frames{grid-template-columns:1fr}
-  .frame-win{height:auto;min-height:320px}
   .win{width:100%}
   .win-body{min-height:0}
   .faq .answer{padding-left:0}
@@ -666,100 +712,127 @@ section.sc > canvas.scene{
   </div>
 </section>
 
-<!-- ═══ Fig.01 用法 · 四帧横向预览:全部 PRD 原样式手搓 + 箭头光标 ═══ -->
+<!-- ═══ Fig.01 用法 · 大舞台+步骤切换:四帧 1:1 PRD 原尺寸,自动轮播/点击切换 ═══ -->
 <section class="sc" id="fig-01" data-scene="threads">
   <canvas class="scene" aria-hidden="true"></canvas>
   <div class="wrap">
     <div class="sec-head">
-      <div class="fig-label"><b>Fig. 01</b><br>How to use<br>· 4 帧</div>
+      <div class="fig-label"><b>Fig. 01</b><br>How to use<br>· 4 步</div>
       <div>
-        <h2 class="rv">看这四帧,就会用了。</h2>
+        <h2 class="rv">看这四步,就会用了。</h2>
         <p class="lede rv">从下载到每天自动登录,全部过程就这些。</p>
       </div>
     </div>
-    <div class="frames">
-
-      <div class="frame rv">
-        <div class="frame-win">
-          <div class="pw-bar">
-            <div class="bar-bot bot" data-size="18" aria-hidden="true"></div>
-            <span class="nm">GuiGui-Setup</span>
-            <span class="sp"></span>
-            <span class="b" aria-hidden="true">–</span>
-            <span class="b" aria-hidden="true">×</span>
-          </div>
-          <div class="f1-body">
-            <div class="f1-progress" aria-hidden="true"><i></i></div>
-            <div class="f1-row"><span>32 MB · 已校验</span><span class="f1-open">打开</span></div>
-          </div>
-          <span class="cur" style="left:50%;top:62%" aria-hidden="true"><svg viewBox="0 0 20 27" fill="none"><path d="M3 2 L3 19.5 L7.6 15.8 L10.2 23 L13.2 21.7 L10.1 14.9 L16.6 14.9 Z" fill="#fff" stroke="#241F33" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
-        </div>
-        <div class="frame-cap"><b>01 下载</b> · 装完点「打开」</div>
+    <div class="stage rv" id="stage">
+      <div class="stage-steps">
+        <button class="stage-step on" type="button"><span class="n">01</span><span class="tt"><b>下载</b><i>装完点「打开」</i></span></button>
+        <button class="stage-step" type="button"><span class="n">02</span><span class="tt"><b>配置</b><i>学号密码,填一次</i></span></button>
+        <button class="stage-step" type="button"><span class="n">03</span><span class="tt"><b>完成</b><i>点 × 关掉就好</i></span></button>
+        <button class="stage-step" type="button"><span class="n">04</span><span class="tt"><b>日常</b><i>什么都不用做</i></span></button>
+        <div class="stage-note">自动播放 · 点击步骤切换</div>
       </div>
+      <div class="stage-col">
+        <div class="stage-win">
 
-      <div class="frame rv">
-        <div class="frame-win">
-          <div class="pw-greet">
-            <div class="g-bot bot" data-size="38" aria-hidden="true"></div>
-            <div>
-              <h4>早上好。</h4>
-              <div class="say">把账号交给桂桂。</div>
+          <div class="fslot on">
+            <div class="frame-win" data-view="setup · 下载完成">
+              <div class="pw-bar">
+                <div class="bar-bot bot" data-size="20" aria-hidden="true"></div>
+                <span class="nm">GuiGui-Setup</span>
+                <span class="sp"></span>
+                <span class="b" aria-hidden="true">–</span>
+                <span class="b" aria-hidden="true">×</span>
+              </div>
+              <div class="fw-body">
+                <div class="f1-body">
+                  <div class="f1-progress" aria-hidden="true"><i></i></div>
+                  <div class="f1-row"><span>32 MB · 已校验</span><span>100%</span></div>
+                  <span class="f1-open">打开</span>
+                </div>
+              </div>
+              <span class="cur" style="left:53%;top:57%" aria-hidden="true"><svg viewBox="0 0 20 27" fill="none"><path d="M3 2 L3 19.5 L7.6 15.8 L10.2 23 L13.2 21.7 L10.1 14.9 L16.6 14.9 Z" fill="#fff" stroke="#241F33" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
             </div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
-            <span class="pw-in">学号</span>
-            <span class="pw-in">密码</span>
-          </div>
-          <span class="pw-btn">开启每日自动登录</span>
-          <span class="cur move" style="left:44%;top:58%" aria-hidden="true"><svg viewBox="0 0 20 27" fill="none"><path d="M3 2 L3 19.5 L7.6 15.8 L10.2 23 L13.2 21.7 L10.1 14.9 L16.6 14.9 Z" fill="#fff" stroke="#241F33" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
-        </div>
-        <div class="frame-cap"><b>02 配置</b> · 学号密码,填一次</div>
-      </div>
 
-      <div class="frame rv">
-        <div class="frame-win">
-          <div class="pw-bar">
-            <div class="bar-bot bot" data-size="18" aria-hidden="true"></div>
-            <span class="nm">GuiGui</span>
-            <span class="sp"></span>
-            <span class="b hot" aria-hidden="true">×</span>
-          </div>
-          <div class="pw-center">
-            <div class="c-bot bot" data-size="64" aria-hidden="true"></div>
-            <h4>网,已经帮你连好啦</h4>
-            <div class="sub">以后每天都会自动登好。</div>
-          </div>
-          <span class="cur" style="right:5%;top:4%" aria-hidden="true"><svg viewBox="0 0 20 27" fill="none"><path d="M3 2 L3 19.5 L7.6 15.8 L10.2 23 L13.2 21.7 L10.1 14.9 L16.6 14.9 Z" fill="#fff" stroke="#241F33" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
-        </div>
-        <div class="frame-cap"><b>03 完成</b> · 点 × 关掉就好</div>
-      </div>
-
-      <div class="frame rv">
-        <div class="frame-win">
-          <div class="pw-bar">
-            <div class="bar-bot bot" data-size="18" aria-hidden="true"></div>
-            <span class="nm">GuiGui</span>
-            <span class="sp"></span>
-            <span class="b" aria-hidden="true">–</span>
-            <span class="b" aria-hidden="true">×</span>
-          </div>
-          <div class="pw-greet">
-            <div class="g-bot bot" data-size="34" aria-hidden="true"></div>
-            <div>
-              <h4>早上好。</h4>
-              <div class="say">网的事交给我。</div>
+          <div class="fslot">
+            <div class="frame-win" data-view="v-ok · 首次配置">
+              <div class="pw-bar">
+                <div class="bar-bot bot" data-size="20" aria-hidden="true"></div>
+                <span class="nm">GuiGui</span>
+                <span class="sp"></span>
+                <span class="b" aria-hidden="true">–</span>
+                <span class="b" aria-hidden="true">×</span>
+              </div>
+              <div class="fw-body">
+                <div class="pw-greet">
+                  <div class="g-bot bot" data-size="58" aria-hidden="true"></div>
+                  <div>
+                    <h4>早上好。</h4>
+                    <div class="say">把账号交给桂桂。</div>
+                  </div>
+                </div>
+                <div class="pw-status"><span class="d"></span>Campus-WiFi · 已连上 · 学号已识别 ✓</div>
+                <div class="pw-f"><span class="pw-lab">学号</span><span class="pw-in">2025000000001</span></div>
+                <div class="pw-f"><span class="pw-lab">密码</span><span class="pw-in">••••••</span></div>
+                <span class="pw-btn">开启每日自动登录</span>
+              </div>
+              <span class="cur move" style="left:34%;top:58%" aria-hidden="true"><svg viewBox="0 0 20 27" fill="none"><path d="M3 2 L3 19.5 L7.6 15.8 L10.2 23 L13.2 21.7 L10.1 14.9 L16.6 14.9 Z" fill="#fff" stroke="#241F33" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
             </div>
           </div>
-          <div class="pw-status"><span class="d"></span>已连接 · <b>07:00:02 登录成功</b></div>
-          <div style="margin-top:4px">
-            <div class="pw-row"><div><div class="t">自动登录</div><div class="d">明早 07:00 替你登</div></div><span class="pw-sw" aria-hidden="true"></span></div>
-            <div class="pw-row"><div><div class="t">网络</div><div class="d">已连上 Campus-WiFi ✓</div></div></div>
-          </div>
-          <div class="pw-log"><span class="ts">07:00:02</span><span class="ok">[OK]</span> 已登录</div>
-        </div>
-        <div class="frame-cap"><b>04 日常</b> · 什么都不用做</div>
-      </div>
 
+          <div class="fslot">
+            <div class="frame-win" data-view="v-success · 登录成功">
+              <div class="pw-bar">
+                <div class="bar-bot bot" data-size="20" aria-hidden="true"></div>
+                <span class="nm">GuiGui</span>
+                <span class="sp"></span>
+                <span class="b hot" aria-hidden="true">×</span>
+              </div>
+              <div class="fw-body">
+                <div class="pw-center">
+                  <div class="c-bot bot" data-size="140" aria-hidden="true"></div>
+                  <h4>网,已经帮你连好啦</h4>
+                  <div class="sub">以后每天都会自动登好。</div>
+                  <div class="micro">明早 07:00 开始。现在关掉就行。</div>
+                </div>
+              </div>
+              <span class="cur" style="right:4%;top:5%" aria-hidden="true"><svg viewBox="0 0 20 27" fill="none"><path d="M3 2 L3 19.5 L7.6 15.8 L10.2 23 L13.2 21.7 L10.1 14.9 L16.6 14.9 Z" fill="#fff" stroke="#241F33" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+            </div>
+          </div>
+
+          <div class="fslot">
+            <div class="frame-win" data-view="v-main · 日常主页">
+              <div class="pw-bar">
+                <div class="bar-bot bot" data-size="20" aria-hidden="true"></div>
+                <span class="nm">GuiGui</span>
+                <span class="sp"></span>
+                <span class="b" aria-hidden="true">–</span>
+                <span class="b" aria-hidden="true">×</span>
+              </div>
+              <div class="fw-body">
+                <div class="pw-greet">
+                  <div class="g-bot bot" data-size="58" aria-hidden="true"></div>
+                  <div>
+                    <h4>早上好。</h4>
+                    <div class="say">网的事交给我。</div>
+                  </div>
+                </div>
+                <div class="pw-status"><span class="d"></span>已连接 · <b>07:00:02 登录成功</b></div>
+                <div class="pw-row"><div><div class="t">自动登录</div><div class="d">明早 07:00 替你登 · 提前 30 分钟开始试</div></div><span class="pw-sw" aria-hidden="true"></span></div>
+                <div class="pw-row"><div><div class="t">网络</div><div class="d">已连上 Campus-WiFi ✓</div></div></div>
+                <div class="pw-row"><div><div class="t">昨晚</div><div class="d">07:00 第一次就登好了 ✓</div></div></div>
+                <div class="pw-log">
+                  <div><span class="ts">07:00:01</span><span class="ok">[OK]</span> 网络可达</div>
+                  <div><span class="ts">07:00:02</span><span class="ok">[OK]</span> 已登录 · 2025…7209</div>
+                  <div><span class="ts">07:00:03</span>今天到这就下班啦</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="stage-tag"><b>01 / 04</b> · setup 下载完成</div>
+      </div>
     </div>
   </div>
 </section>
@@ -1280,6 +1353,59 @@ if(typeof XiaojiangMotion === 'function'){
     b.addEventListener('click', function(){ if(b._xjm){ try{ b._xjm.setState('complete'); }catch(e){} } });
   });
 }
+
+/* ═══ Fig.01 大舞台:步骤切换 + 自动轮播(悬停暂停,手动点选后停播) ═══ */
+(function(){
+  var stage = document.getElementById('stage');
+  if(!stage) return;
+  var steps = stage.querySelectorAll('.stage-step');
+  var slots = stage.querySelectorAll('.fslot');
+  var win   = stage.querySelector('.stage-win');
+  var tag   = stage.querySelector('.stage-tag');
+  if(!steps.length || steps.length !== slots.length || !win) return;
+  var DWELL = 5000, idx = 0, timer = null, hover = false, seen = false, manual = false;
+  function fit(){
+    var s = Math.min(1, win.clientWidth / 560);
+    win.style.setProperty('--s', s);
+    win.style.height = Math.round(640 * s) + 'px';
+  }
+  function show(i){
+    idx = i;
+    for(var k = 0; k < steps.length; k++){
+      var on = k === i, s = steps[k];
+      if(on && s.classList.contains('on')){ s.classList.remove('on'); void s.offsetWidth; }
+      s.classList.toggle('on', on);
+      slots[k].classList.toggle('on', on);
+    }
+    if(tag){
+      var v = slots[i].firstElementChild.getAttribute('data-view') || '';
+      tag.innerHTML = '<b>0' + (i + 1) + ' / 04</b> · ' + v;
+    }
+  }
+  function arm(){
+    if(timer){ clearTimeout(timer); timer = null; }
+    if(reduce || manual || hover || !seen) return;
+    timer = setTimeout(function(){ show((idx + 1) % steps.length); arm(); }, DWELL);
+  }
+  fit();
+  window.addEventListener('resize', fit);
+  window.addEventListener('load', fit);
+  steps.forEach(function(s, i){
+    s.addEventListener('click', function(){
+      manual = true; stage.classList.add('manual');
+      show(i); arm();
+    });
+  });
+  stage.addEventListener('mouseenter', function(){ hover = true; arm(); });
+  stage.addEventListener('mouseleave', function(){ hover = false; arm(); });
+  if('IntersectionObserver' in window){
+    var sio = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ seen = true; stage.classList.add('live'); } arm(); });
+    }, { threshold:.3 });
+    sio.observe(stage);
+  } else { seen = true; stage.classList.add('live'); }
+  show(0); arm();
+})();
 
 /* ═══ 入场动效 ═══ */
 var rvs = document.querySelectorAll('.rv');
