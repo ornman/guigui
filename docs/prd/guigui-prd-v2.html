@@ -397,13 +397,14 @@ body.backdrop-black .taskbar{display:none}
 
     <!-- 开机仪式(首次/等网络共用) -->
     <div class="v on" id="v-boot">
-      <div class="bot bot-boot" id="boot-bot" data-state="sleep" data-size="58" onclick="mood(this,'happy')" style="cursor:pointer"></div>
+      <div class="bot bot-boot" id="boot-bot" data-state="sleep" data-size="140"></div>
       <div class="boot-cap" id="boot-cap">桂桂伸了个懒腰,正在检查网络…</div>
     </div>
 
     <!-- 首次配置页:一键开启,密码事后温柔补 -->
     <div class="v" id="v-ok">
       <div class="greet">
+        <div class="bot bot-greet" id="boot-bot-greet-ok" data-state="happy" data-size="58"></div>
         <div>
           <h1 class="g">早上好。</h1>
           <p class="tagline">校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好</p>
@@ -467,6 +468,7 @@ body.backdrop-black .taskbar{display:none}
     <!-- 日常主页:体检卡(无 bot,共用 boot-bot) -->
     <div class="v" id="v-main">
       <div class="greet">
+        <div class="bot bot-greet" id="boot-bot-greet-main" data-state="happy" data-size="58"></div>
         <div>
           <h1 class="g" id="main-h1">早上好。</h1>
           <p class="say" id="main-lede">网的事交给我,你放心忙~</p>
