@@ -5,15 +5,27 @@
 <title>桂桂 / GuiGui · 一主页四态 + 详情</title>
 <style>
 /* 色彩纪律:按钮纯黑单色 / 唯一强调紫(状态点/开关/聚焦/选中态) / 唯一暖色例外(不可达点) / 中性色紫染
-   例外:选中态允许紫→粉渐变描边(用户指定) */
+   例外:选中态允许紫→粉渐变描边(用户指定)
+   sRGB 兜底:企业内核/老浏览器不识别 oklch() 时,关键色用 hex 兜底(防 dbedae7 黑屏) */
 :root{
-  --ink:oklch(23% 0.015 295);
-  --ink-2:oklch(45% 0.012 295);
-  --ink-3:oklch(60% 0.010 295);
-  --accent:oklch(58% 0.15 295);
-  --accent-2:oklch(78% 0.15 320);
-  --accent-soft:oklch(58% 0.15 295 / 0.12);
-  --warm:oklch(72% 0.12 70);
+  --ink:#2b2740;
+  --ink-2:#5a5573;
+  --ink-3:#8a8499;
+  --accent:#7c3aed;
+  --accent-2:#c084fc;
+  --accent-soft:rgba(124,58,237,.12);
+  --warm:#e0a04a;
+}
+@supports (color: oklch(0% 0 0)){
+  :root{
+    --ink:oklch(23% 0.015 295);
+    --ink-2:oklch(45% 0.012 295);
+    --ink-3:oklch(60% 0.010 295);
+    --accent:oklch(58% 0.15 295);
+    --accent-2:oklch(78% 0.15 320);
+    --accent-soft:oklch(58% 0.15 295 / 0.12);
+    --warm:oklch(72% 0.12 70);
+  }
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{background:#000}
@@ -366,10 +378,11 @@ body.backdrop-black .taskbar{display:none}
   text-transform:uppercase;color:oklch(70% 0.005 295);margin-bottom:2px;opacity:.8}
 
 @media (prefers-reduced-motion: reduce){
-  *{transition:none !important}
+  *{transition:none !important;animation:none !important}
   .s-line{opacity:1!important;transform:none!important}
   .v-success-stage{opacity:1!important}
   .bot-success{opacity:1!important}
+  #boot-bot,#boot-bot-greet-ok,#boot-bot-greet-main{animation:none !important;opacity:1!important;transform:none!important}
 }
 </style>
 </head>
@@ -435,7 +448,7 @@ body.backdrop-black .taskbar{display:none}
       <div class="v-success-stage">
         <div class="bot bot-success" data-state="complete" data-size="140"></div>
         <h1 class="s-line s-1">网,已经帮你连好啦</h1>
-        <p class="lede s-line s-2">明早 07:00,桂桂会提前替你登好 —<br>你只管睡到自然醒。</p>
+        <p class="lede s-line s-2">明早 07:00,桂桂会提前替你登好<br>你只管睡到自然醒。</p>
         <div class="micro-line s-line s-3">✓ 现在就可以关闭窗口,桂桂在后台守着</div>
         <button class="btn s-line s-4" style="max-width:220px;margin:16px auto 0" onclick="backFrom('v-success')">完成,回主页</button>
         <button class="link s-line s-5" style="display:block;width:fit-content;margin:10px auto 0" onclick="openDetail('v-settings')">高级设置</button>
