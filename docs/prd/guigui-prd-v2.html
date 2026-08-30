@@ -545,6 +545,7 @@ function quickLogin(){
   $('main-lede').textContent='刚刚帮你重新登录了一次 ✓';
 }
 /* 流程动作 */
+function showSuccess(){show('v-success');greet();party()}
 function enableDaily(){configured=true;hasPwd=false;showSuccess()}  /* 一键即开,密码事后补 */
 function loginNow(){hasPwd=true;$('login-err').style.display='none';showSuccess()}
 function pickWifi(el){
@@ -553,12 +554,6 @@ function pickWifi(el){
 }
 /* 登录失败:内联提示(不再单独占一页) */
 function loginError(){openDetail('v-login');greet();$('login-err').style.display='block'}
-/* 桂桂 = 主页按钮:任何视图点击回日常页;主页/首次页内点击 = 弹跳彩蛋 */
-function botClick(){
-  if($('v-boot').classList.contains('on')||$('v-success').classList.contains('on'))return;
-  if($('v-main').classList.contains('on')||$('v-ok').classList.contains('on')){mood(document.querySelector('.g-bot'),'happy');return}
-  goDaily();
-}
 /* 庆祝粒子:canvas-confetti 颜文字模式;画布在卡片内,CDN 失败静默降级 */
 function party(){
   if(typeof confetti!=='function')return;
