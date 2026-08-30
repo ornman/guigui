@@ -81,7 +81,7 @@ body{
 .v.on{display:block}
 /* 日常页:日志钉底,中部留白是呼吸感不是空缺 */
 #v-main.on{display:flex;flex-direction:column;min-height:100%}
-#v-main .log{margin-top:auto}
+#v-main .log-head{margin-top:auto}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* ═══ Bot:各视图内嵌,零位移零飞行(杜绝"乱飞/出界") ═══ */
@@ -167,7 +167,24 @@ input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--a
   background:var(--ink);color:oklch(97% 0.005 295);font:600 14.5px/1.4 inherit;font-family:inherit;
   cursor:pointer;transition:transform .15s ease-out}
 .btn:hover{transform:translateY(-1px)}
-.btn.quiet{background:transparent;color:var(--ink-3);font-weight:500}
+.btn.quiet{background:oklch(100% 0 0 / 0.6);color:var(--ink);font-weight:600;
+  border:1px solid oklch(60% 0.01 295 / 0.4)}
+.btn.quiet:hover{border-color:var(--accent);color:var(--accent)}
+/* 常用时间药丸:一键填充输入框 */
+.presets{display:flex;gap:6px;flex-wrap:wrap}
+.preset{padding:7px 12px;border-radius:99px;border:1px solid oklch(60% 0.01 295 / 0.3);
+  background:oklch(100% 0 0 / 0.5);font:500 12px/1 Inter,"PingFang SC",sans-serif;color:var(--ink-2);
+  cursor:pointer;transition:border-color .15s,background .15s,color .15s}
+.preset:hover{border-color:var(--accent-2)}
+.preset.on{background:var(--ink);color:oklch(97% 0.005 295);border-color:var(--ink)}
+/* 历史日志视图 */
+.day{margin-bottom:16px}
+.day-h{font-family:Inter,"PingFang SC",sans-serif;font-size:10.5px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin:0 0 6px}
+.log-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;
+  font-family:Inter,"PingFang SC",sans-serif;font-size:11px;color:var(--ink-3)}
+.log-head a{color:var(--accent);font-weight:600;cursor:pointer;text-decoration:none}
+.log-head a:hover{text-decoration:underline}
 .link{background:none;border:none;padding:0;margin-top:16px;font:500 13px/1.6 inherit;
   font-family:inherit;color:var(--ink-3);cursor:pointer;
   border-bottom:1px solid oklch(60% 0.01 295 / .4);transition:color .15s}
@@ -419,8 +436,10 @@ body.backdrop-black .taskbar{display:none}
       <div class="row"><div><div class="t">自动登录</div>
         <div class="d" id="auto-desc">明早 07:00 替你登 · 到点前 30 分钟开始试</div></div>
         <span class="sw on" id="sw-auto" onclick="toggleAuto()"></span></div>
-      <div class="check-row"><span class="k">网络</span><span class="v2" id="main-net">已连上 Campus-WiFi ✓</span></div>
-      <div class="check-row"><span class="k">昨晚</span><span class="v2">第一次就登好了 ✓</span></div>
+      <div class="row"><div><div class="t">网络</div>
+        <div class="d" id="main-net">已连上 Campus-WiFi ✓</div></div></div>
+      <div class="row"><div><div class="t">昨晚</div>
+        <div class="d">07:00 第一次就登好了 ✓</div></div></div>
 
       <div class="micro-line" id="pwd-prompt" style="display:none;background:oklch(58% 0.15 295 / 0.07);padding:10px 12px;border-radius:10px;line-height:1.7">
         还差一步:桂桂还没拿到密码,掉线时没法自动帮登。
@@ -430,11 +449,37 @@ body.backdrop-black .taskbar{display:none}
       <button class="btn quiet" id="main-btn" onclick="quickLogin()">立即重新登录</button>
       <button class="link" onclick="openDetail('v-settings')">高级设置</button>
 
+      <div class="log-head"><span>最近一次运行</span><a href="javascript:void(0)" onclick="openDetail('v-log')">历史日志 →</a></div>
       <div class="log">
         <div><span class="ts">07:00:01</span><span class="ok">[OK]</span> 网络可达</div>
         <div><span class="ts">07:00:02</span><span class="ok">[OK]</span> 已登录 · 2025…7209</div>
         <div><span class="ts">07:00:03</span>[INFO] 窗口心跳结束 · 今日任务完成</div>
       </div>
+    </div>
+
+    <!-- 历史日志(新增:主页内嵌日志保留,这里看每天的历史) -->
+    <div class="v" id="v-log">
+      <button class="back" onclick="backFrom('v-log')">‹ 返回</button>
+      <h1 style="font-size:22px">历史日志。</h1>
+      <p class="lede">桂桂每天做了什么,都在这里:</p>
+      <div class="day"><div class="day-h">今天</div>
+        <div class="log">
+          <div><span class="ts">07:00:01</span><span class="ok">[OK]</span> 网络可达</div>
+          <div><span class="ts">07:00:02</span><span class="ok">[OK]</span> 已登录 · 2025…7209</div>
+          <div><span class="ts">07:00:03</span>[INFO] 窗口心跳结束 · 今日任务完成</div>
+        </div></div>
+      <div class="day"><div class="day-h">昨天 · 8月29日</div>
+        <div class="log">
+          <div><span class="ts">06:55:02</span><span class="ok">[OK]</span> 开门即试,一次登好 ✓</div>
+        </div></div>
+      <div class="day"><div class="day-h">8月28日 · 假期静默</div>
+        <div class="log">
+          <div><span class="ts">07:00:01</span>[静默] 连不上,每天只探 1 次,不吵你</div>
+        </div></div>
+      <div class="day"><div class="day-h">8月27日 · 假期静默</div>
+        <div class="log">
+          <div><span class="ts">07:00:01</span>[静默] 连不上,每天只探 1 次,不吵你</div>
+        </div></div>
     </div>
 
     <!-- 高级设置(按使用频率排序:核心 → 保底 → 系统 → 进阶) -->
@@ -443,21 +488,20 @@ body.backdrop-black .taskbar{display:none}
       <h1 style="font-size:22px">高级设置</h1>
 
       <div class="tiny-label">每日自动登录</div>
-      <div class="times times-pick">
-        <button>06:30</button><button>06:45</button><button class="on">07:00</button><button>07:15</button>
-        <button>07:30</button><button>07:45</button><button>08:00</button><button id="btn-custom">自定义</button>
-      </div>
-      <div class="f" id="custom-time" style="display:none;margin-top:10px">
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <div class="time-input">
-            <input id="ct-h" inputmode="numeric" maxlength="2" value="07" aria-label="小时">
-            <span class="colon">:</span>
-            <input id="ct-m" inputmode="numeric" maxlength="2" value="30" aria-label="分钟">
-          </div>
-          <span style="font:400 12px Inter,'PingFang SC',sans-serif;color:var(--ink-3)">直接输入就行 · 到点前 30 分钟,桂桂开始试</span>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:2px 0 4px">
+        <div class="time-input">
+          <input id="ct-h" inputmode="numeric" maxlength="2" value="07" aria-label="小时">
+          <span class="colon">:</span>
+          <input id="ct-m" inputmode="numeric" maxlength="2" value="00" aria-label="分钟">
+        </div>
+        <div class="presets">
+          <button class="preset" data-t="06:45">06:45</button>
+          <button class="preset on" data-t="07:00">07:00</button>
+          <button class="preset" data-t="07:30">07:30</button>
+          <button class="preset" data-t="08:00">08:00</button>
         </div>
       </div>
-      <div class="micro-line">校园网 06:50 开门 · 到点前 30 分钟开始,试 6 次,登上就停</div>
+      <div class="micro-line">直接输入,或点常用时间 · 校园网 06:50 开门 · 到点前 30 分钟开始,试 6 次,登上就停</div>
       <div class="row"><div><div class="t">开机时补登录</div><div class="d">开机或重新登录系统时,桂桂顺手登一次</div></div>
         <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
       <div class="row"><div><div class="t">窗口内重试间隔</div><div class="d">登上就停,不浪费探测</div></div>
@@ -540,7 +584,7 @@ body.backdrop-black .taskbar{display:none}
 <script>
 const win=document.getElementById('win');
 const $=id=>document.getElementById(id);
-const views=['v-boot','v-ok','v-login','v-success','v-guide','v-main','v-settings'];
+const views=['v-boot','v-ok','v-login','v-success','v-guide','v-main','v-settings','v-log'];
 let mainState='ok',configured=false,hasPwd=false;
 const origin={};   /* 详情视图来路:返回必回原处 */
 
@@ -679,12 +723,7 @@ document.querySelectorAll('.sel-pick').forEach(el=>el.addEventListener('click',(
   const q=el.querySelector('.q');
   if(q&&q.dataset.orig)q.textContent=q.dataset.orig+' · 已选';
 }));
-/* 时间槽 + 自绘下拉 */
-document.querySelectorAll('.times-pick').forEach(g=>g.addEventListener('click',e=>{
-  if(e.target.tagName!=='BUTTON'||e.target.classList.contains('off'))return;
-  g.querySelectorAll('button').forEach(b=>b.classList.remove('on'));
-  e.target.classList.add('on');
-}));
+/* 自绘下拉 */
 document.querySelectorAll('.dd').forEach(dd=>{
   dd.querySelector('.dd-btn').addEventListener('click',e=>{
     e.stopPropagation();
@@ -700,9 +739,27 @@ document.querySelectorAll('.dd').forEach(dd=>{
   }));
 });
 document.addEventListener('click',()=>document.querySelectorAll('.dd.open').forEach(o=>o.classList.remove('open')));
-/* 自定义时间:点「自定义」展开 HH:MM 输入 */
-document.getElementById('btn-custom').addEventListener('click',()=>{
-  $('custom-time').style.display='block';
+/* 自定义时间:输入常驻,常用时间一键填充;手动键入自动跳格 + 范围约束 */
+document.querySelectorAll('.preset').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.preset').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  const t=b.dataset.t.split(':');
+  $('ct-h').value=t[0];$('ct-m').value=t[1];
+}));
+['ct-h','ct-m'].forEach((id,i,arr)=>{
+  const el=$(id);
+  el.addEventListener('input',()=>{
+    el.value=el.value.replace(/\D/g,'').slice(0,2);
+    el.classList.remove('err');
+    document.querySelectorAll('.preset').forEach(x=>x.classList.remove('on'));
+    if(el.value.length===2&&i<arr.length-1)$(arr[i+1]).focus();
+  });
+  el.addEventListener('blur',()=>{
+    if(!el.value)return;
+    const max=i===0?23:59;let v=parseInt(el.value,10);
+    if(isNaN(v)||v>max){v=Math.min(isNaN(v)?0:v,max);el.classList.add('err')}
+    el.value=String(v).padStart(2,'0');
+  });
 });
 /* 窗口化 */
 function minimize(){$('pill-text').textContent='桂桂在后台静默运行 · 点击打开';hideWin()}
