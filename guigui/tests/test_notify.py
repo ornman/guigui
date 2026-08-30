@@ -125,7 +125,7 @@ def test_register_protocol_writes_hkcu(monkeypatch):
     monkeypatch.setitem(sys.modules, "winreg", fake_winreg)
 
     assert notify.register_protocol()
-    cmd = written["Software\\Classes\\guigui/shell\\open\\command/None"]
+    cmd = written[r"Software\Classes\guigui\shell\open\command" + "/None"]
     assert '"%1"' in cmd
-    assert written["Software\\Classes\\guigui/None"] == "URL:guigui protocol"
-    assert written["Software\\Classes\\guigui/URL Protocol"] == ""
+    assert written[r"Software\Classes\guigui" + "/None"] == "URL:guigui protocol"
+    assert written[r"Software\Classes\guigui" + "/URL Protocol"] == ""
