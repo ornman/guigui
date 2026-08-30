@@ -106,11 +106,12 @@ body{
 .bot.blink .e-closed{display:inline !important}
 /* 滴泪(cry 时眼下面 圆点 周期下移) */
 @keyframes tear{0%{transform:translateY(0);opacity:.95}70%{opacity:.95}100%{transform:translateY(14px);opacity:0}}
-/* 苏醒折线描画 + 拉伸弹起 */
+/* 苏醒折线描画 + 拉伸弹起(只对 boot-bot 生效;其他 bot 眼睛不要默认隐藏) */
+/* boot-bot 默认“闭眼隐藏”(dashoffset:100);awake class 触发描画动画,forwards 保持 dashoffset:0 */
+#boot-bot .eye{stroke-dasharray:100;stroke-dashoffset:100}
+#boot-bot.awake .eye{animation:eyelift .5s ease-out,draw .6s .3s ease-out forwards}
 .bot.awake svg{animation:wake .7s cubic-bezier(.34,1.56,.64,1) both}
 @keyframes wake{0%{transform:scale(1,.86)}55%{transform:scale(.94,1.08)}100%{transform:none}}
-.bot .eye{stroke-dasharray:100;stroke-dashoffset:100}
-.bot.awake .eye{animation:eyelift .5s ease-out,draw .6s .3s ease-out forwards}
 @keyframes draw{to{stroke-dashoffset:0}}
 @keyframes eyelift{from{transform:translateY(4px);opacity:0}to{transform:none;opacity:1}}
 .bot.pop svg{animation:pop .55s cubic-bezier(.34,1.56,.64,1)}
