@@ -197,6 +197,15 @@ section.sc > canvas.scene{
   align-items:center;gap:clamp(48px, 6vw, 96px);
 }
 .hero > canvas.scene{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:block}
+/* 校徽钢印水印:校蓝 5%,垫在点阵之下(DOM 在 canvas 之前),140s 极慢自转;视差在 JS 鼠标处 */
+.hero > .seal{
+  position:absolute;top:44%;left:50%;
+  width:min(58vh,600px);aspect-ratio:1/1;
+  margin-left:calc(min(58vh,600px) / -2);
+  opacity:.05;pointer-events:none;will-change:transform;
+}
+.hero > .seal img{display:block;width:100%;height:100%;animation:seal-spin 140s linear infinite}
+@keyframes seal-spin{to{transform:rotate(1turn)}}
 .hero .eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:26px;position:relative;z-index:1}
 .hero .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft),0 0 18px rgba(139,92,246,0.8)}
 .hero h1{max-width:12ch;position:relative;z-index:1}
@@ -600,6 +609,7 @@ section.sc > canvas.scene{
 }
 @media (max-width: 520px){
   h1{font-size:clamp(36px,11vw,54px)}
+  .hero > .seal{width:min(92vw,400px);margin-left:calc(min(92vw,400px) / -2)}
   .win{width:100%}
   .win-body{min-height:0}
   .faq .answer{padding-left:0}
@@ -633,6 +643,7 @@ section.sc > canvas.scene{
 
 <!-- ═══ Fig.00 HERO · 背景交互:点阵网格(光标排斥+点亮) ═══ -->
 <section class="hero sc" id="fig-00" data-scene="dots">
+  <div class="seal" aria-hidden="true"><img src="assets/logo-mark.svg" alt=""></div>
   <canvas class="scene" aria-hidden="true"></canvas>
   <div class="wrap">
    <div class="hero-grid">
@@ -1001,7 +1012,16 @@ var DPR = Math.min(devicePixelRatio || 1, 2);
 
 /* ── 全局鼠标 ─────────────────────────────────── */
 var MX = innerWidth/2, MY = innerHeight/3;
-addEventListener('mousemove', function(e){ MX = e.clientX; MY = e.clientY; }, {passive:true});
+var seal = document.querySelector('.hero > .seal');
+addEventListener('mousemove', function(e){
+  MX = e.clientX; MY = e.clientY;
+  /* 校徽水印低系数视差:与光标反向,背景层的深度感 */
+  if(seal && !reduce){
+    var dx = (e.clientX / innerWidth - .5) * -16;
+    var dy = (e.clientY / innerHeight - .5) * -10;
+    seal.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0)';
+  }
+}, {passive:true});
 
 function fitCanvas(cv){
   var r = cv.getBoundingClientRect();
