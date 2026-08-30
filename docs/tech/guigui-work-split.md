@@ -43,7 +43,7 @@
 
 **要做**:
 1. 契约文档 v1:方法签名、参数/返回 JSON 形状、错误码枚举、事件推送(`window.guiguiEmit`)、时延承诺、版本与变更记录规则。
-2. `mock.js`:契约的可执行规范——模拟后端全部行为(三分支探测、登录成败/被拒/不可达、WiFi 扫描、事件推送、按天日志),供浏览器独立运行与联调对齐。
+2. `static/dev/mock.js`:契约的可执行规范——模拟后端全部行为(三分支探测、登录成败/被拒/不可达、WiFi 扫描、事件推送、按天日志)。**仅开发**:URL 带 `?dev=1` 才被 `app.js` 动态注入,生产 `index.html` 不引用;后端打包必须整目录排除 `guigui/app/static/dev/`(契约 1.0.1)。
 3. 原型移植到 `guigui/app/static/index.html`:删四件演示道具(`.demo` 按钮、假任务栏、`#pill` 胶囊、假壁纸背景),body 改透明承载无边框圆角;内嵌思源宋体 + Inter;**CSS 除 body 背景与 @font-face 外零改动**。
 4. `GG` 适配器:三级探测(`window.guigui` → `window.pywebview.api` → mock),后端就位即无缝切真、前端零改动。
 5. 视图动态化:硬编码 HTML 换成生成完全相同标记的渲染函数(v-ok/v-login/v-guide/v-main/v-log/v-settings/时间药丸/总开关);**删除原型预填的占位学号密码**(原型头注 P0 安全要求)。

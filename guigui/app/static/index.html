@@ -593,7 +593,6 @@ html.in-app body{padding:0}
      此声明仅保留在源码中(对外发布网页/产品页另放),运行时不渲染到 UI -->
 <script src="vendor/noteai-bot/xiaojiang-motion.js"></script>
 <script src="vendor/confetti.browser.min.js"></script>
-<script src="mock.js"></script>
 <script src="app.js"></script>
 <script>
 const win=document.getElementById('win');
@@ -681,6 +680,12 @@ async function firstRun(){
   const t0=Date.now();
   const p=await GG.api.probe();
   const el=Date.now()-t0;
+  if(!p.ok&&p.code==='BRIDGE_MISSING'){
+    /* 生产铁律:后端没绑上就明说,绝不拿假数据演下去 */
+    $('boot-cap').textContent='桂桂连不上自己的后端(bridge missing)。请重启桂桂;反复出现请重装。';
+    setTimeout(()=>{mood(b,'sad')},700);
+    return
+  }
   if(p.ok){
     lastNet=p.data.net;
     configured=!!p.data.configured;

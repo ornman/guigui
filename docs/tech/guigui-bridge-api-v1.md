@@ -1,12 +1,14 @@
-# 桂桂 v2 · JS↔Python 桥接契约 v1.0.0
+# 桂桂 v2 · JS↔Python 桥接契约 v1.0.1
 
-> **地位**:前后端通信协议的**唯一权威**(《guigui-work-split.md》§一.2)。后端 bridge 实现以此为准;前端 `mock.js` 是它的可执行规范。
+> **地位**:前后端通信协议的**唯一权威**(《guigui-work-split.md》§一.2)。后端 bridge 实现以此为准;`static/dev/mock.js` 是它的可执行规范(仅开发)。
 > **绑定**:命名空间 `window.guigui.*`。pywebview 经 `js_api` 暴露,实现侧自行决定 camelCase 方法名或 snake_case+映射(契约只锁 JS 侧名字)。
 > **变更规则**:改本文必须 bump 版本并登记「变更记录」,对方适配并回注后才生效。禁止静默改。
 
 ## 0. 总则
 
-- **传输中立**:契约只定义方法/参数/返回/事件,不绑死 pywebview;前端经 `GG` 适配器三级探测(`window.guigui` → `window.pywebview.api` → mock),后端就位即切真,前端零改动。
+- **传输中立**:契约只定义方法/参数/返回/事件,不绑死 pywebview;前端经 `GG` 适配器绑定(`window.guigui` → `window.pywebview.api`),后端就位即切真,前端零改动。
+- **mock 只许活在开发目录(1.0.1 起)**:可执行规范位于 `guigui/app/static/dev/mock.js`,仅当 URL 带 `?dev=1` 时由 `app.js` 动态注入;生产 `index.html` 不引用它。**后端打包必须整目录排除 `guigui/app/static/dev/`**。
+- **生产禁止假数据回落**:生产模式后端未绑定时,适配器一律返回 `BRIDGE_MISSING`(见错误码表),UI 停在开机页明说「连不上后端,请重启/重装」;绝不渲染 mock 数据、绝不假成功。
 - **统一信封**:所有方法返回 Promise。
   - 成功:`{ok:true, data:<载荷>}`
   - 失败:`{ok:false, code:<错误码>, message:<人话,可直显>}` —— 后端**不得抛异常代替信封**。
@@ -25,6 +27,7 @@
 | `WIFI_CONNECT_TIMEOUT` | 连接超时(90s) | 同上 |
 | `NOT_CONFIGURED` | 未完成首装就触发动作 | 引导回首装页 |
 | `SAVE_FAILED` | 配置落盘失败 | 设置项回滚 + 提示 |
+| `BRIDGE_MISSING` | 后端未绑定/方法缺失(生产无回落) | 停在开机页,明示重启/重装 |
 | `INTERNAL` | 兜底 | 内联提示,不弹窗 |
 
 ## 2. 方法清单
@@ -166,7 +169,8 @@
 
 | 版本 | 日期 | 变更 | 状态 |
 |---|---|---|---|
-| 1.0.0 | 2026-08-31 | 初版:11 方法 + 4 事件 + 8 错误码 | 前端已按此实现 mock;待后端回注适配 |
+| 1.0.0 | 2026-08-31 | 初版:11 方法 + 4 事件 + 8 错误码 | 已被 1.0.1 取代 |
+| 1.0.1 | 2026-08-31 | mock 移入 `static/dev/`,仅 `?dev=1` 加载;生产无绑定返回 `BRIDGE_MISSING` 诚实报错(错误码 +1);打包必须排除 `static/dev/` | 前端已实现;**后端待办:打包排除 dev 目录** |
 
 ## 6. 集成待办(联调问题记这里)
 

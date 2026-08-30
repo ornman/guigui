@@ -1,11 +1,12 @@
-/* app.js — GG 适配器:桥接契约 v1.0.0(docs/tech/guigui-bridge-api-v1.md)的前端侧绑定。
-   三级探测:window.guigui(后端注入别名)→ pywebview.js api → GGMock(契约可执行规范)。
-   后端就位后前端零改动切真;浏览器里自动回落 mock。
+/* app.js — GG 适配器:桥接契约的前端侧绑定。
+   生产:index.html 不引用任何 mock;后端未绑定时诚实报错(BRIDGE_MISSING),绝不回落假数据。
+   开发:URL 带 ?dev=1(devshell / 浏览器联调)才动态注入 dev/mock.js,未实现的方法可经 GGMock 兜底。
    html.in-app 仅在真后端绑定时挂上(透明无边框窗口样式,见 index.html #app-overrides)。 */
 (function(){
 'use strict';
 const SUBS={};
-let mode='mock',raw=null,readyResolve=null;
+const DEV=new URLSearchParams(location.search).has('dev');
+let mode=DEV?'dev':'connecting',raw=null,readyResolve=null;
 const ready=new Promise(r=>readyResolve=r);
 
 function bind(api){
@@ -19,20 +20,28 @@ function tryBind(){
   if(window.pywebview&&window.pywebview.api){bind(window.pywebview.api);return true}
   return false;
 }
-if(!tryBind()){
+if(tryBind()){
+  /* 真后端已在(同步注入的别名) */
+}else if(DEV){
   window.addEventListener('pywebviewready',tryBind,{once:true});
-  /* 兜底:真后端的 pywebviewready 通常 <500ms 就位;过了宽限期仍无事件 → 浏览器 mock */
-  setTimeout(readyResolve,1200);
+  const s=document.createElement('script');
+  s.src='dev/mock.js';
+  s.onload=()=>readyResolve();
+  s.onerror=()=>{mode='dead';readyResolve()};
+  document.head.appendChild(s);
+  setTimeout(readyResolve,1500);
+}else{
+  window.addEventListener('pywebviewready',tryBind,{once:true});
+  /* 生产铁律:宽限期内后端没绑上 → dead,所有调用返回 BRIDGE_MISSING,由 UI 明说 */
+  setTimeout(()=>{if(mode!=='real'){mode='dead';readyResolve()}},1200);
 }
 
-/* 每个契约方法都经 dispatch:等绑定就绪后分发,信封原样透传。
-   注意 rest 参数——bind 传参是散参,apply 需要真数组,否则对象会被当空参列表 */
+/* 每个契约方法经 dispatch:真实现优先;仅 dev 模式允许 mock 兜底;信封原样透传 */
 function dispatch(name,...args){
   return ready.then(()=>{
-    const impl=raw||window.GGMock;
-    if(!impl||typeof impl[name]!=='function')
-      return{ok:false,code:'INTERNAL',message:'桥接方法缺失: '+name};
-    return impl[name].apply(impl,args);
+    if(raw&&typeof raw[name]==='function')return raw[name].apply(raw,args);
+    if(DEV&&window.GGMock&&typeof GGMock[name]==='function')return GGMock[name].apply(GGMock,args);
+    return{ok:false,code:'BRIDGE_MISSING',message:'后端未就绪'+(DEV?'(mock 亦缺失)':'')};
   });
 }
 
@@ -41,10 +50,10 @@ window.GG={
   ready,
   on(type,fn){(SUBS[type]=SUBS[type]||[]).push(fn);return()=>{SUBS[type]=SUBS[type].filter(f=>f!==fn)}},
   api:new Proxy({},{get:(t,name)=>dispatch.bind(null,name)}),
-  win(cmd){if(mode==='real'&&raw){cmd==='minimize'?raw.winMinimize():raw.winClose()}}
+  win(cmd){if(raw){cmd==='minimize'?raw.winMinimize():raw.winClose()}}
 };
 
-/* 后端 → 前端事件统一入口(契约 §3);mock 模拟的事件也走这里 */
+/* 后端 → 前端事件统一入口(契约 §3);dev 模式下 mock 模拟的事件也走这里 */
 window.guiguiEmit=function(type,payload){
   (SUBS[type]||[]).forEach(fn=>{try{fn(payload)}catch(e){console.warn('[gg] handler',type,e)}});
 };
