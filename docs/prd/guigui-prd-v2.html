@@ -113,10 +113,11 @@ body{
 /* 庆祝页大 bot(固定大尺寸,无归位) */
 .bot-success{width:140px;height:140px;margin:0 auto 10px}
 /* v-success 内容层:卡片光晕脉冲 + bot 弹入 + 4 行文字逐行浮入 + 背景渐显
-   默认 opacity:0;加 .in class 触发 cardGlow */
+   默认 opacity:0;加 .in class 触发 cardGlow
+   text-align:center 让 bot / h1 / p / 微文案 / 按钮全部在 stage 同一垂直中轴 */
 .v-success-stage{position:relative;padding:24px 12px;border-radius:18px;overflow:hidden;
   background:linear-gradient(180deg,oklch(58% 0.15 295 / .10),oklch(70% 0.14 330 / .06) 50%,transparent);
-  opacity:0}
+  text-align:center;opacity:0}
 .v-success-stage.in{animation:cardGlow 1.4s cubic-bezier(.22,1,.36,1) forwards}
 @keyframes cardGlow{
   0%{opacity:0;transform:scale(.96);box-shadow:0 0 0 0 oklch(58% 0.15 295 / .55)}
@@ -133,7 +134,7 @@ body{
 }
 /* 文字逐行浮入:4 行各延迟 0.2/0.5/0.8/1.1s,每行 0.3s ease-out 8px 上滑
    默认隐藏,.in class 触发显式从隐藏态过渡到可见 */
-.s-line{opacity:0;transform:translateY(8px)}
+.s-line{display:block;opacity:0;transform:translateY(8px);text-align:center}
 .v-success-stage.in .s-line{animation:lineIn .42s cubic-bezier(.22,1,.36,1) forwards}
 .v-success-stage.in .s-1{animation-delay:.20s}
 .v-success-stage.in .s-2{animation-delay:.50s}
