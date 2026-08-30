@@ -16,11 +16,12 @@
    · 背景:流动渐变 mesh(紫/品红/蓝),光标视差
    · 每个板块背景交互不同:
        Fig.00 Hero  — 点阵网格,光标排斥 + 点亮
-       Fig.01 场景   — 竖向信号丝,光标推开弯曲
-       Fig.02 触发器 — 方格矩阵,光标点亮 + 点击涟漪
-       Fig.03 信号   — 电磁波全案:多层辉光波/包络/频谱/粒子,
-                        光标 X 调频率 Y 调幅度(「你在调信号」)
-       Fig.05 下载   — 渐变大胶囊磁吸按钮 + 扫光 + 脉冲光环
+       Fig.01 信号   — 电磁波全案 · 光标即波源:波在光标处隆起、
+                        被拉向光标,光标持续发涟漪,点击脉冲爆发
+       Fig.02 场景   — 竖向信号丝,光标推开弯曲 + 脉冲光点下行
+       Fig.03 触发器 — 方格矩阵,光标点亮 + 对角扫描波 + 点击涟漪
+       Fig.04 问答   — 星座网,光标把答案连成网
+       Fig.05 下载   — 下载流汇入 CTA + 磁吸渐变大胶囊
    · 玻璃:磨砂面板(backdrop blur + 内高光 + 噪点),产品窗口真磨砂
    ============================================================ */
 :root{
@@ -335,10 +336,10 @@ section.sc > canvas.scene{
   border:1px solid rgba(255,255,255,0.14);
   background:#100D1D;
   box-shadow:0 30px 80px rgba(36,31,51,0.35);
-  min-height:560px;display:flex;align-items:center;
+  min-height:clamp(600px, 82vh, 880px);display:flex;align-items:center;
 }
 .sig > canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-.sig .inner{position:relative;z-index:1;padding:64px 60px;max-width:660px}
+.sig .inner{position:relative;z-index:1;padding:80px 72px;max-width:680px}
 .sig .fig-label{color:#8B85A8}
 .sig .fig-label b{color:#CFC9E4}
 .sig h2{color:#F2EFFA;margin-top:16px}
@@ -582,7 +583,7 @@ section.sc > canvas.scene{
   </div>
 </section>
 
-<!-- ═══ Fig.01 电磁波 · 炫酷全案:光标调频调幅(用户点名提到最前) ═══ -->
+<!-- ═══ Fig.01 电磁波 · 炫酷全案:光标即波源(波随光标隆起,点击脉冲爆发) ═══ -->
 <section class="sc" id="fig-01">
   <div class="wrap">
     <div class="sig rv">
@@ -591,7 +592,7 @@ section.sc > canvas.scene{
         <div class="fig-label"><b>Fig. 01</b> — Signal · 电磁场</div>
         <h2>不是一根信号柱,<br>是一道<span class="em">被调好的波</span>。</h2>
         <p class="lede">校园网不是「信号格」的问题,是「信号准时到达」的问题。桂桂做的事,是在你还在刷牙时,把这道波调到正好。</p>
-        <div class="hint"><span class="cur" aria-hidden="true">✛</span>移动光标 · 横向调频率 · 纵向调幅度</div>
+        <div class="hint"><span class="cur" aria-hidden="true">✛</span>光标即波源 · 波随你起伏 · 点击发射脉冲</div>
         <div class="specs">
           <div class="cell"><div class="fig-label">Retry</div><b>6 次 / 窗口</b></div>
           <div class="cell"><div class="fig-label">Interval</div><b>5 min</b></div>
@@ -995,45 +996,50 @@ document.querySelectorAll('[data-scene="squares"]').forEach(function(sec){
   });
 });
 
-/* ═══ 2d. Fig.03 电磁波全案 ═══ */
-var em = { freq:1, amp:1, tFreq:1, tAmp:1, parts:[], has:false };
+/* ═══ 2d. Fig.01 电磁波全案 v2 · 光标即波源 ═══
+   反馈直给(对标 Hero 点阵):波在光标处隆起并被拉向光标高度、
+   光标持续向外发涟漪、点击触发脉冲爆发、粒子被光标吸引加速、
+   频谱在光标正下方抬升——光标一动,全场立刻跟着动 */
+var em = { parts:[], has:false };
+function emGauss(x, cx, sig){
+  var d = x - cx;
+  return Math.exp(-(d*d)/(2*sig*sig));
+}
 function drawEM(sc, t){
   var ctx = sc.S.ctx, W = sc.S.w, H = sc.S.h, cv = sc.cv;
   ctx.clearRect(0,0,W,H);
   var m = localMouse(cv);
   var over = m.x > 0 && m.x < W && m.y > 0 && m.y < H;
-  /* 目标:X→频率 0.45..2.4;Y→幅度 0.35..1.9 */
-  em.tFreq = over ? 0.45 + (m.x/W) * 1.95 : 0.9 + Math.sin(t*.00035)*.5;
-  em.tAmp  = over ? 0.35 + (1 - m.y/H) * 1.55 : 1 + Math.sin(t*.0005)*.35;
-  em.freq += (em.tFreq - em.freq)*.055;
-  em.amp  += (em.tAmp  - em.amp)*.055;
-
   var cy = H*0.52;
+  var drift = .8 + Math.sin(t*.0004)*.3;   /* 无光标时的呼吸 */
   ctx.globalCompositeOperation = 'lighter';
 
   /* 背景细网格 */
   ctx.strokeStyle = 'rgba(139,92,246,0.06)'; ctx.lineWidth = 1;
   for(var gy = 40; gy < H; gy += 56){ ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
 
-  /* 多层辉光波 + AM 包络 */
-  var layers = 6;
-  for(var L=0; L<layers; L++){
-    var lf = (0.9 + L*0.42) * em.freq;
-    var la = (34 - L*3.4) * em.amp;
+  /* 多层辉光波:光标处幅度放大 + 波面被拉向光标高度 */
+  for(var L=0; L<6; L++){
+    var lf = 0.9 + L*0.42;
+    var la = (40 - L*4) * drift;
     var speed = .9 + L*.35;
     var grad = ctx.createLinearGradient(0,0,W,0);
     grad.addColorStop(0,   'rgba(109,77,232,'+(0.85 - L*0.1)+')');
     grad.addColorStop(.5,  'rgba(196,121,255,'+(0.8 - L*0.1)+')');
     grad.addColorStop(1,   'rgba(232,121,249,'+(0.7 - L*0.1)+')');
     ctx.strokeStyle = grad;
-    ctx.lineWidth = L === 0 ? 2.2 : 1.4;
+    ctx.lineWidth = L === 0 ? 2.4 : 1.5;
     ctx.shadowColor = L < 3 ? 'rgba(139,92,246,0.85)' : 'rgba(217,70,239,0.5)';
     ctx.shadowBlur = L === 0 ? 18 : 10;
     ctx.beginPath();
     for(var x=0; x<=W; x+=4){
-      var env = .5 + .5*Math.sin(x*0.0038*em.freq - t*.0011);       /* 波包 */
+      var env = .5 + .5*Math.sin(x*0.0038 - t*.0011);
       var y = cy + Math.sin(x*0.011*lf + t*.0016*speed) * la * (0.25 + 0.75*env)
                    + Math.sin(x*0.0042*lf*1.7 + t*.0009) * la*.35;
+      if(over){
+        var g = emGauss(x, m.x, 150);
+        y = cy + (y - cy)*(1 + g*1.9) + (m.y - cy) * g * .5;
+      }
       x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
     }
     ctx.stroke();
@@ -1046,31 +1052,85 @@ function drawEM(sc, t){
   ctx.beginPath(); ctx.moveTo(0,cy); ctx.lineTo(W,cy); ctx.stroke();
   ctx.setLineDash([]);
 
-  /* 波上骑行粒子 */
-  if(!em.has){ for(var p=0;p<26;p++) em.parts.push({ x:Math.random(), v:.0012+Math.random()*.0022, s:1+Math.random()*2, ph:Math.random()*6.283 }); em.has = true; }
+  /* 光标 = 波源:十字准星 + 亮核 */
+  if(over){
+    ctx.strokeStyle = 'rgba(232,121,249,0.8)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(m.x-14, m.y); ctx.lineTo(m.x-4, m.y);
+    ctx.moveTo(m.x+4, m.y); ctx.lineTo(m.x+14, m.y);
+    ctx.moveTo(m.x, m.y-14); ctx.lineTo(m.x, m.y-4);
+    ctx.moveTo(m.x, m.y+4); ctx.lineTo(m.x, m.y+14);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(m.x, m.y, 3, 0, 6.283);
+    ctx.fillStyle = 'rgba(240,220,255,0.95)';
+    ctx.shadowColor = 'rgba(217,70,239,1)'; ctx.shadowBlur = 16;
+    ctx.fill();
+    ctx.beginPath(); ctx.arc(m.x, m.y, 9, 0, 6.283);
+    ctx.strokeStyle = 'rgba(217,70,239,0.5)'; ctx.shadowBlur = 0; ctx.stroke();
+  }
+
+  /* 波源持续发涟漪(无光标时从面板中心) */
+  sc.er = sc.er || []; sc.lastRing = sc.lastRing || 0;
+  if(t - sc.lastRing > 620){
+    sc.er.push({ x: over?m.x:W*.62, y: over?m.y:cy, r:8, a:.85 });
+    sc.lastRing = t;
+  }
+  for(var r1=sc.er.length-1; r1>=0; r1--){
+    var g2 = sc.er[r1];
+    g2.r += 2.8; g2.a *= .982;
+    if(g2.a < .02 || g2.r > Math.max(W,H)){ sc.er.splice(r1,1); continue; }
+    ctx.beginPath(); ctx.arc(g2.x, g2.y, g2.r, 0, 6.283);
+    ctx.strokeStyle = 'rgba(196,121,255,'+g2.a.toFixed(3)+')';
+    ctx.lineWidth = 1.6; ctx.stroke();
+  }
+
+  /* 点击脉冲爆发:粗辉光环 + 内环 */
+  sc.bursts = sc.bursts || [];
+  for(var b1=sc.bursts.length-1; b1>=0; b1--){
+    var B = sc.bursts[b1];
+    B.r += 8; B.life -= .022;
+    if(B.life <= 0){ sc.bursts.splice(b1,1); continue; }
+    ctx.beginPath(); ctx.arc(B.x, B.y, B.r, 0, 6.283);
+    ctx.strokeStyle = 'rgba(232,121,249,'+(B.life*.9).toFixed(3)+')';
+    ctx.lineWidth = 3; ctx.shadowColor='rgba(217,70,239,0.9)'; ctx.shadowBlur=14; ctx.stroke();
+    ctx.beginPath(); ctx.arc(B.x, B.y, B.r*.66, 0, 6.283);
+    ctx.strokeStyle = 'rgba(160,120,255,'+(B.life*.6).toFixed(3)+')';
+    ctx.lineWidth = 1.5; ctx.shadowBlur=0; ctx.stroke();
+  }
+
+  /* 骑行粒子:光标附近被吸引加速、更亮更大 */
+  if(!em.has){ for(var p=0;p<30;p++) em.parts.push({ x:Math.random(), v:.0012+Math.random()*.0022, s:1+Math.random()*2, ph:Math.random()*6.283 }); em.has = true; }
   for(var q=0;q<em.parts.length;q++){
     var pt = em.parts[q];
-    pt.x += pt.v * em.freq; if(pt.x > 1.05) pt.x = -0.05;
+    var pull = over ? emGauss(pt.x*W, m.x, 200) : 0;
+    pt.x += pt.v * (1 + pull*2.2); if(pt.x > 1.05) pt.x = -0.05;
     var px = pt.x * W;
-    var env2 = .5 + .5*Math.sin(px*0.0038*em.freq - t*.0011);
-    var py = cy + Math.sin(px*0.011*em.freq + t*.0016) * 34*em.amp * (0.25+0.75*env2);
-    var a = 0.25 + 0.6*Math.abs(Math.sin(t*.003 + pt.ph));
+    var env2 = .5 + .5*Math.sin(px*0.0038 - t*.0011);
+    var py = cy + Math.sin(px*0.011 + t*.0016) * 40*drift * (0.25+0.75*env2);
+    if(over){
+      var g3 = emGauss(px, m.x, 150);
+      py = cy + (py-cy)*(1+g3*1.9) + (m.y-cy)*g3*.5;
+      py += (m.y - py) * pull * .35;
+      px += (m.x - px) * pull * .18;
+    }
+    var a = 0.25 + 0.6*Math.abs(Math.sin(t*.003 + pt.ph)) + pull*.3;
     ctx.beginPath();
-    ctx.arc(px, py, pt.s, 0, 6.283);
-    ctx.fillStyle = 'rgba(232,180,255,'+a.toFixed(3)+')';
-    ctx.shadowColor = 'rgba(217,70,239,0.9)'; ctx.shadowBlur = 8;
+    ctx.arc(px, py, pt.s + pull*1.6, 0, 6.283);
+    ctx.fillStyle = 'rgba(232,180,255,'+Math.min(1,a).toFixed(3)+')';
+    ctx.shadowColor = 'rgba(217,70,239,0.9)'; ctx.shadowBlur = 8 + pull*12;
     ctx.fill();
   }
   ctx.shadowBlur = 0;
 
-  /* 底部频谱 */
+  /* 底部频谱:光标正下方的柱子抬高变亮 */
   var bars = 56, bw = W/bars;
   for(var bI=0;bI<bars;bI++){
     var e = Math.abs(Math.sin(t*.0016 + bI*0.55) * Math.sin(t*.0007 + bI*0.21));
-    var bh = (6 + e*46*em.amp) * (0.4 + 0.6*Math.sin(Math.PI*bI/bars));
+    var hb = over ? emGauss(bI*bw, m.x, 130) : 0;
+    var bh = (6 + e*46*drift + hb*44) * (0.4 + 0.6*Math.sin(Math.PI*bI/bars));
     var bg2 = ctx.createLinearGradient(0,H,0,H-bh);
     bg2.addColorStop(0,'rgba(109,77,232,0.30)');
-    bg2.addColorStop(1,'rgba(232,121,249,0.55)');
+    bg2.addColorStop(1, hb > .3 ? 'rgba(240,150,255,0.75)' : 'rgba(232,121,249,0.55)');
     ctx.fillStyle = bg2;
     ctx.fillRect(bI*bw+1.5, H-bh, bw-3, bh);
   }
@@ -1195,6 +1255,20 @@ if(emEl){
       es.forEach(function(e){ emScene.active = e.isIntersecting; if(e.isIntersecting && !emScene.S) emScene.S = fitCanvas(emScene.cv); });
     }, { threshold:0, rootMargin:'60px' }).observe(emEl);
   } else if(!reduce){ emScene.active = true; emScene.S = fitCanvas(emScene.cv); }
+}
+/* 电磁波面板:点击 = 脉冲爆发 */
+var sigPanel = document.querySelector('.sig');
+if(sigPanel){
+  sigPanel.addEventListener('pointerdown', function(e){
+    if(reduce) return;
+    var r = document.getElementById('em-canvas').getBoundingClientRect();
+    for(var i=0;i<scenes.length;i++){
+      if(scenes[i].kind === 'em'){
+        scenes[i].bursts = scenes[i].bursts || [];
+        scenes[i].bursts.push({ x:e.clientX - r.left, y:e.clientY - r.top, r:12, life:1 });
+      }
+    }
+  });
 }
 if(!reduce){
   var lt = performance.now();
