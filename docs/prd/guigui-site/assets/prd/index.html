@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>桂桂 / GuiGui · 一主页四态 + 详情</title>
+<!-- ⚠ 本原型为 PRD 演示,所有学号/密码为占位示例(2025000000001 / 100001)。
+     生产代码严禁预填账密:账密必须经用户输入或从 OS keychain 读取。
+     输入框已加 autocomplete="new-password" 防浏览器回填真实凭据。 -->
+<style>
+/* 色彩纪律:按钮纯黑单色 / 唯一强调紫(状态点/开关/聚焦/选中态) / 唯一暖色例外(不可达点) / 中性色紫染
+   例外:选中态允许紫→粉渐变描边(用户指定)
+   sRGB 兜底:企业内核/老浏览器不识别 oklch() 时,关键色用 hex 兜底(防 dbedae7 黑屏) */
+:root{
+  --ink:#2b2740;
+  --ink-2:#5a5573;
+  --ink-3:#8a8499;
+  --accent:#7c3aed;
+  --accent-2:#c084fc;
+  --accent-soft:rgba(124,58,237,.12);
+  --warm:#e0a04a;
+}
+@supports (color: oklch(0% 0 0)){
+  :root{
+    --ink:oklch(23% 0.015 295);
+    --ink-2:oklch(45% 0.012 295);
+    --ink-3:oklch(60% 0.010 295);
+    --accent:oklch(58% 0.15 295);
+    --accent-2:oklch(78% 0.15 320);
+    --accent-soft:oklch(58% 0.15 295 / 0.12);
+    --warm:oklch(72% 0.12 70);
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:#000}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:#000}
+body.backdrop-black::before{background:#000}
+body.backdrop-win11::before{
+  background:
+    radial-gradient(1150px 850px at 50% 38%, oklch(40% 0.10 265 / 0.9), transparent 62%),
+    radial-gradient(760px 600px at 36% 32%, oklch(52% 0.13 300 / 0.55), transparent 62%),
+    radial-gradient(700px 560px at 64% 52%, oklch(46% 0.12 220 / 0.5), transparent 62%),
+    radial-gradient(520px 420px at 50% 46%, oklch(60% 0.14 290 / 0.35), transparent 65%),
+    linear-gradient(180deg, oklch(18% 0.03 265), oklch(10% 0.02 265));
+}
+body{
+  color:var(--ink);
+  font:16px/1.75 "Source Han Serif SC","Noto Serif SC",Georgia,"Recoleta",serif;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding:32px 24px 96px;
+}
+
+/* ═══ 窗口:伪透明(磨砂壁纸烘焙,打包后 = Mica/Acrylic) ═══ */
+.window{
+  position:relative;width:560px;max-width:100%;height:640px;
+  border:1px solid oklch(100% 0 0 / 0.55);border-radius:22px;
+  background:
+    radial-gradient(420px 300px at 14% 0%, oklch(93% 0.05 300 / 0.55), transparent 70%),
+    radial-gradient(460px 340px at 102% 104%, oklch(87% 0.07 330 / 0.45), transparent 70%),
+    radial-gradient(380px 280px at 96% -6%, oklch(91% 0.05 220 / 0.35), transparent 70%),
+    linear-gradient(168deg, oklch(92% 0.015 265), oklch(84% 0.025 285));
+  box-shadow:
+    0 24px 70px oklch(0% 0 0 / 0.5),0 2px 8px oklch(0% 0 0 / 0.3),
+    inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 0 oklch(100% 0 0 / 0.25);
+  transition:transform .45s cubic-bezier(.3,1.2,.4,1),opacity .35s;
+  overflow:hidden; /* 一切特效裁剪在卡片圆角内 */
+}
+.window.minimized{transform:scale(.1) translateY(60vh);opacity:0;pointer-events:none}
+
+.titlebar{display:flex;align-items:center;height:44px;padding:0 14px;
+  border-bottom:1px solid oklch(100% 0 0 / 0.45)}
+.titlebar .name{font-family:Inter,"PingFang SC",sans-serif;font-size:11px;font-weight:600;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);cursor:pointer}
+.titlebar .name:hover{color:var(--ink)}
+.titlebar .tag{font-family:Inter,"PingFang SC",sans-serif;font-size:10px;color:var(--ink-3);
+  opacity:.65;margin-left:10px;letter-spacing:.06em}
+.titlebar .spacer{flex:1}
+.tbtn{width:26px;height:26px;border:none;border-radius:8px;background:transparent;
+  color:var(--ink-3);font-family:Inter,sans-serif;font-size:13px;line-height:1;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s}
+.tbtn:hover{background:oklch(100% 0 0 / 0.55);color:var(--ink)}
+
+.body{position:relative;height:calc(100% - 44px);padding:28px 36px 26px;
+  overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;
+  scrollbar-color:oklch(23% 0.015 295 / 0.22) transparent}
+/* 滚动条按设计系统自制:细、圆、半透明墨色,不要系统白底滑块 */
+.body::-webkit-scrollbar,.dd-menu::-webkit-scrollbar{width:5px}
+.body::-webkit-scrollbar-track,.dd-menu::-webkit-scrollbar-track{background:transparent}
+.body::-webkit-scrollbar-thumb,.dd-menu::-webkit-scrollbar-thumb{border-radius:99px;background:oklch(23% 0.015 295 / 0.22)}
+.body::-webkit-scrollbar-thumb:hover,.dd-menu::-webkit-scrollbar-thumb:hover{background:oklch(23% 0.015 295 / 0.38)}
+/* 深色日志面板内的滚动条用浅色 */
+.log::-webkit-scrollbar{width:5px}
+.log::-webkit-scrollbar-track{background:transparent}
+.log::-webkit-scrollbar-thumb{border-radius:99px;background:oklch(97% 0.005 295 / 0.25)}
+.v{display:none;animation:fadein .3s ease-out}
+.v.on{display:block}
+.v.leaving{animation:fadeout .25s ease-in forwards}
+@keyframes fadeout{from{opacity:1}to{opacity:0}}
+/* 日常页:日志钉底,中部留白是呼吸感不是空缺 */
+#v-main.on{display:flex;flex-direction:column;min-height:100%}
+#v-main .log{margin-top:auto}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ═══ Bot:bumbum55/noteai-bot 接管几何+动画(见 vendor/noteai-bot/LICENSE) ═══ */
+/* 容器布局:内部 SVG 由 XiaojiangMotion 注入 */
+.bot{position:relative;display:flex;align-items:center;justify-content:center}
+.bot svg{display:block;overflow:visible;width:100%;height:100%}
+
+/* ═══ Boot-bot:v-boot 仪式大 bot(140x140,grid 居中,不再 absolute) ═══ */
+/* 拆分后:boot-bot 永远在 v-boot 内 140x140;boot-bot-greet 永远在 .greet 内 58x58
+   不再做 58↔140 切换、不再做 transform 平移归位、彻底拆掉 .centered/.dock-in/.botSettle
+   base 不带 transition(避免 SVG attribute 变化触发的过渡卡住) */
+#boot-bot{width:140px;height:140px;transform-origin:50% 50%}
+/* 仪式入场:仅 .entering 阶段触发 pop 弹起;无 transform 平移(改 grid 居中) */
+#boot-bot.entering{animation:pop 1s cubic-bezier(.34,1.56,.64,1) both}
+/* 庆祝页大 bot(固定大尺寸,无归位) */
+.bot-success{width:140px;height:140px;margin:0 auto 10px}
+/* v-success 内容层:卡片光晕脉冲 + bot 弹入 + 4 行文字逐行浮入 + 背景渐显
+   默认 opacity:0;加 .in class 触发 cardGlow
+   text-align:center 让 bot / h1 / p / 微文案 / 按钮全部在 stage 同一垂直中轴 */
+.v-success-stage{position:relative;padding:24px 12px;border-radius:18px;overflow:hidden;
+  background:linear-gradient(180deg,oklch(58% 0.15 295 / .10),oklch(70% 0.14 330 / .06) 50%,transparent);
+  text-align:center;opacity:0}
+.v-success-stage.in{animation:cardGlow 1.4s cubic-bezier(.22,1,.36,1) forwards}
+@keyframes cardGlow{
+  0%{opacity:0;transform:scale(.96);box-shadow:0 0 0 0 oklch(58% 0.15 295 / .55)}
+  35%{opacity:1;transform:scale(1.02);box-shadow:0 0 0 8px oklch(58% 0.15 295 / .0)}
+  100%{opacity:1;transform:scale(1);box-shadow:0 0 0 0 oklch(58% 0.15 295 / 0)}
+}
+/* bot 弹入(下方 30px 弹起,旋转 -8° → 0°)— 0.55s,落定后接 happy-bounce
+   默认隐藏(0 opacity),加 .in class 触发动画 */
+.bot-success{width:140px;height:140px;margin:0 auto 10px;opacity:0}
+@keyframes botIn{
+  0%{opacity:0;transform:translateY(30px) rotate(-8deg) scale(.85)}
+  60%{opacity:1;transform:translateY(-6px) rotate(2deg) scale(1.06)}
+  100%{opacity:1;transform:translateY(0) rotate(0) scale(1)}
+}
+/* 文字逐行浮入:4 行各延迟 0.2/0.5/0.8/1.1s,每行 0.3s ease-out 8px 上滑
+   默认隐藏,.in class 触发显式从隐藏态过渡到可见 */
+.s-line{display:block;opacity:0;transform:translateY(8px);text-align:center}
+.v-success-stage.in .s-line{animation:lineIn .42s cubic-bezier(.22,1,.36,1) forwards}
+.v-success-stage.in .s-1{animation-delay:.20s}
+.v-success-stage.in .s-2{animation-delay:.50s}
+.v-success-stage.in .s-3{animation-delay:.80s}
+.v-success-stage.in .s-4{animation-delay:1.10s}
+.v-success-stage.in .s-5{animation-delay:1.30s}
+@keyframes lineIn{to{opacity:1;transform:none}}
+
+/* ═══ 主页问候行:bot-greet + 标题,flex 垂直居中,永不错位 ═══ */
+/* bot-greet 容器:58x58,flex-shrink:0;回主页入口是标题栏名字,不再点 bot */
+.greet{display:flex;align-items:center;gap:14px;margin-bottom:2px}
+.bot-greet{width:58px;height:58px;flex-shrink:0;cursor:pointer}
+.bot-greet:hover{filter:brightness(1.06)}
+body.hide-gui .bot-greet{display:none}
+
+/* pop 反馈(用户点击桂桂时) */
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.1,.9)}70%{transform:scale(.95,1.05)}100%{transform:scale(1)}}
+.bot.pop{animation:pop .55s cubic-bezier(.34,1.56,.64,1)}
+
+/* 各状态微动作:CSS 辅助库的 spring — 给 div 加 transform,不干扰库内部 SVG 动画
+   boot-bot(仪式大 bot)和 bot-success(庆祝大 bot)都走自己的专属动画,不再挂 micro */
+@keyframes happy-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes happy-sway{0%,100%{transform:rotate(-3deg) translateY(0)}50%{transform:rotate(3deg) translateY(-3px)}}
+@keyframes sad-droop{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(-6deg)}}
+@keyframes cry-shake{0%,100%{transform:translateY(0)}25%{transform:translateY(-1px)}75%{transform:translateY(1px)}}
+@keyframes idle-breath{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+
+/* 主页 / 首次页 greet 小 bot 走 micro 动画 */
+/* bot-greet micro 动画:统一用 data-mood(与 mood() 函数一致,报告 5.4) */
+.bot-greet[data-mood=idle]{animation-name:idle-breath;animation-duration:2.4s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+.bot-greet[data-mood=happy]{animation-name:happy-sway;animation-duration:1.6s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 90%}
+.bot-greet[data-mood=sad]{animation-name:sad-droop;animation-duration:2.2s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 50%}
+.bot-greet[data-mood=cry]{animation-name:cry-shake;animation-duration:.5s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+/* 庆祝页大 bot(独立容器,自己 bounce)— 自身已挂 .bot-success happy 状态
+   注意:此规则被 .v-success-stage.in .bot-success 覆盖(那个有更高特异性) */
+.v-success-stage.in .bot-success[data-state=complete]{animation-name:botIn, happy-bounce;animation-duration:.55s, .9s;animation-delay:0s, .55s;animation-timing-function:cubic-bezier(.22,1,.36,1), ease-in-out;animation-iteration-count:1, infinite;animation-fill-mode:both, none;transform-origin:50% 50%}
+.tagline{font:600 13px/1.6 Inter,"PingFang SC",sans-serif;color:var(--ink-2);
+  letter-spacing:.02em;margin:0}
+.tagline b{color:var(--accent)}
+/* 桂桂的口吻行:衬线,像她本人在说话 */
+.say{font:400 14px/1.7 "Source Han Serif SC","Noto Serif SC",Georgia,serif;color:var(--ink-2);margin:2px 0 0}
+
+/* 开机仪式:bot 完美居中(grid 强制);仪式期间 visible,归位后透明但保留布局 */
+/* v-boot:仪式态全屏占位,bot 与 boot-cap 在 grid 中部堆叠;不切渐变,goSetup 后即隐藏 */
+#v-boot{position:absolute;inset:0;display:none;pointer-events:none}
+#v-boot.on{display:flex;flex-direction:column;justify-content:center;align-items:center;row-gap:18px}
+#v-boot .boot-cap{text-align:center;pointer-events:none;color:var(--ink-3);font:600 13px/1.5 Inter,sans-serif;letter-spacing:.02em;opacity:.85}
+
+.boot-cap{margin-top:22px;text-align:center;font-size:13.5px;color:var(--ink-3);
+  font-family:Inter,"PingFang SC",sans-serif;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
+
+/* ═══ 元件 ═══ */
+h1{font-size:27px;font-weight:600;letter-spacing:-.01em;line-height:1.3}
+.lede{font-size:14px;color:var(--ink-2);margin-bottom:18px}
+.status{display:flex;align-items:center;gap:10px;padding:11px 0;margin:16px 0 16px;
+  border-top:1px solid oklch(100% 0 0 / 0.5);border-bottom:1px solid oklch(100% 0 0 / 0.5);
+  font-size:13px;color:var(--ink-2)}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--ink-3)}
+.status.ok .dot{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.status.warn .dot{background:var(--warm)}
+/* 问题状态行:掉线=品牌紫(自己能修),不可达=琥珀(外部问题) */
+.status.warn{background:oklch(58% 0.15 295 / 0.06);border-radius:10px;padding:10px 12px;margin:12px 0 4px}
+.status.danger{background:oklch(72% 0.12 70 / 0.1);border-radius:10px;padding:10px 12px;margin:12px 0 4px}
+.status.danger .dot{background:var(--warm);animation:pulse 1.4s ease-in-out infinite}
+/* 状态即标题时,修复按钮与状态同色 */
+#v-main.st-warn #main-btn{border-color:var(--accent);color:var(--accent)}
+#v-main.st-down #main-btn{border-color:oklch(60% 0.11 70);color:oklch(52% 0.11 70)}
+/* 首装链路是单行道:无返回 */
+body.setup .back{display:none}
+/* 首次仪式的苏醒动画:拉伸弹起 + 眼嘴弧线依次描画 */
+.micro-line{font-size:12px;color:var(--ink-3);font-family:Inter,"PingFang SC",sans-serif;
+  margin:0 0 16px;line-height:1.8}
+
+.f{margin-bottom:14px}
+.f>label{display:block;font-family:Inter,"PingFang SC",sans-serif;font-size:11px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+input{width:100%;padding:11px 14px;border:1px solid oklch(60% 0.01 295 / 0.35);
+  border-radius:12px;background:oklch(100% 0 0 / 0.6);font:15px/1.5 inherit;font-family:inherit;
+  color:var(--ink);transition:border-color .18s,box-shadow .18s}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+/* 密码框小眼睛:明文/隐藏切换(类名避开 bot 的 .eye 眼睛路径) */
+.pw-wrap{position:relative}
+.pw-wrap input{padding-right:46px}
+.pw-eye{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:34px;height:34px;
+  display:flex;align-items:center;justify-content:center;border:none;border-radius:9px;
+  background:transparent;color:var(--ink-3);cursor:pointer;transition:background .15s,color .15s}
+.pw-eye:hover{background:oklch(58% 0.15 295 / 0.08);color:var(--ink)}
+.pw-eye svg{width:18px;height:18px}
+.pw-eye .i-off{display:none}
+.pw-eye.off .i-on{display:none}
+.pw-eye.off .i-off{display:block}
+/* 自定义时间:两位一格直接键入,自动跳格 */
+.time-input{display:flex;align-items:center;gap:7px}
+.time-input input{width:56px;padding:10px 6px;text-align:center;font:600 19px/1 Inter,sans-serif;
+  letter-spacing:.05em;border-radius:11px}
+.time-input .colon{font:600 16px Inter,sans-serif;color:var(--ink-3)}
+.time-input input.err{border-color:var(--warm);box-shadow:0 0 0 3px oklch(72% 0.12 70 / .16)}
+
+.btn{display:block;width:100%;padding:12px;margin-top:10px;border:none;border-radius:12px;
+  background:var(--ink);color:oklch(97% 0.005 295);font:600 14.5px/1.4 inherit;font-family:inherit;
+  cursor:pointer;transition:transform .15s ease-out}
+.btn:hover{transform:translateY(-1px)}
+.btn.quiet{background:oklch(100% 0 0 / 0.6);color:var(--ink);font-weight:600;
+  border:1px solid oklch(60% 0.01 295 / 0.4)}
+.btn.quiet:hover{border-color:var(--accent);color:var(--accent)}
+/* 常用时间药丸:一键填充输入框 */
+.presets{display:flex;gap:6px;flex-wrap:wrap}
+.preset{padding:7px 12px;border-radius:99px;border:1px solid oklch(60% 0.01 295 / 0.3);
+  background:oklch(100% 0 0 / 0.5);font:500 12px/1 Inter,"PingFang SC",sans-serif;color:var(--ink-2);
+  cursor:pointer;transition:border-color .15s,background .15s,color .15s}
+.preset:hover{border-color:var(--accent-2)}
+.preset.on{background:var(--ink);color:oklch(97% 0.005 295);border-color:var(--ink)}
+/* 历史日志视图 */
+.day{margin-bottom:16px}
+.day-h{font-family:Inter,"PingFang SC",sans-serif;font-size:10.5px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin:0 0 6px}
+.log .hist{text-align:right;margin-top:4px}
+.log .hist a{font:600 11px/1 Inter,"PingFang SC",sans-serif;color:oklch(82% 0.05 295);
+  text-decoration:none;cursor:pointer}
+.log .hist a:hover{color:oklch(97% 0.005 295);text-decoration:underline}
+.link{background:none;border:none;padding:0;margin-top:16px;font:500 13px/1.6 inherit;
+  font-family:inherit;color:var(--ink-3);cursor:pointer;
+  border-bottom:1px solid oklch(60% 0.01 295 / .4);transition:color .15s}
+.link:hover{color:var(--ink)}
+
+/* 时间槽(时间点专用) */
+.times{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px}
+.times button{position:relative;padding:10px 4px;border:1px solid oklch(60% 0.01 295 / 0.30);border-radius:10px;
+  background:oklch(100% 0 0 / 0.55);font-family:Inter,sans-serif;font-size:13px;color:var(--ink-2);
+  cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.times button:hover{border-color:var(--ink-3)}
+.times button.on{background:oklch(58% 0.15 295 / 0.07);border-color:transparent;color:var(--ink)}
+.times button.off{opacity:.32;pointer-events:none}
+/* 选中态:紫→粉渐变描边,渐显过渡(用户指定) */
+.times button::before{content:"";position:absolute;inset:-1px;border-radius:inherit;
+  padding:1.5px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  opacity:0;transition:opacity .35s ease-out;pointer-events:none}
+.times button.on::before{opacity:1}
+
+/* 自绘下拉(间隔/次数类):非原生 select */
+.dd{position:relative;flex-shrink:0}
+.dd-btn{display:flex;align-items:center;gap:8px;padding:7px 12px 7px 14px;
+  border:1px solid oklch(60% 0.01 295 / 0.30);border-radius:99px;min-width:96px;justify-content:space-between;
+  background:oklch(100% 0 0 / 0.55);font:500 12px/1 Inter,"PingFang SC",sans-serif;color:var(--ink);
+  cursor:pointer;transition:border-color .15s}
+.dd-btn:hover{border-color:var(--accent-2)}
+.dd-btn .car{font-size:9px;color:var(--ink-3)}
+.dd-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:18;min-width:120px;
+  background:oklch(100% 0 0 / 0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid oklch(100% 0 0 / 0.6);border-radius:12px;padding:5px;
+  box-shadow:0 12px 32px oklch(23% 0.015 295/.18);display:none;
+  max-height:190px;overflow-y:auto;scrollbar-width:thin;
+  scrollbar-color:oklch(23% 0.015 295 / 0.22) transparent}
+.dd.open .dd-menu{display:block;animation:fadein .2s ease-out}
+.dd-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;
+  padding:8px 10px;border:none;border-radius:8px;background:transparent;
+  font:500 12.5px/1 Inter,"PingFang SC",sans-serif;color:var(--ink-2);cursor:pointer;text-align:left}
+.dd-menu button:hover{background:oklch(58% 0.15 295 / 0.08);color:var(--ink)}
+.dd-menu button.on{color:var(--accent);font-weight:600}
+.dd-menu button .ck{opacity:0}
+.dd-menu button.on .ck{opacity:1}
+
+.row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;
+  border-bottom:1px solid oklch(60% 0.01 295 / 0.18)}
+.row .t{font-size:14.5px}
+.row .d{font-size:12px;color:var(--ink-3);margin-top:1px;font-family:Inter,"PingFang SC",sans-serif}
+.sw{width:38px;height:22px;flex-shrink:0;position:relative;cursor:pointer;border-radius:11px;
+  background:#EBEEF4;transition:background .2s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+  background:var(--ink);box-shadow:0 1px 3px oklch(23% 0.015 295/.25);transition:transform .2s ease-out,background .2s}
+.sw.on::after{background:oklch(100% 0 0)}
+.sw.on{background:var(--accent)}
+.sw.on::after{transform:translateX(16px)}
+
+.tiny-label{font-family:Inter,"PingFang SC",sans-serif;font-size:10.5px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin:18px 0 6px}
+.check-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  padding:9px 0;border-bottom:1px solid oklch(60% 0.01 295 / 0.15);font-size:14px}
+.check-row .k{color:var(--ink-3);font-size:12.5px;flex-shrink:0;font-family:Inter,"PingFang SC",sans-serif}
+.check-row .v2{text-align:right}
+.check-row .v2 b{color:var(--accent)}
+
+.ssid{position:relative;display:flex;align-items:center;gap:10px;padding:11px 14px;margin-bottom:6px;
+  border:1px solid oklch(60% 0.01 295 / 0.28);border-radius:12px;
+  background:oklch(100% 0 0 / 0.55);cursor:pointer;transition:border-color .15s}
+.ssid:hover{border-color:var(--accent-2)}
+.ssid.on{border-color:transparent;box-shadow:0 0 0 3px var(--accent-soft)}
+.ssid::before{content:"";position:absolute;inset:-1px;border-radius:inherit;
+  padding:1.5px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  opacity:0;transition:opacity .35s ease-out;pointer-events:none}
+.ssid.on::before{opacity:1}
+.ssid .n{font-size:14px}
+.ssid .q{margin-left:auto;font-family:Inter,sans-serif;font-size:11px;color:var(--ink-3);
+  padding:2px 8px;border-radius:99px;background:oklch(60% 0.01 295 / 0.10)}
+
+.log{margin-top:16px;padding:12px 14px;border-radius:12px;background:oklch(20% 0.015 295 / 0.92);
+  font-family:Inter,Consolas,monospace;font-size:11px;line-height:1.8;color:oklch(72% 0.01 295);
+  max-height:110px;overflow-y:auto}
+.log .ts{color:oklch(48% 0.01 295);margin-right:8px}
+.log .ok{color:oklch(75% 0.10 295)}
+
+.back{display:inline-flex;align-items:center;gap:6px;background:none;border:none;padding:0;
+  font:500 12.5px/1 Inter,"PingFang SC",sans-serif;color:var(--ink-3);cursor:pointer;margin-bottom:14px}
+.back:hover{color:var(--ink)}
+/* 首装密码空警告:与 .login-err 同档暖色块,不破裸表单极简 */
+.pwd-warn{display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px 12px;border-radius:10px;
+  background:oklch(72% 0.12 70 / 0.10);font:500 12px/1.5 Inter,"PingFang SC",sans-serif;color:var(--warm)}
+
+/* 庆祝粒子画布:固定在卡片内部,粒子不出窗 */
+#fx{position:absolute;inset:0;z-index:15;pointer-events:none;border-radius:22px}
+
+/* 后台胶囊 / 任务栏 / 演示 */
+.pill{position:fixed;right:22px;bottom:60px;z-index:50;display:none;align-items:center;gap:10px;
+  padding:10px 16px 10px 12px;border-radius:99px;cursor:pointer;
+  background:oklch(20% 0.01 295 / .78);backdrop-filter:blur(24px);
+  border:1px solid oklch(100% 0 0 / 0.12);
+  box-shadow:0 12px 32px oklch(0% 0 0 / 0.4);font-size:13px;color:oklch(88% 0.005 295)}
+.pill.on{display:flex}
+.pill .mini{width:26px;height:26px}
+.taskbar{position:fixed;left:0;right:0;bottom:0;height:48px;z-index:40;
+  display:flex;align-items:center;justify-content:center;
+  background:oklch(28% 0.02 265 / 0.55);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border-top:1px solid oklch(100% 0 0 / 0.08)}
+body.backdrop-black .taskbar{display:none}
+.tb-center{display:flex;align-items:center;gap:10px}
+.tb-start{width:34px;height:34px;border-radius:8px;display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:9px}
+.tb-start i{background:oklch(78% 0.11 255);border-radius:2px}
+.tb-search{width:150px;height:32px;border-radius:16px;background:oklch(100% 0 0 / 0.09);
+  display:flex;align-items:center;gap:8px;padding:0 14px;
+  font:500 11px/1 Inter,"PingFang SC",sans-serif;color:oklch(85% 0.005 265)}
+.tb-search i{width:11px;height:11px;border:1.5px solid oklch(85% 0.005 265);border-radius:50%}
+.tb-app{width:30px;height:30px;border-radius:7px;background:oklch(100% 0 0 / 0.10)}
+.tb-clock{position:absolute;right:16px;text-align:right;font:500 11px/1.5 Inter,sans-serif;color:oklch(88% 0.005 265)}
+.demo{position:fixed;left:22px;bottom:60px;z-index:50;display:flex;gap:6px;flex-wrap:wrap;max-width:460px}
+.demo button{padding:6px 11px;border:1px dashed oklch(55% 0.01 295 / .55);border-radius:99px;
+  background:oklch(20% 0.01 295 / .72);color:oklch(85% 0.005 295);
+  font:500 11px/1 Inter,"PingFang SC",sans-serif;cursor:pointer}
+.demo button:hover{color:#fff;border-color:oklch(70% 0.005 295)}
+.demo .cap{width:100%;font:500 10px/1 Inter,sans-serif;letter-spacing:.12em;
+  text-transform:uppercase;color:oklch(70% 0.005 295);margin-bottom:2px;opacity:.8}
+
+@media (prefers-reduced-motion: reduce){
+  *{transition:none !important;animation:none !important}
+  .s-line{opacity:1!important;transform:none!important}
+  .v-success-stage{opacity:1!important}
+  .bot-success{opacity:1!important}
+  #boot-bot,#boot-bot-greet-ok,#boot-bot-greet-main{animation:none !important;opacity:1!important;transform:none!important}
+}
+</style>
+</head>
+<body class="backdrop-win11">
+
+<div class="window" id="win">
+  <div class="titlebar">
+    <span class="name" onclick="goDaily()" title="回到主页">桂桂 / GuiGui</span>
+    <span class="tag">自动登录校园网</span>
+    <span class="spacer"></span>
+    <button class="tbtn" onclick="minimize()" title="后台静默">–</button>
+    <button class="tbtn" onclick="closeWin()" title="后台静默">×</button>
+  </div>
+
+  <div class="body">
+
+    <!-- 开机仪式(首次/等网络共用) -->
+    <div class="v on" id="v-boot">
+      <div class="bot bot-boot" id="boot-bot" data-state="sleep" data-size="140"></div>
+      <div class="boot-cap" id="boot-cap">桂桂伸了个懒腰,正在检查网络…</div>
+    </div>
+
+    <!-- 首次配置页:一键开启,密码事后温柔补 -->
+    <div class="v" id="v-ok">
+      <div class="greet">
+        <div class="bot bot-greet" id="boot-bot-greet-ok" data-state="happy" data-size="58"></div>
+        <div>
+          <h1 class="g">早上好。</h1>
+          <p class="tagline">校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好</p>
+        </div>
+      </div>
+      <div class="status ok"><span class="dot"></span><span>Campus-WiFi · 已连上 · 学号已识别 ✓</span></div>
+      <div class="f"><label>学号</label><input id="f-sid" value="2025000000001" placeholder="请输入学号" autocomplete="username"></div>
+      <div class="f"><label>密码</label>
+        <div class="pw-wrap"><input type="password" id="f-pwd" placeholder="请输入密码" autocomplete="new-password">
+          <button type="button" class="pw-eye" onclick="togglePw('f-pwd',this)" title="显示 / 隐藏密码">
+            <svg class="i-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
+            <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><path d="M4 4l16 16"/></svg>
+          </button></div>
+        <div class="pwd-warn" id="pwd-warn" style="display:none"><span>⚠</span><span>密码还没填呢</span></div></div>
+      <button class="btn" onclick="enableDaily()">开启每日自动登录</button>
+    </div>
+
+    <!-- 登录表单 -->
+    <div class="v" id="v-login">
+      <button class="back" onclick="backFrom('v-login')">‹ 返回</button>
+      <h1 style="font-size:22px">登录校园网。</h1>
+      <p class="lede">连上了校园网,还没登录。填一次,以后每天都是桂桂的事:</p>
+      <div class="status warn"><span class="dot"></span><span>Campus-WiFi · 未认证</span></div>
+      <div class="micro-line" id="login-err" style="display:none"><span style="color:var(--warm)">⚠ 上次登录被拒:密码可能改过了,改下面的密码再点一次</span></div>
+      <div class="f"><label>学号</label><input value="2025000000001" autocomplete="username"></div>
+      <div class="f"><label>密码</label>
+        <div class="pw-wrap"><input type="password" id="f-pwd-login" value="100001" autocomplete="new-password">
+          <button type="button" class="pw-eye" onclick="togglePw('f-pwd-login',this)" title="显示 / 隐藏密码">
+            <svg class="i-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
+            <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><path d="M4 4l16 16"/></svg>
+          </button></div></div>
+      <button class="btn" onclick="loginNow()">立即登录</button>
+    </div>
+
+    <!-- 登录成功(庆祝页)— bot 弹入 + 文字逐行浮入 + 卡片光晕脉冲 + 彩带 3 波 -->
+    <div class="v" id="v-success">
+      <div class="v-success-stage">
+        <div class="bot bot-success" data-state="complete" data-size="140"></div>
+        <h1 class="s-line s-1">以后每天都会自动帮你登好。</h1>
+        <p class="lede s-line s-2" id="success-time">明早 07:00 开始。现在关掉就行。</p>
+        <div class="micro-line s-line s-3">到点就登，你不用管。</div>
+        <button class="btn s-line s-4" style="max-width:220px;margin:16px auto 0" onclick="backFrom('v-success')">完成,回主页</button>
+        <button class="link s-line s-5" style="display:block;width:fit-content;margin:10px auto 0" onclick="openDetail('v-settings')">高级设置</button>
+      </div>
+    </div>
+
+    <!-- 不可达引导 -->
+    <div class="v" id="v-guide">
+      <button class="back" onclick="backFrom('v-guide')">‹ 返回</button>
+      <h1 style="font-size:22px">这条路今天不通。</h1>
+      <p class="lede">到认证服务器的路连不上,桂桂帮你查:</p>
+      <div class="status warn"><span class="dot"></span><span>10.1.2.3 · 不可达</span></div>
+      <div class="micro-line">① 当前连的是「iphone17 pro max」,像热点。挑一个校园网:</div>
+      <div class="ssid" onclick="pickWifi(this)"><span class="n">Campus-WiFi</span><span class="q">信号强</span></div>
+      <div class="ssid" onclick="pickWifi(this)"><span class="n">Campus-5G</span><span class="q">信号中</span></div>
+      <div class="ssid" onclick="pickWifi(this)"><span class="n">eduroam</span><span class="q">信号弱</span></div>
+      <div class="micro-line" style="margin-top:10px">② 已是校园网仍不通?可能维护中,<a href="javascript:void(0)" onclick="bootWait()" style="color:inherit">重新检测</a></div>
+      <button class="link" onclick="openDetail('v-login')">③ 先填资料,连上后桂桂自动帮你登录</button>
+    </div>
+
+    <!-- 日常主页:体检卡(bot 在 .greet 内 flex 第一位) -->
+    <div class="v" id="v-main">
+      <div class="greet">
+        <div class="bot bot-greet" id="boot-bot-greet-main" data-state="happy" data-size="58"></div>
+        <div>
+          <h1 class="g" id="main-h1">早上好。</h1>
+          <p class="say" id="main-lede">网的事交给我,你放心忙~</p>
+        </div>
+      </div>
+      <div class="status warn" id="main-status" style="display:none"><span class="dot"></span><span id="main-status-text"></span></div>
+
+      <div style="height:10px"></div>
+      <div class="row"><div><div class="t">自动登录</div>
+        <div class="d" id="auto-desc">明早 07:00 替你登 · 提前 30 分钟开始试</div></div>
+        <span class="sw on" id="sw-auto" onclick="toggleAuto()"></span></div>
+      <div class="row"><div><div class="t">网络</div>
+        <div class="d" id="main-net">已连上 Campus-WiFi ✓</div></div></div>
+      <div class="row"><div><div class="t">昨晚</div>
+        <div class="d">07:00 第一次就登好了 ✓</div></div></div>
+
+      <button class="btn quiet" id="main-btn" onclick="quickLogin()">立即重新登录</button>
+      <button class="link" style="display:block;width:fit-content;margin-top:10px;font-size:12px" onclick="openDetail('v-settings')">高级设置</button>
+
+      <div class="log">
+        <div><span class="ts">07:00:01</span><span class="ok">[OK]</span> 网络可达</div>
+        <div><span class="ts">07:00:02</span><span class="ok">[OK]</span> 已登录 · 2025…7209</div>
+        <div><span class="ts">07:00:03</span>今天到这就下班啦 ☕</div>
+        <div class="hist"><a href="javascript:void(0)" onclick="openDetail('v-log')">历史日志 →</a></div>
+      </div>
+    </div>
+
+    <!-- 历史日志(新增:主页内嵌日志保留,这里看每天的历史) -->
+    <div class="v" id="v-log">
+      <button class="back" onclick="backFrom('v-log')">‹ 返回</button>
+      <h1 style="font-size:22px">历史日志。</h1>
+      <p class="lede">桂桂每天做了什么,都在这里:</p>
+      <div class="day"><div class="day-h">今天</div>
+        <div class="log">
+          <div><span class="ts">07:00:01</span><span class="ok">[OK]</span> 网络可达</div>
+          <div><span class="ts">07:00:02</span><span class="ok">[OK]</span> 已登录 · 2025…7209</div>
+          <div><span class="ts">07:00:03</span>今天到这就下班啦 ☕</div>
+        </div></div>
+      <div class="day"><div class="day-h">昨天 · 8月29日</div>
+        <div class="log">
+          <div><span class="ts">06:55:02</span><span class="ok">[OK]</span> 开门即试,一次登好 ✓</div>
+        </div></div>
+      <div class="day"><div class="day-h">8月28日 · 假期静默</div>
+        <div class="log">
+          <div><span class="ts">07:00:01</span>连不上,今天先不打扰,明天再试一次</div>
+        </div></div>
+      <div class="day"><div class="day-h">8月27日 · 假期静默</div>
+        <div class="log">
+          <div><span class="ts">07:00:01</span>连不上,今天先不打扰,明天再试一次</div>
+        </div></div>
+    </div>
+
+    <!-- 高级设置(按使用频率排序:核心 → 保底 → 系统 → 进阶) -->
+    <div class="v" id="v-settings">
+      <button class="back" onclick="backFrom('v-settings')">‹ 返回</button>
+      <h1 style="font-size:22px">高级设置</h1>
+
+      <div class="tiny-label">每日自动登录</div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:2px 0 4px">
+        <div class="time-input">
+          <input id="ct-h" inputmode="numeric" maxlength="2" value="07" aria-label="小时">
+          <span class="colon">:</span>
+          <input id="ct-m" inputmode="numeric" maxlength="2" value="00" aria-label="分钟">
+        </div>
+        <div class="presets">
+          <button class="preset" data-t="06:45">06:45</button>
+          <button class="preset on" data-t="07:00">07:00</button>
+          <button class="preset" data-t="07:30">07:30</button>
+          <button class="preset" data-t="08:00">08:00</button>
+        </div>
+      </div>
+      <div class="micro-line">直接输入,或点常用时间 · 校园网 06:50 才开门 · 我提前 30 分钟开始试,登好就收工</div>
+      <div class="row"><div><div class="t">开机时补登录</div><div class="d">开机或重新登录系统时,桂桂顺手登一次</div></div>
+        <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="row"><div><div class="t">窗口内重试间隔</div><div class="d">登上就停,不浪费探测</div></div>
+        <div class="dd"><button class="dd-btn"><span class="dd-label">5 分钟</span><span class="car">▼</span></button>
+          <div class="dd-menu"><button class="on">5 分钟 <span class="ck">✓</span></button><button>10 分钟 <span class="ck">✓</span></button><button>15 分钟 <span class="ck">✓</span></button></div></div></div>
+
+      <div class="tiny-label">保底机制</div>
+      <div class="row"><div><div class="t">WiFi 兜底</div><div class="d">认证服务器连不上时,自动切到下面选的网络</div></div>
+        <div class="sw" id="sw-fallback" onclick="toggleFallback()"></div></div>
+      <div id="fallback-pick" style="display:none;padding:6px 0 2px">
+        <div class="ssid sel-pick on"><span class="n">Campus-WiFi</span><span class="q" data-orig="信号强">信号强</span></div>
+        <div class="ssid sel-pick"><span class="n">Campus-5G</span><span class="q" data-orig="信号中">信号中</span></div>
+        <div class="ssid sel-pick"><span class="n">eduroam</span><span class="q" data-orig="信号弱">信号弱</span></div>
+        <div class="micro-line">扫到的网络点一下即选,不用手填名字</div>
+      </div>
+      <div class="row"><div><div class="t">白天巡逻</div><div class="d">白天意外断网时,自动悄悄重连</div></div>
+        <div class="sw" onclick="this.classList.toggle('on')"></div></div>
+      <div class="row"><div><div class="t">巡逻间隔</div><div class="d">断网后每 N 分钟试一次</div></div>
+        <div class="dd"><button class="dd-btn"><span class="dd-label">30 分钟</span><span class="car">▼</span></button>
+          <div class="dd-menu"><button>15 分钟 <span class="ck">✓</span></button><button class="on">30 分钟 <span class="ck">✓</span></button><button>60 分钟 <span class="ck">✓</span></button></div></div></div>
+      <div class="row"><div><div class="t">睡眠唤醒补登录</div><div class="d">合盖再打开 30 秒后补一次(笔记本推荐)</div></div>
+        <div class="sw" onclick="this.classList.toggle('on')"></div></div>
+      <div class="row"><div><div class="t">假期静默</div><div class="d">连续 2 天连不上(放假回家了?),自动降为每天 1 次、不打扰</div></div>
+        <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+
+      <div class="tiny-label">系统</div>
+      <div class="row"><div><div class="t">弹通知</div><div class="d">断网恢复、登录失败时才说,平时不打扰</div></div>
+        <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="row"><div><div class="t">显示桂桂</div><div class="d">关掉后主页不再显示小桂桂,功能不受影响</div></div>
+        <div class="sw on" id="sw-gui" onclick="toggleGui(this)"></div></div>
+      <div class="row"><div><div class="t">后台自动化</div><div class="d">总开关:关掉后桂桂就退休,不再自动登录(与主页开关同步)</div></div>
+        <div class="sw on" id="sw-auto-set" onclick="toggleAuto()"></div></div>
+
+      <div class="tiny-label">进阶</div>
+      <div class="row"><div><div class="t">登录失败重试</div><div class="d">单轮登录失败后,再试几回</div></div>
+        <div class="dd"><button class="dd-btn"><span class="dd-label">3 次</span><span class="car">▼</span></button>
+          <div class="dd-menu"><button>1 次 <span class="ck">✓</span></button><button class="on">3 次 <span class="ck">✓</span></button><button>5 次 <span class="ck">✓</span></button></div></div></div>
+      <div class="row"><div><div class="t">重试间隔</div><div class="d">每次失败后歇一歇再试</div></div>
+        <div class="dd"><button class="dd-btn"><span class="dd-label">5 秒</span><span class="car">▼</span></button>
+          <div class="dd-menu"><button class="on">5 秒 <span class="ck">✓</span></button><button>10 秒 <span class="ck">✓</span></button><button>30 秒 <span class="ck">✓</span></button></div></div></div>
+      <div style="height:8px"></div>
+    </div>
+
+  </div>
+
+  <!-- 庆祝粒子画布(裁剪在卡片内) -->
+  <canvas id="fx"></canvas>
+</div>
+
+<!-- 后台胶囊 -->
+<div class="pill" id="pill" onclick="restore()">
+  <svg class="mini" viewBox="0 0 120 120"><path fill="oklch(62% 0.01 295)" d="M60,12 C90,12 106,32 106,62 C106,92 90,108 60,108 C30,108 14,92 14,62 C14,32 30,12 60,12 Z"/><path d="M34,58 Q43,65 52,58 M68,58 Q77,65 86,58" fill="none" stroke="oklch(97% 0.005 295)" stroke-width="5" stroke-linecap="round"/></svg>
+  <span id="pill-text">桂桂在后台静默运行 · 点击打开</span>
+</div>
+
+<!-- 舞台道具:Win11 任务栏(仅预览) -->
+<div class="taskbar">
+  <div class="tb-center">
+    <div class="tb-start"><i></i><i></i><i></i><i></i></div>
+    <div class="tb-search"><i></i>搜索</div>
+    <div class="tb-app"></div><div class="tb-app"></div><div class="tb-app"></div>
+  </div>
+  <div class="tb-clock"><div id="tb-time">--:--</div><div id="tb-date"></div></div>
+</div>
+
+<!-- 演示脚手架 -->
+<div class="demo">
+  <div class="cap">演示 · 仅原型脚手架</div>
+  <button onclick="setBackdrop('win11')">背景·Win11</button>
+  <button onclick="setBackdrop('black')">背景·纯黑</button>
+  <button onclick="firstRun('ok')">首次仪式</button>
+  <button onclick="firstRun('out')">首次·掉线</button>
+  <button onclick="firstRun('down')">首次·不可达</button>
+  <button onclick="bootWait()">开机太快·等网络</button>
+  <button onclick="goDaily()">日常主页</button>
+  <button onclick="wakeProblem('out')">日常·掉线了</button>
+  <button onclick="wakeProblem('down')">日常·不可达</button>
+  <button onclick="loginError()">密码错误</button>
+</div>
+
+<!-- 桂桂 bot 组件来自 bumbum55/noteai-bot(MIT,见 vendor/noteai-bot/LICENSE);
+     此声明仅保留在源码中(对外发布网页/产品页另放),运行时不渲染到 UI -->
+<script src="vendor/noteai-bot/xiaojiang-motion.js"></script>
+<script src="vendor/confetti.browser.min.js"></script>
+<script>
+const win=document.getElementById('win');
+const $=id=>document.getElementById(id);
+const views=['v-boot','v-ok','v-login','v-success','v-guide','v-main','v-settings','v-log'];
+let mainState='ok',configured=false,hasPwd=false;
+const origin={};   /* 详情视图来路:返回必回原处 */
+/* 触发时间:从 v-settings 时间输入/药丸同步,主页 desc 与庆祝页 lede 都读这个值(报告 1.4) */
+let currentTriggerTime='07:00';
+function formatTriggerTime(h,m){return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
+function renderTriggerTime(){
+  const h=parseInt($('ct-h').value,10),m=parseInt($('ct-m').value,10);
+  if(!isNaN(h)&&!isNaN(m))currentTriggerTime=formatTriggerTime(h,m);
+}
+
+/* 桂桂 bot 状态映射:5 状态 → noteai 的内部状态机
+   sleep↔sleep / idle↔idle / happy↔complete(眯弯月+心跳消失) / sad↔thinking / cry↔angry(哭) */
+const MOOD2STATE={sleep:'sleep',idle:'idle',happy:'complete',sad:'thinking',cry:'angry'};
+const STATE2MOOD={sleep:'sleep',idle:'idle',complete:'happy',thinking:'sad',angry:'cry'};
+/* 我们的 OKLCH 紫染白配色 → noteai 的紫蓝渐变 + 眼色 + 心跳色 */
+const BOT_PALETTE={
+  faceTop:'oklch(45% 0.13 295)',     /* 紫蓝渐变顶 */
+  faceBottom:'oklch(20% 0.08 295)',  /* 深紫底 */
+  eyes:'oklch(98% 0.005 295)',       /* 眼白 紫染 */
+  pulse:'oklch(72% 0.14 330)'        /* 心跳粉 */
+};
+/* bot 实例映射:每个 .bot 容器对应一个 XiaojiangMotion */
+const bots={};
+/* 初始化单个 bot */
+function initBot(el,opts){
+  const XJ=globalThis.XiaojiangMotion;
+  if(!XJ){el.textContent='';return null}
+  const size=parseInt(el.dataset.size||'64',10);
+  const state=el.dataset.state||'idle';
+  const inst=new XJ(el,{
+    size,state,followPointer:true,motionScale:1.4,
+    faceTop:BOT_PALETTE.faceTop,faceBottom:BOT_PALETTE.faceBottom,
+    eyes:BOT_PALETTE.eyes,pulse:BOT_PALETTE.pulse
+  });
+  bots[el.id||Math.random().toString(36).slice(2)]=inst;
+  return inst;
+}
+function setBotState(el,state){const b=bots[el.id];if(b)b.setState(state)}
+/* 给定 selector 设置所有匹配 bot 的状态(情绪联动) */
+function setAllBots(mood){
+  const state=MOOD2STATE[mood];if(!state)return;
+  Object.values(bots).forEach(b=>b.setState(state));
+}
+/* 通用 mood:更新所有 bot 状态 + 触发容器 pop 反馈 */
+function mood(el,m){
+  el.dataset.mood=m;
+  el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop');
+  setBotState(el,MOOD2STATE[m]||'idle');
+}
+function currentView(){return views.find(v=>$(v).classList.contains('on'))||'v-main'}
+/* 视图切换:旧 view fadeout(0.25s)→ display:none;新 view 延后 250ms 出现 fadein */
+function show(id){
+  const cur=views.map(v=>$(v)).find(v=>v.classList.contains('on'));
+  const next=$(id);if(cur===next)return;
+  if(cur){
+    cur.classList.add('leaving');
+    setTimeout(()=>cur.classList.remove('on','leaving'),250);
+    setTimeout(()=>{next.classList.add('on')},cur?250:0);
+  }else{next.classList.add('on')}
+}
+/* 来路栈:首次进入时记录,返回后清除(报告 5.5);不再每次覆盖 */
+function openDetail(id){if(!(id in origin))origin[id]=currentView();show(id)}
+function backFrom(id){const dest=origin[id]||'v-main';delete origin[id];if(dest==='v-main')renderMain();show(dest);greet();document.body.classList.remove('setup')}
+function greetText(){const h=new Date().getHours();return h<11?'早上好':(h<18?'下午好':'晚上好')}
+function greet(){const g=greetText()+'。';
+  document.querySelectorAll('.g').forEach(e=>{if(e.id!=='main-h1')e.textContent=g})}
+
+/* 首次仪式:完整苏醒典礼;结束时按网络体检三分流(首装单行道,各落地页无返回) */
+/* 仪式只用 .entering 触发 pop 入场(0.55s) + mood 切换;无 transform 平移、无 .centered、无 reinitBot
+   boot-bot 永远 140x140(grid 居中),greet-bot 在主页 flex 内嵌 58x58 — 互不干扰 */
+function firstRun(state){
+  mainState=state||'ok';
+  document.body.classList.add('setup');
+  const b=$('boot-bot');
+  $('boot-cap').textContent='桂桂伸了个懒腰,正在检查网络…';
+  b.dataset.mood='sleep';
+  b.classList.add('entering');
+  show('v-boot');
+  setTimeout(()=>{b.classList.remove('entering')},900);
+  setTimeout(()=>{mood(b,mainState==='ok'?'idle':(mainState==='out'?'sad':'cry'))},700);
+  setTimeout(goSetup,1500);
+}
+/* reinitBot 已废弃 — 两个 bot 各有独立 DOM,size 在 HTML 写死,不需要中途重建 SVG */
+/* 开机等网络:无典礼(每天开机都走),桂桂睡着在门口等,就绪直接落日常页 */
+function bootWait(){
+  mainState='ok';document.body.classList.remove('setup');
+  const b=$('boot-bot');
+  b.dataset.mood='sleep';b.classList.add('entering');
+  setTimeout(()=>{b.classList.remove('entering')},900);
+  $('boot-cap').innerHTML='校园网 06:50 才开门,桂桂在门口等着…<br><span style="font-size:11px;opacity:.7">每 30 秒看一次,开了就替你登好</span>';
+  show('v-boot');
+  setTimeout(()=>$('boot-cap').textContent='门开了,桂桂进去了…',2200);
+  setTimeout(goDaily,3200);
+}
+function goSetup(){
+  if(mainState==='out')show('v-login');
+  else if(mainState==='down')show('v-guide');
+  else show('v-ok');
+  greet();
+  /* 不再做 .centered/.dock-in 归位动画 — 目标视图的 greet-bot 已在 .greet 内自然显示
+     v-boot 走 .leaving 自动隐藏,目标 view 走 .on 触发 fadein */
+}
+/* 日常主页:渲染当前状态 + 密码补填提示 */
+function goDaily(){
+  document.body.classList.remove('setup');
+  renderMain();show('v-main');greet();
+}
+/* 状态即标题:出问题时,页面最大的字直接说这件事(不靠装饰条) */
+function renderMain(){
+  const gb=document.querySelector('#boot-bot-greet-main');
+  const vm=$('v-main');
+  vm.classList.toggle('st-warn',mainState==='out');
+  vm.classList.toggle('st-down',mainState==='down');
+  $('main-h1').textContent=mainState==='out'?'呜,刚才掉线了。':(mainState==='down'?'现在连不上校园网。':greetText()+'。');
+  const st=$('main-status');
+  st.style.display=mainState==='ok'?'none':'flex';
+  st.className='status '+(mainState==='down'?'danger':'warn');
+  $('main-status-text').textContent=mainState==='out'?'校园网 · 刚刚掉线了':'认证服务器 · 不可达';
+  if(mainState==='ok'){mood(gb,'idle');
+    $('main-lede').textContent='网的事交给我,你放心忙~';
+    $('main-net').textContent='已连上 Campus-WiFi ✓';$('main-btn').textContent='立即重新登录'}
+  else if(mainState==='out'){mood(gb,'sad');
+    $('main-lede').textContent='刚才网断了一下,别担心,登一下就回来。';
+    $('main-net').textContent='校园网 · 还没登录';$('main-btn').textContent='立即登录'}
+  else{mood(gb,'cry');
+    $('main-lede').textContent='现在够不着校园网,我陪你查查看。';
+    $('main-net').textContent='10.1.2.3 · 连不上';$('main-btn').textContent='去排查'}
+}
+function wakeProblem(kind){mainState=kind;goDaily()}
+/* 自动登录总开关:主页与设置页双向同步,关=桂桂睡觉(状态由开关自己表达,文字只讲服务) */
+function setAuto(on){
+  ['sw-auto','sw-auto-set'].forEach(id=>{const s=$(id);if(s)s.classList.toggle('on',on)});
+  const d=$('auto-desc');
+  if(d)d.textContent=on?'明早 '+currentTriggerTime+' 替你登 · 提前 30 分钟开始试':'已关 · 想让我开工随时说';
+  if($('v-main').classList.contains('on')){
+    mood(document.querySelector('#boot-bot-greet-main'),on?'idle':'sleep');
+    $('main-lede').textContent=on?'网的事交给我,你放心忙~':'好,我先歇着,想我了再开。';
+  }
+}
+function toggleAuto(){setAuto(!$('sw-auto').classList.contains('on'))}
+/* 密码小眼睛:明文核对 */
+function togglePw(id,btn){
+  const inp=$(id);const showPw=inp.type==='password';
+  inp.type=showPw?'text':'password';btn.classList.toggle('off',!showPw);
+}
+/* 自定义时间:两位一格直接键入,自动跳格 + 范围约束(比滚轮快,比原生控件美)
+   注:同一份监听器在文件下方"自定义时间"段又重复注册了一次(原代码遗留),已合并到单点;
+   这里仅保留 mainAction,详见下方唯一一份 ct-h/ct-m 监听。 */
+function mainAction(){
+  if(mainState==='ok'){quickLogin()}
+  else if(mainState==='out'){openDetail('v-login')}
+  else{openDetail('v-guide')}
+}
+/* 主页上的重登:就地反馈,不跳庆祝页(庆祝只属于首次/修复成功) */
+function quickLogin(){
+  const gb=document.querySelector('#boot-bot-greet-main');
+  mood(gb,'happy');
+  $('main-lede').textContent='刚刚把网帮你接回来啦 ✓';
+}
+/* 流程动作 */
+/* 庆祝页入场:重新给 stage 加 .in class 触发 CSS animation(display:none→block 不会自动重启动画) */
+function showSuccess(){
+  renderTriggerTime();   /* 同步最新触发时间,避免 lede 写死 07:00 */
+  const lede=$('success-time');
+  if(lede)lede.innerHTML='明早 '+currentTriggerTime+' 开始。现在关掉就行。';
+  show('v-success');
+  const stage=document.querySelector('#v-success .v-success-stage');
+  if(stage){
+    stage.classList.remove('in');
+    void stage.offsetWidth;  /* 强制 reflow */
+    stage.classList.add('in');
+  }
+  greet();party();
+}
+/* 交钥匙即开启:密码必填,为空只给一句温柔提醒 */
+function enableDaily(){
+  if(!$('f-pwd').value.trim()){$('pwd-warn').style.display='block';return}
+  configured=true;hasPwd=true;showSuccess()
+}
+function loginNow(){configured=true;hasPwd=true;$('login-err').style.display='none';showSuccess()}
+function pickWifi(el){
+  el.classList.add('on');
+  setTimeout(()=>{openDetail('v-login')},550);
+}
+/* 登录失败:内联提示(不再单独占一页) */
+function loginError(){openDetail('v-login');greet();$('login-err').style.display='block'}
+/* 庆祝粒子:canvas-confetti 颜文字模式;画布在卡片内,vendor 本地加载(不依赖网络) */
+/* 庆祝粒子:canvas-confetti 颜文字模式,3 波分散在 1.1s 内 */
+function party(){
+  if(typeof confetti!=='function')return;
+  const cv=document.getElementById('fx');
+  cv.width=win.clientWidth;cv.height=win.clientHeight;
+  const fx=confetti.create(cv,{resize:false,useWorker:false});
+  const kao=confetti.shapeFromText({text:'~(￣▽￣)',scalar:2});
+  const heart=confetti.shapeFromText({text:'♥',scalar:1.5});
+  const base={shapes:[kao,heart],colors:['#7c3aed','#c4b5fd','#f0abfc','#fbcfe8'],
+    scalar:1.8,spread:70,startVelocity:40,ticks:180};
+  /* 第 1 波(t=0):从 bot 位置向两侧喷,30 个 */
+  fx({...base,particleCount:18,angle:60,origin:{x:.38,y:.36}});
+  fx({...base,particleCount:18,angle:120,origin:{x:.62,y:.36}});
+  /* 第 2 波(t=400ms):卡片中心向左右扩散,22 个 */
+  setTimeout(()=>{
+    fx({...base,particleCount:11,angle:90,spread:120,startVelocity:32,origin:{x:.5,y:.5}});
+    fx({...base,particleCount:11,angle:90,spread:60,startVelocity:48,origin:{x:.3,y:.5}});
+    fx({...base,particleCount:11,angle:90,spread:60,startVelocity:48,origin:{x:.7,y:.5}});
+  },400);
+  /* 第 3 波(t=900ms):底部升起的小花,18 个 */
+  setTimeout(()=>{
+    fx({...base,particleCount:18,angle:270,spread:160,startVelocity:28,origin:{x:.5,y:.9},
+        scalar:1.2,colors:['#fbcfe8','#f0abfc','#a78bfa']});
+  },900);
+}
+/* 高级设置 */
+function toggleFallback(){
+  const sw=$('sw-fallback'),p=$('fallback-pick');
+  sw.classList.toggle('on');
+  p.style.display=sw.classList.contains('on')?'block':'none';
+}
+function toggleGui(sw){
+  sw.classList.toggle('on');
+  document.body.classList.toggle('hide-gui',!sw.classList.contains('on'));
+}
+document.querySelectorAll('.sel-pick').forEach(el=>el.addEventListener('click',()=>{
+  document.querySelectorAll('.sel-pick').forEach(e=>{
+    e.classList.remove('on');
+    const q=e.querySelector('.q');
+    if(q&&q.dataset.orig)q.textContent=q.dataset.orig;
+  });
+  el.classList.add('on');
+  const q=el.querySelector('.q');
+  if(q&&q.dataset.orig)q.textContent=q.dataset.orig+' · 已选';
+}));
+/* 自绘下拉 */
+document.querySelectorAll('.dd').forEach(dd=>{
+  dd.querySelector('.dd-btn').addEventListener('click',e=>{
+    e.stopPropagation();
+    document.querySelectorAll('.dd.open').forEach(o=>{if(o!==dd)o.classList.remove('open')});
+    dd.classList.toggle('open');
+  });
+  dd.querySelectorAll('.dd-menu button').forEach(b=>b.addEventListener('click',e=>{
+    e.stopPropagation();
+    dd.querySelectorAll('.dd-menu button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    dd.querySelector('.dd-label').textContent=b.textContent.replace('✓','').trim();
+    dd.classList.remove('open');
+  }));
+});
+document.addEventListener('click',()=>document.querySelectorAll('.dd.open').forEach(o=>o.classList.remove('open')));
+/* 自定义时间:输入常驻,常用时间一键填充;手动键入自动跳格 + 范围约束 */
+document.querySelectorAll('.preset').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.preset').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  const t=b.dataset.t.split(':');
+  $('ct-h').value=t[0];$('ct-m').value=t[1];
+  currentTriggerTime=b.dataset.t;   /* 同步给主页 desc 与庆祝页 lede(报告 1.4) */
+  setAuto($('sw-auto').classList.contains('on'));
+}));
+['ct-h','ct-m'].forEach((id,i,arr)=>{
+  const el=$(id);
+  el.addEventListener('input',()=>{
+    el.value=el.value.replace(/\D/g,'').slice(0,2);
+    el.classList.remove('err');
+    document.querySelectorAll('.preset').forEach(x=>x.classList.remove('on'));
+    if(el.value.length===2&&i<arr.length-1)$(arr[i+1]).focus();
+    renderTriggerTime();
+    setAuto($('sw-auto').classList.contains('on'));
+  });
+  el.addEventListener('blur',()=>{
+    if(!el.value)return;
+    const max=i===0?23:59;let v=parseInt(el.value,10);
+    if(isNaN(v)||v>max){v=Math.min(isNaN(v)?0:v,max);el.classList.add('err')}
+    el.value=String(v).padStart(2,'0');
+  });
+});
+/* 窗口化:最小化/关闭时记录当前视图,恢复时回原处(报告 1.3) */
+let lastViewBeforeHide=null;
+function minimize(){$('pill-text').textContent='桂桂在后台静默运行 · 点击打开';hideWin()}
+function closeWin(){$('pill-text').textContent='桂桂已退出前台 · 后台仍每天登录 · 点击打开';hideWin()}
+function hideWin(){lastViewBeforeHide=currentView();win.classList.add('minimized');$('pill').classList.add('on')}
+function restore(){
+  const dest=lastViewBeforeHide&&lastViewBeforeHide!=='v-main'?lastViewBeforeHide:null;
+  $('pill').classList.remove('on');win.classList.remove('minimized');
+  if(dest){show(dest);greet()}
+  else{goDaily()}
+  lastViewBeforeHide=null;
+}
+/* 背景舞台 + 时钟 */
+function setBackdrop(m){document.body.className=(m==='black')?'backdrop-black':'backdrop-win11'}
+function clockTick(){const d=new Date();
+  $('tb-time').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  $('tb-date').textContent=d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate();}
+clockTick();setInterval(clockTick,10000);
+/* 进场:实例化所有 .bot 容器(XiaojiangMotion 注入 SVG) */
+function initAllBots(){document.querySelectorAll('.bot').forEach(el=>initBot(el))}
+/* 随机 gaze 调度:每 3-6 秒给所有 bot 注入一个随机 (x,y) 方向,持续 1.5s 后撤回,
+   配合库自带的 idle 呼吸 + blink,bot 看起来"活的" */
+let gazeHandle=null;
+function startRandomGaze(){
+  if(gazeHandle)return;
+  function tick(){
+    const bts=Object.values(bots);
+    if(bts.length){
+      const x=(Math.random()-0.5)*1.6;  // ±0.8(归一化 [-0.5,0.5])
+      const y=(Math.random()-0.5)*1.0;  // ±0.5
+      const dir=[x,y];
+      bts.forEach(b=>{try{b.setGaze&&b.setGaze(...dir)}catch(e){b.motion&&b.motion.gazeX&&(b.motion.gazeX.target=dir[0],b.motion.gazeY&&(b.motion.gazeY.target=dir[1]))}});
+    }
+    gazeHandle=setTimeout(tick,3000+Math.random()*3000);
+  }
+  tick();
+}
+firstRun();
+initAllBots();
+startRandomGaze();
+</script>
+</body>
+</html>

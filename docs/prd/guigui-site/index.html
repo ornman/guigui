@@ -16,7 +16,7 @@
    · 背景:流动渐变 mesh(紫/品红/蓝),光标视差
    · 能量曲线:Hero 高光 → 中段收敛 → 信号二高潮 → 收敛 → 按钮焦点
        Fig.00 Hero  — 高光① 点阵网格,光标排斥 + 点亮
-       Fig.01 用法   — 四步 walkthrough(时间轴脊柱),静音信号丝背景
+       Fig.01 用法   — 极简四步(编号+短标题+一句话)+ 真实 PRD 原型横板分栏
        Fig.02 触发器 — 无背景 canvas,行 hover 高亮即内容交互
        Fig.03 信号   — 高光② 电磁波全案 · 光标即波源:波在光标处隆起、
                         被拉向光标,光标持续发涟漪,点击脉冲爆发
@@ -318,8 +318,9 @@ section.sc > canvas.scene{
   background:rgba(109,77,232,0.07);
   box-shadow:0 0 0 5px rgba(109,77,232,0.05);
 }
-.step-body h3{font-family:var(--serif);font-size:23px;font-weight:500;letter-spacing:-.015em;padding-top:6px}
-.step-body p{font-size:14.5px;color:var(--ink-2);line-height:1.7;margin-top:8px;max-width:56ch}
+.step-body h3{font-family:var(--serif);font-size:26px;font-weight:500;letter-spacing:-.015em;padding-top:4px}
+/* 动作行:每步唯一的一句话,主色,直给 */
+.step-body .act{font-size:15.5px;color:var(--ink);line-height:1.6;margin-top:6px}
 /* 界面小道具:与每步内容绑定的迷你组件 */
 .step-prop{
   margin-top:14px;display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;
@@ -356,6 +357,28 @@ section.sc > canvas.scene{
 }
 .step-log .t{color:#7A7294;margin-right:8px}
 .step-log .ok{color:#A99BFF}
+
+/* Fig.01 横板分栏:左步骤 walkthrough + 右真实 PRD 原型 */
+.usage-split{display:grid;grid-template-columns:minmax(0,1fr) 620px;gap:52px;align-items:start}
+.prd-frame{
+  position:sticky;top:90px;
+  border-radius:18px;overflow:hidden;
+  border:1px solid var(--line-2);background:#0B0A0F;
+  box-shadow:0 24px 60px rgba(36,31,51,0.20);
+}
+.prd-frame .bar{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+  background:#17131F;border-bottom:1px solid rgba(255,255,255,0.08);
+  font-family:var(--mono);font-size:10.5px;color:#8B85A0;letter-spacing:.05em;
+}
+.prd-frame .bar .dots{display:flex;gap:6px}
+.prd-frame .bar .dots span{width:8px;height:8px;border-radius:50%;border:1px solid rgba(255,255,255,0.22)}
+.prd-frame .bar .ttl{flex:1;text-align:right;font-style:italic;color:#A7A1B8}
+.prd-frame iframe{display:block;width:100%;height:800px;border:0;background:#0B0A0F}
+.prd-cap{
+  margin-top:12px;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);
+  letter-spacing:.05em;text-align:center;line-height:1.7;
+}
 
 /* ═══ Fig.02 触发器(玻璃面板内) ═══ */
 .ft-rows{padding:8px 36px}
@@ -485,6 +508,8 @@ section.sc > canvas.scene{
 
 /* ═══ 响应式 ═══ */
 @media (max-width: 1120px){
+  .usage-split{grid-template-columns:1fr}
+  .prd-frame{position:static}
   .hero{padding-top:56px}
   .hero-grid{grid-template-columns:1fr;gap:48px}
   .win-stage{width:min(468px,100%)}
@@ -623,60 +648,71 @@ section.sc > canvas.scene{
   </div>
 </section>
 
-<!-- ═══ Fig.01 用法 · 四步 walkthrough(时间轴脊柱)+ 静音信号丝背景 ═══ -->
+<!-- ═══ Fig.01 用法 · 横板分栏:左极简四步 + 右真实 PRD 原型(可交互) ═══ -->
 <section class="sc" id="fig-01" data-scene="threads">
   <canvas class="scene" aria-hidden="true"></canvas>
   <div class="wrap">
     <div class="sec-head">
       <div class="fig-label"><b>Fig. 01</b><br>How to use<br>· 4 步</div>
       <div>
-        <h2 class="rv">四步,从下载到安静运行。</h2>
-        <p class="lede rv">只有第二步需要你输入信息,其余都是桂桂的事。</p>
+        <h2 class="rv">四步,之后不用管。</h2>
+        <p class="lede rv">右边就是真实界面,点底部按钮可切换场景。</p>
       </div>
     </div>
-    <div class="panel rv">
-      <ol class="steps">
-        <li class="step">
-          <div class="step-node">01</div>
-          <div class="step-body">
-            <h3>下载安装</h3>
-            <p>32 MB 单文件,双击安装到用户目录,不需要管理员权限,无捆绑无后台常驻。</p>
-            <div class="step-prop"><span class="ok">$</span> guig install <span class="ok">· 32 MB · verified</span></div>
-          </div>
-        </li>
-        <li class="step">
-          <div class="step-node">02</div>
-          <div class="step-body">
-            <h3>首次配置</h3>
-            <p>连上校园 WiFi,输入学号和密码,选一个登录时间(默认 07:00),点「开启每日自动登录」。这是唯一需要动手的一步,大约 30 秒。</p>
-            <div class="step-form" aria-hidden="true">
-              <span class="fld">学号<b>2023xxxx</b></span>
-              <span class="fld">密码<b>••••••</b></span>
-              <span class="fld">时间<b>07:00</b></span>
-              <span class="go">开启每日自动登录</span>
+    <div class="usage-split">
+      <div class="panel rv">
+        <ol class="steps">
+          <li class="step">
+            <div class="step-node">01</div>
+            <div class="step-body">
+              <h3>下载安装</h3>
+              <p class="act">双击,装完。</p>
+              <div class="step-prop"><span class="ok">$</span> guig install · 32 MB</div>
             </div>
-          </div>
-        </li>
-        <li class="step">
-          <div class="step-node">03</div>
-          <div class="step-body">
-            <h3>静默运行</h3>
-            <p>到点自动登录,开电脑即在线。不弹窗、不驻托盘,只有登录失败时才通知你。</p>
-            <div class="step-prop"><span class="dot"></span>已连接 · 07:00:02 login ok · 15ms</div>
-          </div>
-        </li>
-        <li class="step">
-          <div class="step-node">04</div>
-          <div class="step-body">
-            <h3>需要时再打开</h3>
-            <p>改时间、看历史日志、临时暂停,都在同一张卡片里;关掉窗口,后台继续安静运行。</p>
-            <div class="step-log" aria-hidden="true">
-              <div><span class="t">07:00:02</span><span class="ok">✓ login ok · 15ms</span></div>
-              <div><span class="t">昨天 07:00:01</span><span class="ok">✓ login ok · 18ms</span></div>
+          </li>
+          <li class="step">
+            <div class="step-node">02</div>
+            <div class="step-body">
+              <h3>首次配置</h3>
+              <p class="act">学号、密码、时间,填一次。</p>
+              <div class="step-form" aria-hidden="true">
+                <span class="fld">学号<b>2023xxxx</b></span>
+                <span class="fld">密码<b>••••••</b></span>
+                <span class="fld">时间<b>07:00</b></span>
+                <span class="go">开启</span>
+              </div>
             </div>
+          </li>
+          <li class="step">
+            <div class="step-node">03</div>
+            <div class="step-body">
+              <h3>静默运行</h3>
+              <p class="act">之后,什么都不用做。</p>
+              <div class="step-prop"><span class="dot"></span>已连接 · 07:00:02</div>
+            </div>
+          </li>
+          <li class="step">
+            <div class="step-node">04</div>
+            <div class="step-body">
+              <h3>想改再打开</h3>
+              <p class="act">改完关掉,照样自动。</p>
+              <div class="step-log" aria-hidden="true">
+                <div><span class="t">07:00:02</span><span class="ok">✓ login ok</span></div>
+              </div>
+            </div>
+          </li>
+        </ol>
+      </div>
+      <div class="rv">
+        <div class="prd-frame">
+          <div class="bar">
+            <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="ttl">guigui-prd-v2.html</div>
           </div>
-        </li>
-      </ol>
+          <iframe src="assets/prd/index.html" title="桂桂 v2 真实界面原型,点底部演示按钮切换场景" loading="lazy"></iframe>
+        </div>
+        <div class="prd-cap">真实界面原型 · 底部按钮可切换「首次仪式 / 日常主页 / 掉线」</div>
+      </div>
     </div>
   </div>
 </section>
