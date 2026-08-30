@@ -617,18 +617,12 @@ body.backdrop-black .taskbar{display:none}
   <div class="tb-clock"><div id="tb-time">--:--</div><div id="tb-date"></div></div>
 </div>
 
-<!-- 演示脚手架 -->
+<!-- 演示脚手架(官网精简版:只留 4 个关键场景) -->
 <div class="demo">
-  <div class="cap">演示 · 仅原型脚手架</div>
-  <button onclick="setBackdrop('win11')">背景·Win11</button>
-  <button onclick="setBackdrop('black')">背景·纯黑</button>
-  <button onclick="firstRun('ok')">首次仪式</button>
-  <button onclick="firstRun('out')">首次·掉线</button>
-  <button onclick="firstRun('down')">首次·不可达</button>
-  <button onclick="bootWait()">开机太快·等网络</button>
+  <div class="cap">演示 · 点按钮切换场景</div>
+  <button onclick="firstRun('ok')">首次配置</button>
   <button onclick="goDaily()">日常主页</button>
-  <button onclick="wakeProblem('out')">日常·掉线了</button>
-  <button onclick="wakeProblem('down')">日常·不可达</button>
+  <button onclick="wakeProblem('out')">掉线了</button>
   <button onclick="loginError()">密码错误</button>
 </div>
 

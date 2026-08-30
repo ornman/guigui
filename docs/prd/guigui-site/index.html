@@ -298,110 +298,82 @@ section.sc > canvas.scene{
 .sec-head h2{max-width:24ch}
 .sec-head .lede{margin-top:14px}
 
-/* ═══ Fig.01 用法 · 四帧横向预览(产品状态快照 + 光标动效) ═══ */
-.frames{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
-.frame{position:relative;display:flex;flex-direction:column}
-.frame-win{
-  position:relative;height:330px;border-radius:16px;overflow:hidden;
-  background:
-    radial-gradient(200px 150px at 12% 0%, rgba(255,255,255,0.55), transparent 70%),
-    linear-gradient(168deg, rgba(243,241,249,0.92), rgba(224,220,238,0.84));
-  backdrop-filter:blur(20px) saturate(160%);
-  -webkit-backdrop-filter:blur(20px) saturate(160%);
-  border:1px solid rgba(255,255,255,0.9);
-  box-shadow:0 16px 40px rgba(36,31,51,0.14), inset 0 1px 0 rgba(255,255,255,0.95);
-  color:var(--win-ink);padding:14px;
-  display:flex;flex-direction:column;
-  transition:transform 300ms cubic-bezier(0.32,0.72,0,1),box-shadow 300ms ease-out;
+/* ═══ Fig.01 用法 · 左极简四步 + 右真实 PRD 原型(横板分栏) ═══ */
+.steps{padding:40px 44px 32px}
+.step{
+  display:grid;grid-template-columns:64px minmax(0,1fr);gap:30px;
+  position:relative;padding-bottom:40px;
 }
-.frame:hover .frame-win{transform:translateY(-4px);box-shadow:0 22px 52px rgba(36,31,51,0.18), inset 0 1px 0 rgba(255,255,255,0.95)}
-.frame-cap{
-  margin-top:10px;display:flex;align-items:center;gap:8px;
-  background:#1E192E;color:#B9B1D6;border-radius:10px;padding:9px 12px;
-  font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;
+.step:last-child{padding-bottom:8px}
+.step:not(:last-child)::before{
+  content:"";position:absolute;left:31px;top:52px;bottom:-4px;width:1px;
+  background:linear-gradient(180deg,rgba(109,77,232,0.35),rgba(109,77,232,0.08));
 }
-.frame-cap b{color:#fff;font-weight:500}
-/* 编号徽章 */
-.num{
-  position:absolute;top:10px;left:10px;z-index:8;
-  width:30px;height:30px;border-radius:9px;
-  background:#1E192E;color:#fff;font-family:var(--mono);font-size:12px;
+.step-node{
+  width:44px;height:44px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  box-shadow:0 6px 16px rgba(36,31,51,0.35);
+  font-family:var(--mono);font-size:13px;color:var(--accent);
+  border:1px solid rgba(109,77,232,0.45);
+  background:rgba(109,77,232,0.07);
+  box-shadow:0 0 0 5px rgba(109,77,232,0.05);
 }
-/* 02 关键帧高亮 */
-.frame.key .frame-shot img{outline:2px solid rgba(124,92,252,0.55);outline-offset:5px;border-radius:18px}
-.key-badge{
-  position:absolute;top:10px;right:10px;z-index:8;
-  padding:6px 11px;border-radius:99px;
+.step-body h3{font-family:var(--serif);font-size:26px;font-weight:500;letter-spacing:-.015em;padding-top:4px}
+.step-body .act{font-size:15.5px;color:var(--ink);line-height:1.6;margin-top:6px}
+.step-prop{
+  margin-top:14px;display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;
+  font-family:var(--mono);font-size:11.5px;color:var(--ink-2);
+  padding:9px 14px;border-radius:10px;
+  border:1px solid var(--line-2);background:rgba(255,255,255,0.5);
+  line-height:1.6;
+}
+.step-prop .ok{color:var(--accent)}
+.step-prop .dot{
+  display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);
+}
+.step-form{
+  margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+  font-family:var(--mono);font-size:11px;
+}
+.step-form .fld{
+  padding:8px 12px;border-radius:9px;border:1px solid var(--line-2);
+  background:rgba(255,255,255,0.55);color:var(--ink-3);letter-spacing:.04em;
+}
+.step-form .fld b{color:var(--ink);font-weight:400;margin-left:6px}
+.step-form .go{
+  padding:8px 16px;border-radius:9px;border:none;
   background:linear-gradient(135deg,#6D4DE8,#B84DE8);color:#fff;
-  font-family:var(--sans);font-size:10px;font-weight:600;
-  box-shadow:0 6px 16px rgba(124,92,252,0.4);
+  font-family:var(--sans);font-size:11.5px;font-weight:600;letter-spacing:.02em;
 }
-/* 热点脉冲点 */
-.hot{
-  position:absolute;width:13px;height:13px;border-radius:50%;z-index:7;
-  background:#fff;border:3px solid var(--accent);
-  transform:translate(-50%,-50%);pointer-events:none;
-  animation:hot-pulse 2s ease-out infinite;
+.step-log{
+  margin-top:14px;display:inline-block;padding:10px 14px;border-radius:10px;
+  background:rgba(30,25,46,0.92);color:#B9B1D6;
+  font-family:var(--mono);font-size:10.5px;line-height:1.9;
 }
-@keyframes hot-pulse{0%{box-shadow:0 0 0 3px rgba(124,92,252,0.4)}100%{box-shadow:0 0 0 13px rgba(124,92,252,0)}}
-/* 热点放大框:hover / 点按弹出高清局部 */
-.mag{
-  position:absolute;z-index:9;width:232px;border-radius:12px;overflow:hidden;
-  background:#fff;border:1px solid var(--line-2);
-  box-shadow:0 18px 44px rgba(36,31,51,0.30);
-  opacity:0;transform:translateY(10px) scale(0.94);pointer-events:none;
-  transition:opacity .25s cubic-bezier(0.32,0.72,0,1),transform .25s cubic-bezier(0.32,0.72,0,1);
+.step-log .t{color:#7A7294;margin-right:8px}
+.step-log .ok{color:#A99BFF}
+
+/* 分栏:与左侧玻璃面板同一套容器质感(圆角/边框/阴影统一) */
+.usage-split{display:grid;grid-template-columns:minmax(0,1fr) 620px;gap:52px;align-items:start}
+.prd-frame{
+  position:sticky;top:90px;
+  border-radius:20px;overflow:hidden;
+  border:1px solid rgba(255,255,255,0.8);
+  background:#0B0A0F;
+  box-shadow:0 20px 56px rgba(36,31,51,0.10), inset 0 1px 0 rgba(255,255,255,0.95);
 }
-.mag img{display:block;width:100%;height:auto}
-.mag .lab{
-  padding:8px 12px;background:#fff;border-top:1px solid var(--line);
-  font-family:var(--mono);font-size:10.5px;color:var(--ink-2);letter-spacing:.02em;
+.prd-frame .bar{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+  background:#17131F;border-bottom:1px solid rgba(255,255,255,0.08);
+  font-family:var(--mono);font-size:10.5px;color:#8B85A0;letter-spacing:.05em;
 }
-@media (hover:hover){.frame:hover .mag{opacity:1;transform:translateY(0) scale(1)}}
-.mag.open{opacity:1;transform:translateY(0) scale(1)}
-/* 光标动效:真鼠标箭头(尖端为锚点,涟漪从尖端发出) */
-.cur{position:absolute;width:20px;height:27px;z-index:6;pointer-events:none}
-.cur svg{display:block;width:100%;height:100%;filter:drop-shadow(0 3px 8px rgba(36,31,51,0.35))}
-.cur::after{
-  content:"";position:absolute;left:-7px;top:-8px;width:20px;height:20px;border-radius:50%;
-  border:1.5px solid rgba(109,77,232,0.6);
-  animation:cur-click 2.2s ease-out infinite;
-}
-@keyframes cur-click{0%{transform:scale(0.5);opacity:0}25%{opacity:1}60%,100%{transform:scale(1.5);opacity:0}}
-.cur.move{animation:cur-move 3.2s cubic-bezier(0.32,0.72,0,1) infinite}
-@keyframes cur-move{0%,18%{transform:translate(0,0)}60%,100%{transform:translate(16px,80px)}}
-/* 帧1 下载:PRD 同语言小窗(标题栏+进度条+打开) */
-.frame-win{flex:1;min-height:0}
-.f1-bar{display:flex;align-items:center;gap:8px;padding-bottom:9px;border-bottom:1px solid var(--win-line)}
-.f1-mark{
-  width:22px;height:22px;border-radius:7px;
-  background:linear-gradient(135deg,#6D4DE8,#B84DE8);
-  color:#fff;font-family:var(--serif);font-size:12px;font-weight:600;
-  display:flex;align-items:center;justify-content:center;
-}
-.f1-nm{font-family:var(--mono);font-size:9.5px;color:var(--win-ink-2);letter-spacing:.05em}
-.f1-sp{flex:1}
-.f1-tb{
-  width:20px;height:20px;border-radius:6px;border:1px solid transparent;
-  color:var(--win-ink-3);font-size:10px;
-  display:flex;align-items:center;justify-content:center;
-}
-.f1-body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px}
-.f1-progress{height:8px;border-radius:99px;background:rgba(43,37,56,0.10);overflow:hidden}
-.f1-progress i{display:block;height:100%;width:100%;border-radius:99px;background:linear-gradient(90deg,#6D4DE8,#B84DE8)}
-.f1-row{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--win-ink-2)}
-.f1-open{
-  padding:8px 20px;border-radius:99px;
-  background:linear-gradient(135deg,#6D4DE8,#B84DE8);color:#fff;
-  font-family:var(--sans);font-size:12px;font-weight:600;
-}
-/* 帧2-4:PRD 真实设计截图(与产品像素一致) */
-.frame-shot{position:relative;border-radius:18px}
-.frame-shot img{
-  display:block;width:100%;height:auto;border-radius:16px;
-  filter:drop-shadow(0 16px 40px rgba(36,31,51,0.18));
+.prd-frame .bar .dots{display:flex;gap:6px}
+.prd-frame .bar .dots span{width:8px;height:8px;border-radius:50%;border:1px solid rgba(255,255,255,0.22)}
+.prd-frame .bar .ttl{flex:1;text-align:right;font-style:italic;color:#A7A1B8}
+.prd-frame iframe{display:block;width:100%;height:800px;border:0;background:#0B0A0F}
+.prd-cap{
+  margin-top:12px;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);
+  letter-spacing:.05em;text-align:center;line-height:1.7;
 }
 
 /* ═══ Fig.02 触发器(玻璃面板内) ═══ */
@@ -532,6 +504,8 @@ section.sc > canvas.scene{
 
 /* ═══ 响应式 ═══ */
 @media (max-width: 1120px){
+  .usage-split{grid-template-columns:1fr}
+  .prd-frame{position:static}
   .hero{padding-top:56px}
   .hero-grid{grid-template-columns:1fr;gap:48px}
   .win-stage{width:min(468px,100%)}
@@ -541,8 +515,10 @@ section.sc > canvas.scene{
   .nav{top:10px;gap:16px;padding:12px 22px}
   .nav .links{display:none}
   .sec-head,.dl-head{grid-template-columns:1fr;gap:18px;margin-bottom:32px}
-  .frames{grid-template-columns:repeat(2,1fr)}
-  .ft-rows,.faq-wrap{padding:24px 20px}
+  .step{grid-template-columns:44px minmax(0,1fr);gap:16px;padding-bottom:28px}
+  .step-node{width:36px;height:36px;font-size:11px}
+  .step:not(:last-child)::before{left:17.5px;top:42px}
+  .steps,.ft-rows,.faq-wrap{padding:24px 20px}
   .ft-row{grid-template-columns:70px 1fr;gap:14px}
   .ft-row .d{grid-column:2}
   .faq summary{grid-template-columns:70px 1fr 16px;gap:14px;font-size:16.5px}
@@ -556,8 +532,6 @@ section.sc > canvas.scene{
 }
 @media (max-width: 520px){
   h1{font-size:clamp(36px,11vw,54px)}
-  .frames{grid-template-columns:1fr}
-  .frame-win{height:auto;min-height:300px}
   .win{width:100%}
   .win-body{min-height:0}
   .faq .answer{padding-left:0}
@@ -670,80 +644,71 @@ section.sc > canvas.scene{
   </div>
 </section>
 
-<!-- ═══ Fig.01 用法 · 四帧横向预览:下载 → 配置 → 成功 → 日常(状态快照 + 光标动效) ═══ -->
+<!-- ═══ Fig.01 用法 · 横板分栏:左极简四步 + 右真实 PRD 原型(可交互) ═══ -->
 <section class="sc" id="fig-01" data-scene="threads">
   <canvas class="scene" aria-hidden="true"></canvas>
   <div class="wrap">
     <div class="sec-head">
-      <div class="fig-label"><b>Fig. 01</b><br>How to use<br>· 4 帧</div>
+      <div class="fig-label"><b>Fig. 01</b><br>How to use<br>· 4 步</div>
       <div>
-        <h2 class="rv">看这四帧,就会用了。</h2>
-        <p class="lede rv">从下载到每天自动登录,全部过程就这些。</p>
+        <h2 class="rv">四步,之后不用管。</h2>
+        <p class="lede rv">右边就是真实界面,点底部按钮可切换场景。</p>
       </div>
     </div>
-    <div class="frames">
-
-      <div class="frame rv">
-        <span class="num" aria-hidden="true">01</span>
-        <div class="frame-win">
-          <div class="f1-bar">
-            <span class="f1-mark" aria-hidden="true">桂</span>
-            <span class="f1-nm">GuiGui-Setup.exe</span>
-            <span class="f1-sp"></span>
-            <span class="f1-tb" aria-hidden="true">–</span>
-            <span class="f1-tb" aria-hidden="true">×</span>
-          </div>
-          <div class="f1-body">
-            <div class="f1-progress" aria-hidden="true"><i></i></div>
-            <div class="f1-row"><span>32 MB · 已校验</span><span class="f1-open">打开</span></div>
-          </div>
-          <span class="cur" style="left:50%;top:62%" aria-hidden="true"><svg viewBox="0 0 20 27" fill="none"><path d="M3 2 L3 19.5 L7.6 15.8 L10.2 23 L13.2 21.7 L10.1 14.9 L16.6 14.9 Z" fill="#fff" stroke="#241F33" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
-        </div>
-        <div class="frame-cap"><b>下载</b><span>装完点「打开」</span></div>
+    <div class="usage-split">
+      <div class="panel rv">
+        <ol class="steps">
+          <li class="step">
+            <div class="step-node">01</div>
+            <div class="step-body">
+              <h3>下载安装</h3>
+              <p class="act">双击,装完。</p>
+              <div class="step-prop"><span class="ok">$</span> guig install · 32 MB</div>
+            </div>
+          </li>
+          <li class="step">
+            <div class="step-node">02</div>
+            <div class="step-body">
+              <h3>首次配置</h3>
+              <p class="act">学号、密码、时间,填一次。</p>
+              <div class="step-form" aria-hidden="true">
+                <span class="fld">学号<b>2023xxxx</b></span>
+                <span class="fld">密码<b>••••••</b></span>
+                <span class="fld">时间<b>07:00</b></span>
+                <span class="go">开启</span>
+              </div>
+            </div>
+          </li>
+          <li class="step">
+            <div class="step-node">03</div>
+            <div class="step-body">
+              <h3>静默运行</h3>
+              <p class="act">之后,什么都不用做。</p>
+              <div class="step-prop"><span class="dot"></span>已连接 · 07:00:02</div>
+            </div>
+          </li>
+          <li class="step">
+            <div class="step-node">04</div>
+            <div class="step-body">
+              <h3>想改再打开</h3>
+              <p class="act">改完关掉,照样自动。</p>
+              <div class="step-log" aria-hidden="true">
+                <div><span class="t">07:00:02</span><span class="ok">✓ login ok</span></div>
+              </div>
+            </div>
+          </li>
+        </ol>
       </div>
-
-      <div class="frame key rv">
-        <span class="num" aria-hidden="true">02</span>
-        <span class="key-badge" aria-hidden="true">唯一要动手的一步</span>
-        <div class="frame-shot">
-          <img src="assets/screenshots/prd-ok.png" alt="首次配置页:桂桂问候,输入学号密码,开启每日自动登录">
-          <span class="cur move" style="left:40%;top:56%" aria-hidden="true"><svg viewBox="0 0 20 27" fill="none"><path d="M3 2 L3 19.5 L7.6 15.8 L10.2 23 L13.2 21.7 L10.1 14.9 L16.6 14.9 Z" fill="#fff" stroke="#241F33" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
-          <span class="hot" style="left:50%;top:87%" aria-hidden="true"></span>
-          <div class="mag" style="left:50%;margin-left:-116px;bottom:20%">
-            <img src="assets/screenshots/crop-ok.png" alt="放大:学号、密码输入框与开启按钮">
-            <div class="lab">就填这三个框,点「开启每日自动登录」</div>
+      <div class="rv">
+        <div class="prd-frame">
+          <div class="bar">
+            <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="ttl">guigui-prd-v2.html</div>
           </div>
+          <iframe src="assets/prd/index.html" title="桂桂 v2 真实界面原型,点底部演示按钮切换场景" loading="lazy"></iframe>
         </div>
-        <div class="frame-cap"><b>配置</b><span>学号密码,填一次</span></div>
+        <div class="prd-cap">真实界面原型 · 底部按钮可切换「首次配置 / 日常主页 / 掉线」</div>
       </div>
-
-      <div class="frame rv">
-        <span class="num" aria-hidden="true">03</span>
-        <div class="frame-shot">
-          <img src="assets/screenshots/prd-success.png" alt="登录成功页:网,已经帮你连好啦,以后每天都会自动登好">
-          <span class="cur" style="right:4%;top:3%" aria-hidden="true"><svg viewBox="0 0 20 27" fill="none"><path d="M3 2 L3 19.5 L7.6 15.8 L10.2 23 L13.2 21.7 L10.1 14.9 L16.6 14.9 Z" fill="#fff" stroke="#241F33" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
-          <span class="hot" style="right:7%;top:4%" aria-hidden="true"></span>
-          <div class="mag" style="right:4px;top:13%">
-            <img src="assets/screenshots/crop-close.png" alt="放大:窗口右上角关闭按钮">
-            <div class="lab">点 × 关掉,后台继续跑</div>
-          </div>
-        </div>
-        <div class="frame-cap"><b>完成</b><span>关掉就好</span></div>
-      </div>
-
-      <div class="frame rv">
-        <span class="num" aria-hidden="true">04</span>
-        <div class="frame-shot">
-          <img src="assets/screenshots/prd-main.png" alt="日常主页:自动登录开关、网络状态与今日日志">
-          <span class="hot" style="left:50%;top:37%" aria-hidden="true"></span>
-          <div class="mag" style="left:50%;margin-left:-116px;top:44%">
-            <img src="assets/screenshots/crop-status.png" alt="放大:自动登录开关与网络状态行">
-            <div class="lab">到点自动登录 · 失败才通知你</div>
-          </div>
-        </div>
-        <div class="frame-cap"><b>日常</b><span>什么都不用做</span></div>
-      </div>
-
     </div>
   </div>
 </section>
@@ -1249,14 +1214,6 @@ if(!reduce){
     btn.addEventListener('mouseleave', function(){ btn.style.transform = ''; });
   });
 }
-
-/* ═══ 四帧:点按切换放大框(移动端无 hover) ═══ */
-document.querySelectorAll('.frame').forEach(function(f){
-  f.addEventListener('click', function(){
-    var m = f.querySelector('.mag');
-    if(m) m.classList.toggle('open');
-  });
-});
 
 /* ═══ 桂桂 bot ═══ */
 if(typeof XiaojiangMotion === 'function'){
