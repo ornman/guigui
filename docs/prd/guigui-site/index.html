@@ -671,8 +671,9 @@ section.sc > canvas.scene{
   </div>
 </section>
 
-<!-- ═══ Fig.04 问答(玻璃面板,安静对比) ═══ -->
-<section class="sc" id="fig-04">
+<!-- ═══ Fig.04 问答 · 背景交互:星座网(光标把答案连成网) ═══ -->
+<section class="sc" id="fig-04" data-scene="stars">
+  <canvas class="scene" aria-hidden="true"></canvas>
   <div class="wrap">
     <div class="sec-head">
       <div class="fig-label"><b>Fig. 04</b><br>FAQ<br>· 7 项</div>
@@ -717,7 +718,9 @@ section.sc > canvas.scene{
 </section>
 
 <!-- ═══ Fig.05 下载 · 重点 CTA ═══ -->
-<section class="sc" id="fig-05">
+<!-- ═══ Fig.05 下载 · 背景交互:下载流(粒子汇入 CTA) ═══ -->
+<section class="sc" id="fig-05" data-scene="stream">
+  <canvas class="scene" aria-hidden="true"></canvas>
   <div class="wrap">
     <div class="dl-eyebrow rv">
       <span class="pulse" aria-hidden="true"></span>
@@ -887,60 +890,99 @@ function drawDots(sc, t){
   }
 }
 
-/* ═══ 2b. Fig.01 竖向信号丝(光标推开弯曲) ═══ */
+/* ═══ 2b. Fig.02 竖向信号丝(光标推开弯曲 + 脉冲光点沿丝下行) ═══ */
+function threadX(x, y, m){
+  var dx = x - m.x, dy = y - m.y;
+  var d = Math.sqrt(dx*dx + dy*dy);
+  var f = Math.max(0, 1 - d/220);
+  return { px: x + (d > 0 ? dx/d * f*f * 40 : 0), f: f };
+}
 function drawThreads(sc, t){
   var ctx = sc.S.ctx, W = sc.S.w, H = sc.S.h, cv = sc.cv;
   ctx.clearRect(0,0,W,H);
-  var gap = 44;
+  var gap = 40;
   var m = inRect(cv) ? localMouse(cv) : {x:-9999,y:-9999};
+  var lines = [];
   for(var x = gap/2; x < W; x += gap){
     ctx.beginPath();
     var lit = 0;
-    for(var y = 0; y <= H; y += 18){
-      var dx = x - m.x, dy = y - m.y;
-      var d = Math.sqrt(dx*dx + dy*dy);
-      var f = Math.max(0, 1 - d/190);
-      if(f > lit) lit = f;
-      var px = x + (d > 0 ? dx/d * f*f * 34 : 0);
-      y === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+    for(var y = 0; y <= H; y += 16){
+      var r = threadX(x, y, m);
+      if(r.f > lit) lit = r.f;
+      y === 0 ? ctx.moveTo(r.px, y) : ctx.lineTo(r.px, y);
     }
-    ctx.strokeStyle = 'rgba(124,77,255,' + (0.05 + lit*0.5).toFixed(3) + ')';
-    ctx.lineWidth = 1 + lit*0.8;
+    ctx.strokeStyle = lit > .35
+      ? 'rgba(217,70,239,' + (0.10 + lit*0.75).toFixed(3) + ')'
+      : 'rgba(124,77,255,' + (0.07 + lit*0.55).toFixed(3) + ')';
+    ctx.lineWidth = 1 + lit*1.6;
     ctx.stroke();
+    lines.push(x);
   }
+  /* 脉冲光点:信号沿丝下行,光标附近的丝上更密更亮 */
+  if(!sc.pu){
+    sc.pu = [];
+    for(var i=0;i<18;i++) sc.pu.push({ li:(Math.random()*40)|0, p:Math.random(), v:.004+Math.random()*.008 });
+  }
+  ctx.shadowColor = 'rgba(217,70,239,0.9)';
+  for(var k=0;k<sc.pu.length;k++){
+    var pu = sc.pu[k];
+    pu.p += pu.v;
+    if(pu.p > 1){ pu.p = 0; pu.li = (Math.random()*lines.length)|0; }
+    var lx = lines[Math.min(pu.li, lines.length-1)];
+    var y = pu.p * H;
+    var r2 = threadX(lx, y, m);
+    ctx.beginPath();
+    ctx.arc(r2.px, y, 1.6 + r2.f*2.6, 0, 6.283);
+    ctx.fillStyle = 'rgba(232,121,249,' + (0.35 + r2.f*0.6).toFixed(3) + ')';
+    ctx.shadowBlur = 8 + r2.f*12;
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
 }
 
-/* ═══ 2c. Fig.02 方格矩阵(点亮+涟漪) ═══ */
+/* ═══ 2c. Fig.03 方格矩阵(光标点亮 + 对角扫描波 + 点击涟漪带环) ═══ */
 var ripples = [];
 function drawSquares(sc, t){
   var ctx = sc.S.ctx, W = sc.S.w, H = sc.S.h, cv = sc.cv;
   ctx.clearRect(0,0,W,H);
-  var gap = 52, s = 7;
+  var gap = 46;
   var m = inRect(cv) ? localMouse(cv) : {x:-9999,y:-9999};
+  /* 对角扫描波位置(-0.15..1.2 循环) */
+  var sw = (t * 0.00009) % 1.35 - 0.15;
   for(var x = gap/2; x < W; x += gap){
     for(var y = gap/2; y < H; y += gap){
       var dx = x-m.x, dy = y-m.y;
-      var f = Math.max(0, 1 - Math.sqrt(dx*dx+dy*dy)/200);
-      /* 涟漪贡献 */
+      var f = Math.max(0, 1 - Math.sqrt(dx*dx+dy*dy)/220);
+      var nd = (x + y) / (W + H);
+      var wave = Math.max(0, 1 - Math.abs(nd - sw) / 0.09);
       var rp = 0;
       for(var i=0;i<ripples.length;i++){
         var R = ripples[i];
         var dd = Math.sqrt((x-R.x)*(x-R.x) + (y-R.y)*(y-R.y));
         var band = Math.abs(dd - R.r);
-        if(band < 46) rp = Math.max(rp, (1 - band/46) * R.life);
+        if(band < 52) rp = Math.max(rp, (1 - band/52) * R.life);
       }
-      var v = Math.max(f, rp);
-      if(v < 0.03) continue;
-      ctx.fillStyle = 'rgba(124,77,255,' + (v*.4).toFixed(3) + ')';
-      var sz = s + v*8;
+      var v = Math.max(f*.85, wave*.5, rp*.9);
+      if(v < 0.04) continue;
+      var sz = 8 + v*10;
+      ctx.fillStyle = v > .5
+        ? 'rgba(217,70,239,' + Math.min(.8, v).toFixed(3) + ')'
+        : 'rgba(124,77,255,' + Math.min(.7, v*.75).toFixed(3) + ')';
       ctx.beginPath();
-      /* round(x,4) */
-      ctx.roundRect ? ctx.roundRect(x-sz/2, y-sz/2, sz, sz, 2.5) : ctx.rect(x-sz/2, y-sz/2, sz, sz);
+      ctx.roundRect ? ctx.roundRect(x-sz/2, y-sz/2, sz, sz, 3) : ctx.rect(x-sz/2, y-sz/2, sz, sz);
       ctx.fill();
     }
   }
+  /* 涟漪环描边 */
+  for(var q=0;q<ripples.length;q++){
+    ctx.beginPath();
+    ctx.arc(ripples[q].x, ripples[q].y, ripples[q].r, 0, 6.283);
+    ctx.strokeStyle = 'rgba(217,70,239,' + (ripples[q].life*.5).toFixed(3) + ')';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
   for(var k=ripples.length-1;k>=0;k--){
-    ripples[k].r += 4.5; ripples[k].life -= 0.012;
+    ripples[k].r += 5.5; ripples[k].life -= 0.010;
     if(ripples[k].life <= 0) ripples.splice(k,1);
   }
 }
@@ -1045,6 +1087,101 @@ function drawEM(sc, t){
   ctx.globalCompositeOperation = 'source-over';
 }
 
+/* ═══ 2e. Fig.04 星座网(粒子漂浮互连,光标把附近的点连成网) ═══ */
+function drawStars(sc, t){
+  var ctx = sc.S.ctx, W = sc.S.w, H = sc.S.h, cv = sc.cv;
+  ctx.clearRect(0,0,W,H);
+  if(!sc.pts){
+    sc.pts = [];
+    for(var i=0;i<44;i++) sc.pts.push({
+      x:Math.random()*W, y:Math.random()*H,
+      vx:(Math.random()-.5)*.22, vy:(Math.random()-.5)*.22,
+      r:.9+Math.random()*1.6, ph:Math.random()*6.283
+    });
+  }
+  var m = inRect(cv) ? localMouse(cv) : null;
+  var P = sc.pts;
+  for(var j=0;j<P.length;j++){
+    var p = P[j];
+    p.x += p.vx; p.y += p.vy;
+    if(p.x < -8) p.x = W+8; if(p.x > W+8) p.x = -8;
+    if(p.y < -8) p.y = H+8; if(p.y > H+8) p.y = -8;
+    if(m){ /* 光标轻微引力:把星点往光标方向带 */
+      var dx = m.x-p.x, dy = m.y-p.y, d2 = dx*dx+dy*dy;
+      if(d2 < 260*260 && d2 > 900){ var d = Math.sqrt(d2); p.x += dx/d*.5; p.y += dy/d*.5; }
+    }
+  }
+  /* 粒子互连 */
+  for(var a=0;a<P.length;a++){
+    for(var b=a+1;b<P.length;b++){
+      var ddx = P[a].x-P[b].x, ddy = P[a].y-P[b].y;
+      var dd = ddx*ddx+ddy*ddy;
+      if(dd < 105*105){
+        var al = (1 - Math.sqrt(dd)/105) * 0.15;
+        ctx.strokeStyle = 'rgba(124,77,255,'+al.toFixed(3)+')';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(P[a].x,P[a].y); ctx.lineTo(P[b].x,P[b].y); ctx.stroke();
+      }
+    }
+    if(m){ /* 光标连网:高亮连线到光标 */
+      var mdx = P[a].x-m.x, mdy = P[a].y-m.y;
+      var md = Math.sqrt(mdx*mdx+mdy*mdy);
+      if(md < 180){
+        var al2 = (1 - md/180) * 0.55;
+        ctx.strokeStyle = 'rgba(217,70,239,'+al2.toFixed(3)+')';
+        ctx.lineWidth = 1 + al2;
+        ctx.beginPath(); ctx.moveTo(P[a].x,P[a].y); ctx.lineTo(m.x,m.y); ctx.stroke();
+      }
+    }
+  }
+  /* 星点闪烁 */
+  for(var q=0;q<P.length;q++){
+    var tw = .4 + .6*Math.abs(Math.sin(t*.0012 + P[q].ph));
+    ctx.beginPath();
+    ctx.arc(P[q].x, P[q].y, P[q].r*tw + .4, 0, 6.283);
+    ctx.fillStyle = 'rgba(160,120,255,'+(0.35+tw*.5).toFixed(3)+')';
+    ctx.fill();
+  }
+}
+
+/* ═══ 2f. Fig.05 下载流(粒子从顶部加速汇入 CTA 按钮) ═══ */
+function drawStream(sc, t){
+  var ctx = sc.S.ctx, W = sc.S.w, H = sc.S.h, cv = sc.cv;
+  ctx.clearRect(0,0,W,H);
+  /* CTA 按钮中心(canvas 坐标,每帧重取) */
+  var btn = document.querySelector('#fig-05 .btn-cta');
+  var br = btn ? btn.getBoundingClientRect() : {left:W/2-100, top:H-80, width:200, height:60};
+  var sr = cv.getBoundingClientRect();
+  var tx = br.left + br.width/2 - sr.left;
+  var ty = br.top + br.height/2 - sr.top;
+  if(!sc.sp){
+    sc.sp = [];
+    for(var i=0;i<52;i++) sc.sp.push({
+      x:Math.random()*W, y:Math.random()*H*.6,
+      v:.8+Math.random()*1.4, ph:Math.random()*6.283, r:1+Math.random()*1.8
+    });
+  }
+  ctx.shadowColor = 'rgba(139,92,246,0.85)';
+  for(var k=0;k<sc.sp.length;k++){
+    var p = sc.sp[k];
+    var prog = Math.min(1, Math.max(0, p.y / Math.max(1, ty)));
+    p.y += p.v * (0.7 + prog*1.9);                       /* 越接近越快 */
+    p.x += Math.sin(t*.0016 + p.ph)*.5 + (tx - p.x) * prog * prog * 0.045;  /* 汇入按钮 */
+    var ddx = p.x-tx, ddy = p.y-ty;
+    if(ddx*ddx + ddy*ddy < 30*30 || p.y > H + 30){
+      p.x = Math.random()*W; p.y = -20 - Math.random()*60; p.v = .8+Math.random()*1.4;
+      continue;
+    }
+    var a = 0.25 + prog*0.65;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r + prog*1.2, 0, 6.283);
+    ctx.fillStyle = prog > .6 ? 'rgba(232,121,249,'+a.toFixed(3)+')' : 'rgba(124,77,255,'+a.toFixed(3)+')';
+    ctx.shadowBlur = 6 + prog*10;
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+}
+
 /* ═══ 场景注册 + 主循环 ═══ */
 document.querySelectorAll('[data-scene]').forEach(function(el){
   addScene(el, el.dataset.scene);
@@ -1069,6 +1206,8 @@ if(!reduce){
       else if(sc.kind === 'threads') drawThreads(sc, now);
       else if(sc.kind === 'squares') drawSquares(sc, now);
       else if(sc.kind === 'em') drawEM(sc, now);
+      else if(sc.kind === 'stars') drawStars(sc, now);
+      else if(sc.kind === 'stream') drawStream(sc, now);
     }
     requestAnimationFrame(loop);
   })(lt);
