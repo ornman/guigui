@@ -101,6 +101,8 @@ body.hide-gui .greet .g-bot{display:none}
 .tagline{font:600 13px/1.6 Inter,"PingFang SC",sans-serif;color:var(--ink-2);
   letter-spacing:.02em;margin:0}
 .tagline b{color:var(--accent)}
+/* 桂桂的口吻行:衬线,像她本人在说话 */
+.say{font:400 14px/1.7 "Source Han Serif SC","Noto Serif SC",Georgia,serif;color:var(--ink-2);margin:2px 0 0}
 
 /* 开机仪式:bot 内嵌于视图,居中 */
 #v-boot{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100%}
@@ -364,16 +366,14 @@ body.backdrop-black .taskbar{display:none}
         </div>
         <div>
           <h1 class="g">早上好。</h1>
-          <p class="tagline">校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好</p>
+          <p class="say" id="main-lede">网的事交给我,你放心忙~</p>
         </div>
       </div>
-      <p class="lede" id="main-lede">一切正常,放心去忙。</p>
 
-      <div class="tiny-label">今日体检</div>
-      <div class="check-row"><span class="k">自动登录</span><span class="v2"><b>已开启</b> · 每天 07:00</span></div>
-      <div class="check-row"><span class="k">网络</span><span class="v2" id="main-net">已登录 ✓ · Campus-WiFi</span></div>
-      <div class="check-row"><span class="k">下次行动</span><span class="v2">明天 07:00 · 窗口 06:30–07:30</span></div>
-      <div class="check-row"><span class="k">最近心跳</span><span class="v2" style="font-family:Inter,sans-serif;font-size:12.5px">07:00:02 成功 · 1/6 次即停</span></div>
+      <div style="height:10px"></div>
+      <div class="check-row"><span class="k">自动登录</span><span class="v2"><b>开着</b> · 明早 07:00 替你登</span></div>
+      <div class="check-row"><span class="k">网络</span><span class="v2" id="main-net">已连上 Campus-WiFi ✓</span></div>
+      <div class="check-row"><span class="k">昨晚</span><span class="v2">第一次就登好了 ✓</span></div>
 
       <div class="micro-line" id="pwd-prompt" style="display:none;background:oklch(58% 0.15 295 / 0.07);padding:10px 12px;border-radius:10px;line-height:1.7">
         还差一步:桂桂还没拿到密码,掉线时没法自动帮登。
@@ -482,7 +482,7 @@ body.backdrop-black .taskbar{display:none}
   <button onclick="loginError()">密码错误</button>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script src="vendor/confetti.browser.min.js"></script>
 <script>
 const win=document.getElementById('win');
 const $=id=>document.getElementById(id);
@@ -523,14 +523,14 @@ function renderMain(){
   const gb=document.querySelector('#v-main .g-bot');
   $('pwd-prompt').style.display=(!hasPwd)?'block':'none';
   if(mainState==='ok'){mood(gb,'idle');
-    $('main-lede').textContent='一切正常,放心去忙。';
-    $('main-net').textContent='已登录 ✓ · Campus-WiFi';$('main-btn').textContent='立即重新登录'}
+    $('main-lede').textContent='网的事交给我,你放心忙~';
+    $('main-net').textContent='已连上 Campus-WiFi ✓';$('main-btn').textContent='立即重新登录'}
   else if(mainState==='out'){mood(gb,'sad');
-    $('main-lede').textContent='刚才掉线了,桂桂没赶上。';
-    $('main-net').textContent='校园网 · 未认证';$('main-btn').textContent='立即登录'}
+    $('main-lede').textContent='刚才网断了一下,别担心,登一下就回来。';
+    $('main-net').textContent='校园网 · 还没登录';$('main-btn').textContent='立即登录'}
   else{mood(gb,'cry');
-    $('main-lede').textContent='连不上校园网。';
-    $('main-net').textContent='10.1.2.3 · 不可达';$('main-btn').textContent='去排查'}
+    $('main-lede').textContent='现在够不着校园网,我陪你查查看。';
+    $('main-net').textContent='10.1.2.3 · 连不上';$('main-btn').textContent='去排查'}
 }
 function wakeProblem(kind){mainState=kind;goDaily()}
 function mainAction(){
@@ -542,7 +542,7 @@ function mainAction(){
 function quickLogin(){
   const gb=document.querySelector('#v-main .g-bot');
   mood(gb,'happy');
-  $('main-lede').textContent='刚刚帮你重新登录了一次 ✓';
+  $('main-lede').textContent='刚刚把网帮你接回来啦 ✓';
 }
 /* 流程动作 */
 function showSuccess(){show('v-success');greet();party()}
@@ -554,14 +554,15 @@ function pickWifi(el){
 }
 /* 登录失败:内联提示(不再单独占一页) */
 function loginError(){openDetail('v-login');greet();$('login-err').style.display='block'}
-/* 庆祝粒子:canvas-confetti 颜文字模式;画布在卡片内,CDN 失败静默降级 */
+/* 庆祝粒子:canvas-confetti 颜文字模式;画布在卡片内,vendor 本地加载(不依赖网络) */
 function party(){
   if(typeof confetti!=='function')return;
   const cv=document.getElementById('fx');
   cv.width=win.clientWidth;cv.height=win.clientHeight;
   const fx=confetti.create(cv,{resize:false,useWorker:false});
-  const kao=fx.shapeFromText({text:'~(￣▽￣)',scalar:2});
-  const heart=fx.shapeFromText({text:'♥',scalar:1.5});
+  /* shapeFromText 只在模块级 confetti 上,create() 实例没有 */
+  const kao=confetti.shapeFromText({text:'~(￣▽￣)',scalar:2});
+  const heart=confetti.shapeFromText({text:'♥',scalar:1.5});
   const base={shapes:[kao,heart],colors:['#7c3aed','#c4b5fd','#f0abfc'],
     scalar:1.8,spread:65,startVelocity:38,ticks:160};
   fx({...base,particleCount:16,angle:60,origin:{x:.38,y:.42}});
