@@ -14,12 +14,12 @@
 /* ============================================================
    桂桂官网 v0.7 — 花哨渐变网格底 × 磨砂玻璃 × 分区背景交互
    · 背景:流动渐变 mesh(紫/品红/蓝),光标视差
-   · 能量曲线:两拍高光 → 中段收敛 → 终点聚焦按钮
+   · 能量曲线:Hero 高光 → 中段收敛 → 信号二高潮 → 收敛 → 按钮焦点
        Fig.00 Hero  — 高光① 点阵网格,光标排斥 + 点亮
-       Fig.01 信号   — 高光② 电磁波全案 · 光标即波源:波在光标处隆起、
+       Fig.01 用法   — 四步 walkthrough(时间轴脊柱),静音信号丝背景
+       Fig.02 触发器 — 无背景 canvas,行 hover 高亮即内容交互
+       Fig.03 信号   — 高光② 电磁波全案 · 光标即波源:波在光标处隆起、
                         被拉向光标,光标持续发涟漪,点击脉冲爆发
-       Fig.02 用法   — 四步 walkthrough(时间轴脊柱),静音信号丝背景保留
-       Fig.03 触发器 — 无背景 canvas,行 hover 高亮即内容交互
        Fig.04 问答   — 纯玻璃面板,安静阅读
        Fig.05 下载   — 能量全部集中在磁吸渐变 CTA 按钮
    · 玻璃:磨砂面板(backdrop blur + 内高光 + 噪点),产品窗口真磨砂
@@ -528,9 +528,9 @@ section.sc > canvas.scene{
 <nav class="nav" aria-label="主导航">
   <a href="#top" class="brand">桂桂<i>/ GuiGui</i></a>
   <div class="links">
-    <a href="#fig-01">01 信号</a>
-    <a href="#fig-02">02 用法</a>
-    <a href="#fig-03">03 触发器</a>
+    <a href="#fig-01">01 用法</a>
+    <a href="#fig-02">02 触发器</a>
+    <a href="#fig-03">03 信号</a>
     <a href="#fig-04">04 问答</a>
     <a href="#fig-05">05 下载</a>
   </div>
@@ -560,7 +560,7 @@ section.sc > canvas.scene{
           <span class="arr-c">→</span>
           <span class="shine" aria-hidden="true"></span>
         </a>
-        <a class="btn-text" href="#fig-02">看怎么用</a>
+        <a class="btn-text" href="#fig-01">看怎么用</a>
       </div>
     </div>
 
@@ -623,33 +623,12 @@ section.sc > canvas.scene{
   </div>
 </section>
 
-<!-- ═══ Fig.01 电磁波 · 炫酷全案:光标即波源(波随光标隆起,点击脉冲爆发) ═══ -->
-<section class="sc" id="fig-01">
-  <div class="wrap">
-    <div class="sig rv">
-      <canvas id="em-canvas" aria-hidden="true"></canvas>
-      <div class="inner">
-        <div class="fig-label"><b>Fig. 01</b> — Signal · 电磁场</div>
-        <h2>07:00 前后 30 分钟,<br>每 5 分钟<span class="em">试一次,连上即停</span>。</h2>
-        <p class="lede">认证服务器每天 06:50 开门。桂桂在起床前完成全部尝试,任一次成功即停,失败才会通知你。</p>
-        <div class="hint"><span class="cur" aria-hidden="true">✛</span>光标即波源 · 波随你起伏 · 点击发射脉冲</div>
-        <div class="specs">
-          <div class="cell"><div class="fig-label">Retry</div><b>6 次 / 窗口</b></div>
-          <div class="cell"><div class="fig-label">Interval</div><b>5 min</b></div>
-          <div class="cell"><div class="fig-label">Avg Login</div><b>15 ms</b></div>
-          <div class="cell"><div class="fig-label">Server Opens</div><b>06:50</b></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══ Fig.02 场景 · 背景交互:静音版信号丝(只保留光标轻推) ═══ -->
-<section class="sc" id="fig-02" data-scene="threads">
+<!-- ═══ Fig.01 用法 · 四步 walkthrough(时间轴脊柱)+ 静音信号丝背景 ═══ -->
+<section class="sc" id="fig-01" data-scene="threads">
   <canvas class="scene" aria-hidden="true"></canvas>
   <div class="wrap">
     <div class="sec-head">
-      <div class="fig-label"><b>Fig. 02</b><br>How to use<br>· 4 步</div>
+      <div class="fig-label"><b>Fig. 01</b><br>How to use<br>· 4 步</div>
       <div>
         <h2 class="rv">四步,从下载到安静运行。</h2>
         <p class="lede rv">只有第二步需要你输入信息,其余都是桂桂的事。</p>
@@ -702,11 +681,11 @@ section.sc > canvas.scene{
   </div>
 </section>
 
-<!-- ═══ Fig.03 触发器 · 无背景 canvas(行 hover 高亮即交互,中段收敛) ═══ -->
-<section class="sc" id="fig-03">
+<!-- ═══ Fig.02 触发器 · 无背景 canvas(行 hover 高亮即交互,中段收敛) ═══ -->
+<section class="sc" id="fig-02">
   <div class="wrap">
     <div class="sec-head">
-      <div class="fig-label"><b>Fig. 03</b><br>Methods<br>· 8 触发器</div>
+      <div class="fig-label"><b>Fig. 02</b><br>Methods<br>· 8 触发器</div>
       <div>
         <h2 class="rv">五种触发时机,<br>三项安静策略。</h2>
         <p class="lede rv">单一时间点会漏。多层叠加保底,总有一层替你兜住。</p>
@@ -722,6 +701,28 @@ section.sc > canvas.scene{
         <div class="ft-row"><div class="fig-label"><b>06</b> Policy</div><span class="t">假期静默</span><span class="d">连续 48 小时不可达,心跳降为每天 1 次且不通知。回校自动恢复。</span></div>
         <div class="ft-row"><div class="fig-label"><b>07</b> UX</div><span class="t">关窗即静</span><span class="d">关闭窗口无托盘图标,只留一枚胶囊浮标,点一下还原。</span></div>
         <div class="ft-row"><div class="fig-label"><b>08</b> UX</div><span class="t">系统通知</span><span class="d">成败都走 Win11 通知中心,失败 3 次内自动去重不刷屏。</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Fig.03 信号 · 炫酷全案:光标即波源(波随光标隆起,点击脉冲爆发) ═══
+     中段第二高潮:紧跟触发器列表,把「重试机制」可视化 -->
+<section class="sc" id="fig-03">
+  <div class="wrap">
+    <div class="sig rv">
+      <canvas id="em-canvas" aria-hidden="true"></canvas>
+      <div class="inner">
+        <div class="fig-label"><b>Fig. 03</b> — Signal · 电磁场</div>
+        <h2>07:00 前后 30 分钟,<br>每 5 分钟<span class="em">试一次,连上即停</span>。</h2>
+        <p class="lede">认证服务器每天 06:50 开门。桂桂在起床前完成全部尝试,任一次成功即停,失败才会通知你。</p>
+        <div class="hint"><span class="cur" aria-hidden="true">✛</span>光标即波源 · 波随你起伏 · 点击发射脉冲</div>
+        <div class="specs">
+          <div class="cell"><div class="fig-label">Retry</div><b>6 次 / 窗口</b></div>
+          <div class="cell"><div class="fig-label">Interval</div><b>5 min</b></div>
+          <div class="cell"><div class="fig-label">Avg Login</div><b>15 ms</b></div>
+          <div class="cell"><div class="fig-label">Server Opens</div><b>06:50</b></div>
+        </div>
       </div>
     </div>
   </div>
