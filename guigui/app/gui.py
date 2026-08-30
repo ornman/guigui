@@ -25,7 +25,8 @@ log = logging.getLogger(__name__)
 
 WINDOW_SIZE = (560, 640)
 WATCH_INTERVAL = 2.0
-BG_COLOR = "#f4f2f7"   # 接近前端底色;真透明 WebView2 不稳定,伪透明按前端烘焙
+# 窗口配置与前端验证过的 devshell 完全一致(work-split:F4 无边框透明窗口验证通过);
+# 拖拽靠 titlebar 的 .pywebview-drag-region 类(pywebview 6 默认选择器,原生支持)
 
 _STATE2NET = {"up": "logged_in", "down": "unreachable", "failed": "not_logged_in"}
 
@@ -136,13 +137,12 @@ def run(view: str | None = None) -> int:
     api = GuiGuiApi()
     try:
         window = webview.create_window(
-            "桂桂", str(index), js_api=api,
-            width=WINDOW_SIZE[0], height=WINDOW_SIZE[1],
-            resizable=False, frameless=True, easy_drag=False,
-            background_color=BG_COLOR)
+            "桂桂 / GuiGui", str(index), js_api=api,
+            width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], min_size=WINDOW_SIZE,
+            frameless=True, transparent=True, resizable=False)
     except TypeError:  # 旧版 pywebview 参数差异兜底
         window = webview.create_window(
-            "桂桂", str(index), js_api=api,
+            "桂桂 / GuiGui", str(index), js_api=api,
             width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], resizable=False)
     api.attach_window(window)
 
