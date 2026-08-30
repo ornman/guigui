@@ -84,33 +84,32 @@ body{
 #v-main .log{margin-top:auto}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
-/* ═══ Bot:各视图内嵌,零位移零飞行(杜绝"乱飞/出界") ═══ */
-.bot svg{width:100%;height:100%;display:block}
-.bot .b-body{fill:var(--ink)}
-.bot .eye,.bot .mouth{fill:none;stroke:oklch(97% 0.005 295);stroke-width:5;stroke-linecap:round}
-.bot .tear{fill:oklch(70% 0.11 240);opacity:0}
-.bot[data-mood=sleep] .e-idle,.bot[data-mood=sleep] .e-happy,.bot[data-mood=sleep] .m-idle,.bot[data-mood=sleep] .m-happy,.bot[data-mood=sleep] .m-sad{display:none}
-.bot[data-mood=idle] .e-closed,.bot[data-mood=idle] .e-happy,.bot[data-mood=idle] .m-happy,.bot[data-mood=idle] .m-sad{display:none}
-.bot[data-mood=happy] .e-closed,.bot[data-mood=happy] .e-idle,.bot[data-mood=happy] .m-idle,.bot[data-mood=happy] .m-sad{display:none}
-.bot[data-mood=sad] .e-idle,.bot[data-mood=sad] .e-happy,.bot[data-mood=sad] .m-idle,.bot[data-mood=sad] .m-happy{display:none}
-.bot[data-mood=sad] .eye{transform:translateY(4px)}
-.bot[data-mood=cry] .e-idle,.bot[data-mood=cry] .e-happy,.bot[data-mood=cry] .m-idle,.bot[data-mood=cry] .m-happy{display:none}
-.bot[data-mood=cry] .eye{transform:translateY(2px) scale(1,.85)}
-.bot[data-mood=cry] .tear{opacity:1;animation:tear 1.3s ease-in infinite}
-@keyframes tear{0%{transform:translateY(0);opacity:1}80%{opacity:1}100%{transform:translateY(26px);opacity:0}}
-.bot.awake .eye{animation:eyelift .5s ease-out}
-@keyframes eyelift{from{transform:translateY(6px);opacity:0}to{transform:none;opacity:1}}
-.bot.pop svg{animation:pop .55s cubic-bezier(.34,1.56,.64,1)}
-@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.1,.9)}70%{transform:scale(.95,1.05)}100%{transform:scale(1)}}
-.bot.sway svg{animation:sway 1.1s ease-in-out infinite;transform-origin:50% 88%}
-@keyframes sway{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
+/* ═══ Bot:bumbum55/noteai-bot 接管几何+动画(见 vendor/noteai-bot/LICENSE) ═══ */
+/* 容器布局:内部 SVG 由 XiaojiangMotion 注入 */
+.bot{position:relative;display:flex;align-items:center;justify-content:center}
+.bot svg{display:block;overflow:visible;width:100%;height:100%}
+
+/* 首次仪式:bot 居中 140px,苏醒 + 归位到左上角问候块左侧(58px) */
+.bot-boot{width:140px;height:140px;margin:18vh auto 16px;
+  animation:botSettle 1.4s cubic-bezier(.4,.6,.2,1) both;
+  transform-origin:50% 50%}
+@keyframes botSettle{
+  0%{opacity:0;transform:scale(.78) translateY(20px)}
+  35%{opacity:1;transform:scale(1.04) translateY(-4px)}
+  100%{opacity:1;transform:scale(1) translateY(0)}
+}
+/* 庆祝页大 bot(固定大尺寸,无归位) */
+.bot-success{width:140px;height:140px;margin:36px auto 10px}
 
 /* 主页问候行:内嵌 bot + 标题,flex 垂直居中,永不错位 */
 .greet{display:flex;align-items:center;gap:14px;margin-bottom:2px}
 .greet .g-bot{width:58px;height:58px;flex-shrink:0;cursor:pointer}
-.greet .g-bot:hover svg{animation:wiggle .5s ease-in-out}
-@keyframes wiggle{0%,100%{transform:rotate(0)}30%{transform:rotate(-7deg)}70%{transform:rotate(7deg)}}
+.greet .g-bot:hover{filter:brightness(1.06)}
 body.hide-gui .greet .g-bot{display:none}
+
+/* pop 反馈(用户点击桂桂时) */
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.1,.9)}70%{transform:scale(.95,1.05)}100%{transform:scale(1)}}
+.bot.pop{animation:pop .55s cubic-bezier(.34,1.56,.64,1)}
 .tagline{font:600 13px/1.6 Inter,"PingFang SC",sans-serif;color:var(--ink-2);
   letter-spacing:.02em;margin:0}
 .tagline b{color:var(--accent)}
@@ -145,12 +144,6 @@ h1{font-size:27px;font-weight:600;letter-spacing:-.01em;line-height:1.3}
 /* 首装链路是单行道:无返回 */
 body.setup .back{display:none}
 /* 首次仪式的苏醒动画:拉伸弹起 + 眼嘴弧线依次描画 */
-.bot.awake svg{animation:wake .7s cubic-bezier(.34,1.56,.64,1) both}
-@keyframes wake{0%{transform:scale(1,.86)}55%{transform:scale(.94,1.08)}100%{transform:none}}
-#boot-bot .eye,#boot-bot .mouth{stroke-dasharray:100;stroke-dashoffset:100}
-#boot-bot.awake .eye{animation:draw .6s .3s ease-out forwards}
-#boot-bot.awake .mouth{animation:draw .6s .55s ease-out forwards}
-@keyframes draw{to{stroke-dashoffset:0}}
 .micro-line{font-size:12px;color:var(--ink-3);font-family:Inter,"PingFang SC",sans-serif;
   margin:0 0 16px;line-height:1.8}
 
@@ -341,31 +334,14 @@ body.backdrop-black .taskbar{display:none}
 
     <!-- 开机仪式(首次/等网络共用) -->
     <div class="v on" id="v-boot">
-      <div class="bot" id="boot-bot" data-mood="sleep">
-        <svg viewBox="0 0 120 120">
-          <path class="b-body" d="M60,12 C90,12 106,32 106,62 C106,92 90,108 60,108 C30,108 14,92 14,62 C14,32 30,12 60,12 Z"/>
-          <path class="eye e-closed" pathLength="100" d="M35,58 Q43,64 51,58 M69,58 Q77,64 85,58"/>
-          <path class="eye e-idle" pathLength="100" d="M35,60 Q43,53 51,60 M69,60 Q77,53 85,60"/>
-          <path class="eye e-happy" pathLength="100" d="M33,57 Q43,45 53,57 M67,57 Q77,45 87,57"/>
-          <path class="mouth m-idle" pathLength="100" d="M52,82 Q60,87 68,82"/>
-          <path class="mouth m-happy" pathLength="100" d="M49,80 Q60,92 71,80"/>
-          <path class="mouth m-sad" pathLength="100" d="M52,88 Q60,80 68,88"/>
-        </svg>
-      </div>
+      <div class="bot bot-boot" id="boot-bot" data-state="sleep" data-size="140"></div>
       <div class="boot-cap" id="boot-cap">桂桂伸了个懒腰,正在检查网络…</div>
     </div>
 
     <!-- 首次配置页:一键开启,密码事后温柔补 -->
     <div class="v" id="v-ok">
       <div class="greet">
-        <div class="g-bot bot" data-mood="happy" onclick="mood(this,'happy')">
-          <svg viewBox="0 0 120 120">
-            <path class="b-body" d="M60,12 C90,12 106,32 106,62 C106,92 90,108 60,108 C30,108 14,92 14,62 C14,32 30,12 60,12 Z"/>
-            <path class="eye e-idle" d="M35,60 Q43,53 51,60 M69,60 Q77,53 85,60"/>
-            <path class="eye e-happy" d="M33,57 Q43,45 53,57 M67,57 Q77,45 87,57"/>
-            <path class="mouth m-happy" d="M49,80 Q60,92 71,80"/>
-          </svg>
-        </div>
+        <div class="g-bot bot" data-state="complete" data-size="58"></div>
         <div>
           <h1 class="g">早上好。</h1>
           <p class="tagline">校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好</p>
@@ -402,12 +378,8 @@ body.backdrop-black .taskbar{display:none}
 
     <!-- 登录成功(庆祝页) -->
     <div class="v" id="v-success">
-      <div class="bot sway" style="width:110px;height:110px;margin:36px auto 10px" data-mood="happy">
-        <svg viewBox="0 0 120 120">
-          <path class="b-body" d="M60,12 C90,12 106,32 106,62 C106,92 90,108 60,108 C30,108 14,92 14,62 C14,32 30,12 60,12 Z"/>
-          <path class="eye e-happy" d="M33,57 Q43,45 53,57 M67,57 Q77,45 87,57"/>
-          <path class="mouth m-happy" d="M49,80 Q60,92 71,80"/>
-        </svg>
+      <div class="bot bot-success" data-state="complete" data-size="140" style="margin:36px auto 10px">
+        
       </div>
       <h1 style="text-align:center">网,已经帮你连好啦</h1>
       <p class="lede" style="text-align:center">明早 07:00,桂桂会提前替你登好 —<br>你只管睡到自然醒。</p>
@@ -433,13 +405,7 @@ body.backdrop-black .taskbar{display:none}
     <!-- 日常主页:体检卡 -->
     <div class="v" id="v-main">
       <div class="greet">
-        <div class="g-bot bot" data-mood="idle" onclick="mood(this,'happy')">
-          <svg viewBox="0 0 120 120">
-            <path class="b-body" d="M60,12 C90,12 106,32 106,62 C106,92 90,108 60,108 C30,108 14,92 14,62 C14,32 30,12 60,12 Z"/>
-            <path class="eye e-idle" d="M35,60 Q43,53 51,60 M69,60 Q77,53 85,60"/>
-            <path class="mouth m-idle" d="M52,82 Q60,87 68,82"/>
-          </svg>
-        </div>
+        <div class="g-bot bot" data-state="idle" data-size="58"></div>
         <div>
           <h1 class="g" id="main-h1">早上好。</h1>
           <p class="say" id="main-lede">网的事交给我,你放心忙~</p>
@@ -592,6 +558,9 @@ body.backdrop-black .taskbar{display:none}
   <button onclick="loginError()">密码错误</button>
 </div>
 
+<!-- 桂桂 bot 组件来自 bumbum55/noteai-bot(MIT,见 vendor/noteai-bot/LICENSE);
+     此声明仅保留在源码中(对外发布网页/产品页另放),运行时不渲染到 UI -->
+<script src="vendor/noteai-bot/xiaojiang-motion.js"></script>
 <script src="vendor/confetti.browser.min.js"></script>
 <script>
 const win=document.getElementById('win');
@@ -600,8 +569,45 @@ const views=['v-boot','v-ok','v-login','v-success','v-guide','v-main','v-setting
 let mainState='ok',configured=false,hasPwd=false;
 const origin={};   /* 详情视图来路:返回必回原处 */
 
-/* 通用 mood:任意 .bot 元素 */
-function mood(el,m){el.dataset.mood=m;el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop')}
+/* 桂桂 bot 状态映射:5 状态 → noteai 的内部状态机
+   sleep↔sleep / idle↔idle / happy↔complete(眯弯月+心跳消失) / sad↔thinking / cry↔angry(哭) */
+const MOOD2STATE={sleep:'sleep',idle:'idle',happy:'complete',sad:'thinking',cry:'angry'};
+const STATE2MOOD={sleep:'sleep',idle:'idle',complete:'happy',thinking:'sad',angry:'cry'};
+/* 我们的 OKLCH 紫染白配色 → noteai 的紫蓝渐变 + 眼色 + 心跳色 */
+const BOT_PALETTE={
+  faceTop:'oklch(45% 0.13 295)',     /* 紫蓝渐变顶 */
+  faceBottom:'oklch(20% 0.08 295)',  /* 深紫底 */
+  eyes:'oklch(98% 0.005 295)',       /* 眼白 紫染 */
+  pulse:'oklch(72% 0.14 330)'        /* 心跳粉 */
+};
+/* bot 实例映射:每个 .bot 容器对应一个 XiaojiangMotion */
+const bots={};
+/* 初始化单个 bot */
+function initBot(el,opts){
+  const XJ=globalThis.XiaojiangMotion;
+  if(!XJ){el.textContent='';return null}
+  const size=parseInt(el.dataset.size||'64',10);
+  const state=el.dataset.state||'idle';
+  const inst=new XJ(el,{
+    size,state,followPointer:false,motionScale:0.9,
+    faceTop:BOT_PALETTE.faceTop,faceBottom:BOT_PALETTE.faceBottom,
+    eyes:BOT_PALETTE.eyes,pulse:BOT_PALETTE.pulse
+  });
+  bots[el.id||Math.random().toString(36).slice(2)]=inst;
+  return inst;
+}
+function setBotState(el,state){const b=bots[el.id];if(b)b.setState(state)}
+/* 给定 selector 设置所有匹配 bot 的状态(情绪联动) */
+function setAllBots(mood){
+  const state=MOOD2STATE[mood];if(!state)return;
+  Object.values(bots).forEach(b=>b.setState(state));
+}
+/* 通用 mood:更新所有 bot 状态 + 触发容器 pop 反馈 */
+function mood(el,m){
+  el.dataset.mood=m;
+  el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop');
+  setBotState(el,MOOD2STATE[m]||'idle');
+}
 function currentView(){return views.find(v=>$(v).classList.contains('on'))||'v-main'}
 function show(id){views.forEach(v=>$(v).classList.remove('on'));$(id).classList.add('on')}
 function openDetail(id){origin[id]=currentView();show(id)}
@@ -611,6 +617,8 @@ function greet(){const g=greetText()+'。';
   document.querySelectorAll('.g').forEach(e=>{if(e.id!=='main-h1')e.textContent=g})}
 
 /* 首次仪式:完整苏醒典礼;结束时按网络体检三分流(首装单行道,各落地页无返回) */
+/* 首次仪式:bot 居中沉睡 → 睁眼 → 滑动归位到左上角(问候块左侧)
+   整个动作用 CSS keyframes 表达,JS 只切状态和 goto */
 function firstRun(state){
   mainState=state||'ok';
   document.body.classList.add('setup');
@@ -801,8 +809,10 @@ function clockTick(){const d=new Date();
   $('tb-time').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
   $('tb-date').textContent=d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate();}
 clockTick();setInterval(clockTick,10000);
-/* 进场 */
+/* 进场:实例化所有 .bot 容器(XiaojiangMotion 注入 SVG) */
+function initAllBots(){document.querySelectorAll('.bot').forEach(el=>initBot(el))}
 firstRun();
+initAllBots();
 </script>
 </body>
 </html>

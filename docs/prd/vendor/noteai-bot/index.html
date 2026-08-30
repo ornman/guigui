@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#eef5fc" />
+  <meta name="description" content="小匠，NoteAI 文档智能伙伴的自动动作展示。" />
+  <title>小匠 · NoteAI 动作展示</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #eef5fc;
+      --page-deep: #e4eef9;
+      --ink: #183453;
+      --muted: #7890a9;
+      --blue: #2c70cb;
+      --mint: #71dbae;
+      --line: rgba(31, 77, 124, .13);
+      --glow: rgba(71, 139, 221, .24);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { width: 100%; min-width: 320px; height: 100%; margin: 0; }
+
+    body {
+      overflow: hidden;
+      color: var(--ink);
+      background: var(--page);
+    }
+
+    button, input, select, textarea { font: inherit; }
+
+    .showcase {
+      position: relative;
+      isolation: isolate;
+      width: 100%;
+      height: 100%;
+      min-height: 520px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 18% 16%, rgba(113, 219, 174, .18), transparent 28%),
+        radial-gradient(circle at 82% 22%, var(--glow), transparent 32%),
+        linear-gradient(145deg, var(--page) 0%, #f8fbff 48%, var(--page-deep) 100%);
+      transition: --glow 900ms ease;
+    }
+
+    .showcase::before {
+      position: absolute;
+      inset: 0;
+      z-index: -2;
+      background-image:
+        linear-gradient(rgba(31, 77, 124, .025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(31, 77, 124, .025) 1px, transparent 1px);
+      background-size: 42px 42px;
+      content: "";
+      mask-image: radial-gradient(circle at center, black, transparent 72%);
+    }
+
+    .showcase::after {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      z-index: -1;
+      width: min(76vmin, 760px);
+      aspect-ratio: 1;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      content: "";
+      transform: translate(-50%, -50%);
+      box-shadow:
+        0 0 0 min(6vmin, 62px) rgba(255, 255, 255, .14),
+        0 0 0 min(13vmin, 132px) rgba(39, 106, 181, .025);
+    }
+
+    .brand {
+      position: absolute;
+      top: clamp(20px, 4vw, 48px);
+      z-index: 5;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .08em;
+    }
+
+    .brand { left: clamp(22px, 5vw, 72px); }
+
+    .brand strong {
+      margin-left: 6px;
+      color: var(--blue);
+      font-size: inherit;
+      letter-spacing: .04em;
+    }
+
+    .intro,
+    .demo {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      transition: opacity 850ms ease, transform 1000ms cubic-bezier(.2, .8, .2, 1), visibility 850ms;
+    }
+
+    .intro {
+      opacity: 0;
+      visibility: hidden;
+      transform: scale(.965);
+    }
+
+    .intro-copy { text-align: center; }
+
+    .eyebrow {
+      margin: 0 0 25px;
+      color: var(--blue);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .42em;
+      text-transform: uppercase;
+    }
+
+    .intro h1 {
+      margin: 0;
+      font-size: clamp(58px, 11vw, 148px);
+      font-weight: 500;
+      letter-spacing: .15em;
+      line-height: .92;
+    }
+
+    .intro h1 span { display: block; }
+
+    .intro h1 small {
+      display: block;
+      margin: 27px 0 0;
+      color: var(--muted);
+      font-size: clamp(13px, 1.5vw, 18px);
+      font-weight: 500;
+      letter-spacing: .48em;
+    }
+
+    .intro-subtitle {
+      margin: 31px 0 0;
+      color: var(--muted);
+      font-size: clamp(12px, 1.2vw, 15px);
+      letter-spacing: .22em;
+    }
+
+    .demo {
+      grid-template-rows: minmax(0, 1fr) auto;
+      padding: clamp(74px, 9vh, 112px) 24px clamp(44px, 7vh, 78px);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(18px);
+    }
+
+    .character-stage {
+      position: relative;
+      display: grid;
+      width: min(78vmin, 720px);
+      height: min(62vh, 620px);
+      place-items: center;
+    }
+
+    .aura {
+      position: absolute;
+      width: clamp(238px, 38vmin, 430px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(93, 159, 231, .2), rgba(113, 219, 174, .08) 45%, transparent 70%);
+      filter: blur(15px);
+      opacity: .72;
+      animation: aura-breathe 4.4s ease-in-out infinite;
+    }
+
+    .bot-host {
+      position: relative;
+      z-index: 2;
+      width: clamp(220px, 34vmin, 390px);
+      aspect-ratio: 1;
+      filter: drop-shadow(0 28px 35px rgba(25, 55, 91, .19));
+    }
+
+    .bot-host svg { width: 100%; height: 100%; }
+
+    .scene-copy {
+      min-height: 126px;
+      text-align: center;
+    }
+
+    .scene-copy.is-entering { animation: copy-enter 700ms cubic-bezier(.2, .8, .2, 1) both; }
+
+    .scene-index {
+      margin-bottom: 13px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .36em;
+    }
+
+    .scene-title {
+      margin: 0;
+      font-size: clamp(25px, 3vw, 38px);
+      font-weight: 500;
+      letter-spacing: .18em;
+    }
+
+    .scene-english {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .42em;
+    }
+
+    .dots {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 21px;
+    }
+
+    .dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: rgba(24, 52, 83, .18);
+      transition: width 450ms ease, border-radius 450ms ease, background 450ms ease;
+    }
+
+    .dot.is-active { width: 21px; border-radius: 999px; background: var(--blue); }
+
+    .showcase[data-phase="intro"] .intro {
+      opacity: 1;
+      visibility: visible;
+      transform: scale(1);
+    }
+
+    .showcase[data-phase="demo"] .demo {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .showcase[data-state="angry"] { --glow: rgba(63, 99, 154, .22); }
+    .showcase[data-state="alarm"] { --glow: rgba(92, 153, 222, .3); }
+    .showcase[data-state="loading"] { --glow: rgba(81, 147, 224, .32); }
+    .showcase[data-state="ingesting"] { --glow: rgba(83, 186, 160, .25); }
+    .showcase[data-state="diagnosing"] { --glow: rgba(78, 198, 158, .3); }
+    .showcase[data-state="sleep"] { --glow: rgba(79, 111, 166, .18); }
+
+    @keyframes aura-breathe {
+      0%, 100% { opacity: .52; transform: scale(.94); }
+      50% { opacity: .86; transform: scale(1.06); }
+    }
+
+    @keyframes copy-enter {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-height: 680px) {
+      .demo { padding-top: 62px; padding-bottom: 22px; }
+      .character-stage { height: min(58vh, 430px); }
+      .bot-host { width: clamp(180px, 29vmin, 300px); }
+      .scene-copy { min-height: 112px; }
+      .dots { margin-top: 14px; }
+    }
+
+    @media (max-width: 520px) {
+      .intro h1 { letter-spacing: .08em; }
+      .intro h1 small { letter-spacing: .3em; }
+      .showcase::after { width: 108vmin; }
+      .character-stage { width: 100%; }
+      .bot-host { width: min(70vw, 300px); }
+    }
+  </style>
+</head>
+<body>
+  <main class="showcase" id="showcase" data-phase="intro" data-state="idle">
+    <div class="brand" aria-label="witexpert NoteAI">witexpert<strong>NoteAI</strong></div>
+
+    <section class="intro" aria-label="小匠开场">
+      <div class="intro-copy">
+        <p class="eyebrow">NOTEAI PRESENTS</p>
+        <h1><span>小匠</span><small>XIAOJIANG</small></h1>
+        <p class="intro-subtitle">NOTEAI 文档智能伙伴</p>
+      </div>
+    </section>
+
+    <section class="demo" aria-label="小匠动作轮播">
+      <div class="character-stage">
+        <div class="aura" aria-hidden="true"></div>
+        <div class="bot-host" id="xiaojiang" aria-hidden="true"></div>
+      </div>
+      <div class="scene-copy" id="scene-copy" aria-live="polite">
+        <div class="scene-index">场景 · <span id="scene-number">01</span> / 08</div>
+        <h2 class="scene-title" id="scene-title">待命</h2>
+        <div class="scene-english" id="scene-english">IDLE</div>
+        <div class="dots" id="dots" aria-hidden="true"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./xiaojiang-motion.js?v=1"></script>
+  <script>
+    (() => {
+      const scenes = [
+        { state: 'idle', title: '待命', english: 'IDLE', duration: 3800 },
+        { state: 'reading', title: '阅读', english: 'READING', duration: 3800 },
+        { state: 'angry', title: '生气', english: 'ANGRY', duration: 3400 },
+        { state: 'alarm', title: '提醒', english: 'ALERT', duration: 3400 },
+        { state: 'loading', title: '加载', english: 'LOADING', duration: 4200 },
+        { state: 'ingesting', title: '资料汇入', english: 'INGESTING', duration: 4400 },
+        { state: 'diagnosing', title: '诊断', english: 'DIAGNOSING', duration: 4400 },
+        { state: 'sleep', title: '休息', english: 'SLEEP', duration: 4200 },
+      ];
+
+      const overrides = window.__XIAOJIANG_SHOWCASE_TIMING__ || {};
+      const introDuration = overrides.intro ?? 3000;
+      const loopIntroDuration = overrides.loopIntro ?? 2400;
+      const transitionDelay = overrides.transition ?? 140;
+      const root = document.getElementById('showcase');
+      const host = document.getElementById('xiaojiang');
+      const copy = document.getElementById('scene-copy');
+      const number = document.getElementById('scene-number');
+      const title = document.getElementById('scene-title');
+      const english = document.getElementById('scene-english');
+      const dots = document.getElementById('dots');
+      let current = 0;
+      let timer = 0;
+
+      scenes.forEach((scene, index) => {
+        const dot = document.createElement('span');
+        dot.className = `dot${index === 0 ? ' is-active' : ''}`;
+        dots.appendChild(dot);
+      });
+
+      const bot = new XiaojiangMotion(host, {
+        size: 360,
+        motionScale: 1.12,
+        followPointer: false,
+        respectReducedMotion: false,
+      });
+
+      function updateDots(index) {
+        [...dots.children].forEach((dot, dotIndex) => {
+          dot.classList.toggle('is-active', dotIndex === index);
+        });
+      }
+
+      function animateCopy() {
+        copy.classList.remove('is-entering');
+        void copy.offsetWidth;
+        copy.classList.add('is-entering');
+      }
+
+      function showScene(index) {
+        current = index;
+        const scene = scenes[current];
+        root.dataset.phase = 'demo';
+        root.dataset.state = scene.state;
+        bot.setState(scene.state);
+        number.textContent = String(current + 1).padStart(2, '0');
+        title.textContent = scene.title;
+        english.textContent = scene.english;
+        updateDots(current);
+        animateCopy();
+        const duration = overrides.scene ?? scene.duration;
+        clearTimeout(timer);
+        timer = window.setTimeout(() => {
+          if (current === scenes.length - 1) showIntro(false);
+          else showScene(current + 1);
+        }, duration);
+      }
+
+      function showIntro(firstRun) {
+        clearTimeout(timer);
+        root.dataset.phase = 'intro';
+        root.dataset.state = 'idle';
+        bot.setState('idle');
+        timer = window.setTimeout(() => showScene(0), firstRun ? introDuration : loopIntroDuration);
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        clearTimeout(timer);
+        if (!document.hidden) {
+          if (root.dataset.phase === 'intro') showIntro(false);
+          else showScene(current);
+        }
+      });
+
+      showIntro(true);
+    })();
+  </script>
+</body>
+</html>
