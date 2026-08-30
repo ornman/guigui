@@ -166,10 +166,11 @@ body.hide-gui .bot-greet{display:none}
 @keyframes idle-breath{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
 
 /* 主页 / 首次页 greet 小 bot 走 micro 动画 */
-.bot-greet[data-state=idle],.bot-greet[data-mood=idle]{animation-name:idle-breath;animation-duration:2.4s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
-.bot-greet[data-state=complete],.bot-greet[data-mood=happy]{animation-name:happy-sway;animation-duration:1.6s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 90%}
-.bot-greet[data-state=thinking],.bot-greet[data-mood=sad]{animation-name:sad-droop;animation-duration:2.2s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 50%}
-.bot-greet[data-state=angry],.bot-greet[data-mood=cry]{animation-name:cry-shake;animation-duration:.5s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+/* bot-greet micro 动画:统一用 data-mood(与 mood() 函数一致,报告 5.4) */
+.bot-greet[data-mood=idle]{animation-name:idle-breath;animation-duration:2.4s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+.bot-greet[data-mood=happy]{animation-name:happy-sway;animation-duration:1.6s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 90%}
+.bot-greet[data-mood=sad]{animation-name:sad-droop;animation-duration:2.2s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 50%}
+.bot-greet[data-mood=cry]{animation-name:cry-shake;animation-duration:.5s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
 /* 庆祝页大 bot(独立容器,自己 bounce)— 自身已挂 .bot-success happy 状态
    注意:此规则被 .v-success-stage.in .bot-success 覆盖(那个有更高特异性) */
 .v-success-stage.in .bot-success[data-state=complete]{animation-name:botIn, happy-bounce;animation-duration:.55s, .9s;animation-delay:0s, .55s;animation-timing-function:cubic-bezier(.22,1,.36,1), ease-in-out;animation-iteration-count:1, infinite;animation-fill-mode:both, none;transform-origin:50% 50%}
@@ -488,7 +489,7 @@ body.backdrop-black .taskbar{display:none}
 
       <div style="height:10px"></div>
       <div class="row"><div><div class="t">自动登录</div>
-        <div class="d" id="auto-desc">明早 07:00 替你登 · 到点前 30 分钟开始试</div></div>
+        <div class="d" id="auto-desc">明早 07:00 替你登 · 提前 30 分钟开始试</div></div>
         <span class="sw on" id="sw-auto" onclick="toggleAuto()"></span></div>
       <div class="row"><div><div class="t">网络</div>
         <div class="d" id="main-net">已连上 Campus-WiFi ✓</div></div></div>
@@ -501,7 +502,7 @@ body.backdrop-black .taskbar{display:none}
       <div class="log">
         <div><span class="ts">07:00:01</span><span class="ok">[OK]</span> 网络可达</div>
         <div><span class="ts">07:00:02</span><span class="ok">[OK]</span> 已登录 · 2025…7209</div>
-        <div><span class="ts">07:00:03</span>[INFO] 窗口心跳结束 · 今日任务完成</div>
+        <div><span class="ts">07:00:03</span>今天到这就下班啦 ☕</div>
         <div class="hist"><a href="javascript:void(0)" onclick="openDetail('v-log')">历史日志 →</a></div>
       </div>
     </div>
@@ -515,7 +516,7 @@ body.backdrop-black .taskbar{display:none}
         <div class="log">
           <div><span class="ts">07:00:01</span><span class="ok">[OK]</span> 网络可达</div>
           <div><span class="ts">07:00:02</span><span class="ok">[OK]</span> 已登录 · 2025…7209</div>
-          <div><span class="ts">07:00:03</span>[INFO] 窗口心跳结束 · 今日任务完成</div>
+          <div><span class="ts">07:00:03</span>今天到这就下班啦 ☕</div>
         </div></div>
       <div class="day"><div class="day-h">昨天 · 8月29日</div>
         <div class="log">
@@ -523,11 +524,11 @@ body.backdrop-black .taskbar{display:none}
         </div></div>
       <div class="day"><div class="day-h">8月28日 · 假期静默</div>
         <div class="log">
-          <div><span class="ts">07:00:01</span>[静默] 连不上,每天只探 1 次,不吵你</div>
+          <div><span class="ts">07:00:01</span>连不上,今天先不打扰,明天再试一次</div>
         </div></div>
       <div class="day"><div class="day-h">8月27日 · 假期静默</div>
         <div class="log">
-          <div><span class="ts">07:00:01</span>[静默] 连不上,每天只探 1 次,不吵你</div>
+          <div><span class="ts">07:00:01</span>连不上,今天先不打扰,明天再试一次</div>
         </div></div>
     </div>
 
@@ -550,7 +551,7 @@ body.backdrop-black .taskbar{display:none}
           <button class="preset" data-t="08:00">08:00</button>
         </div>
       </div>
-      <div class="micro-line">直接输入,或点常用时间 · 校园网 06:50 开门 · 到点前 30 分钟开始,试 6 次,登上就停</div>
+      <div class="micro-line">直接输入,或点常用时间 · 校园网 06:50 才开门 · 我提前 30 分钟开始试,登好就收工</div>
       <div class="row"><div><div class="t">开机时补登录</div><div class="d">开机或重新登录系统时,桂桂顺手登一次</div></div>
         <div class="sw on" onclick="this.classList.toggle('on')"></div></div>
       <div class="row"><div><div class="t">窗口内重试间隔</div><div class="d">登上就停,不浪费探测</div></div>
@@ -699,8 +700,9 @@ function show(id){
     setTimeout(()=>{next.classList.add('on')},cur?250:0);
   }else{next.classList.add('on')}
 }
-function openDetail(id){origin[id]=currentView();show(id)}
-function backFrom(id){const dest=origin[id]||'v-main';if(dest==='v-main')renderMain();show(dest);greet();document.body.classList.remove('setup')}
+/* 来路栈:首次进入时记录,返回后清除(报告 5.5);不再每次覆盖 */
+function openDetail(id){if(!(id in origin))origin[id]=currentView();show(id)}
+function backFrom(id){const dest=origin[id]||'v-main';delete origin[id];if(dest==='v-main')renderMain();show(dest);greet();document.body.classList.remove('setup')}
 function greetText(){const h=new Date().getHours();return h<11?'早上好':(h<18?'下午好':'晚上好')}
 function greet(){const g=greetText()+'。';
   document.querySelectorAll('.g').forEach(e=>{if(e.id!=='main-h1')e.textContent=g})}
@@ -771,7 +773,7 @@ function wakeProblem(kind){mainState=kind;goDaily()}
 function setAuto(on){
   ['sw-auto','sw-auto-set'].forEach(id=>{const s=$(id);if(s)s.classList.toggle('on',on)});
   const d=$('auto-desc');
-  if(d)d.textContent=on?'明早 '+currentTriggerTime+' 替你登 · 到点前 30 分钟开始试':'已关 · 想让我开工随时说';
+  if(d)d.textContent=on?'明早 '+currentTriggerTime+' 替你登 · 提前 30 分钟开始试':'已关 · 想让我开工随时说';
   if($('v-main').classList.contains('on')){
     mood(document.querySelector('#boot-bot-greet-main'),on?'idle':'sleep');
     $('main-lede').textContent=on?'网的事交给我,你放心忙~':'好,我先歇着,想我了再开。';
