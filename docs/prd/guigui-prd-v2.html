@@ -89,25 +89,13 @@ body{
 .bot{position:relative;display:flex;align-items:center;justify-content:center}
 .bot svg{display:block;overflow:visible;width:100%;height:100%}
 
-/* 首次仪式:bot 居中 140px + 归位到左上角问候块左侧(58px) */
-/* boot-bot 容器:absolute 58x58 在 #win 左上角(归宿)
-   挂到 #win 子元素;base 不带 transition(避免 SVG attribute 变化触发的过渡卡住) */
-#boot-bot{position:absolute;left:36px;top:84px;width:58px;height:58px;z-index:10;
-  transform-origin:50% 50%;transform:translate(0,0) scale(1)}
-/* 仪式态:.centered 用 transform 平移 + 缩放到 #win 中央(560x640 卡片中) */
-#boot-bot.centered{width:140px;height:140px;left:36px;top:84px;
-  transform:translate(204px,232px) scale(1);
-  transition:transform .4s cubic-bezier(.22,1,.36,1), width .4s, height .4s}
-/* 仪式动画:entering 阶段执行;不要 forwards/both,让 .centered 的 transform 持续生效 */
-#boot-bot.centered.entering{animation:botSettle 1.4s cubic-bezier(.22,1,.36,1)}
-@keyframes botSettle{
-  0%{opacity:0;transform:translate(204px,252px) scale(.78)}
-  35%{opacity:1;transform:translate(204px,228px) scale(1.04)}
-  100%{opacity:1;transform:translate(204px,232px) scale(1)}
-}
-/* 归位动画:从中央 → 左上角 58x58,过渡 + ease-out-quint */
-#boot-bot.dock-in{transform:translate(0,0) scale(1);
-  transition:transform .9s cubic-bezier(.22,1,.36,1), width .9s, height .9s}
+/* ═══ Boot-bot:v-boot 仪式大 bot(140x140,grid 居中,不再 absolute) ═══ */
+/* 拆分后:boot-bot 永远在 v-boot 内 140x140;boot-bot-greet 永远在 .greet 内 58x58
+   不再做 58↔140 切换、不再做 transform 平移归位、彻底拆掉 .centered/.dock-in/.botSettle
+   base 不带 transition(避免 SVG attribute 变化触发的过渡卡住) */
+#boot-bot{width:140px;height:140px;transform-origin:50% 50%}
+/* 仪式入场:仅 .entering 阶段触发 pop 弹起;无 transform 平移(改 grid 居中) */
+#boot-bot.entering{animation:pop 1s cubic-bezier(.34,1.56,.64,1) both}
 /* 庆祝页大 bot(固定大尺寸,无归位) */
 .bot-success{width:140px;height:140px;margin:0 auto 10px}
 /* v-success 内容层:卡片光晕脉冲 + bot 弹入 + 4 行文字逐行浮入 + 背景渐显
@@ -140,29 +128,30 @@ body{
 .v-success-stage.in .s-5{animation-delay:1.30s}
 @keyframes lineIn{to{opacity:1;transform:none}}
 
-/* 主页问候行:内嵌 bot + 标题,flex 垂直居中,永不错位 */
+/* ═══ 主页问候行:bot-greet + 标题,flex 垂直居中,永不错位 ═══ */
+/* bot-greet 容器:58x58,flex-shrink:0;回主页入口是标题栏名字,不再点 bot */
 .greet{display:flex;align-items:center;gap:14px;margin-bottom:2px}
-.greet #boot-bot{width:58px;height:58px;flex-shrink:0;cursor:pointer}
-.greet #boot-bot:hover{filter:brightness(1.06)}
-body.hide-gui .greet #boot-bot{display:none}
+.bot-greet{width:58px;height:58px;flex-shrink:0;cursor:pointer}
+.bot-greet:hover{filter:brightness(1.06)}
+body.hide-gui .bot-greet{display:none}
 
 /* pop 反馈(用户点击桂桂时) */
 @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.1,.9)}70%{transform:scale(.95,1.05)}100%{transform:scale(1)}}
 .bot.pop{animation:pop .55s cubic-bezier(.34,1.56,.64,1)}
 
 /* 各状态微动作:CSS 辅助库的 spring — 给 div 加 transform,不干扰库内部 SVG 动画
-   boot-bot 单独类(它走 .settled 归位),不挂这些 micro 动画 */
+   boot-bot(仪式大 bot)和 bot-success(庆祝大 bot)都走自己的专属动画,不再挂 micro */
 @keyframes happy-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 @keyframes happy-sway{0%,100%{transform:rotate(-3deg) translateY(0)}50%{transform:rotate(3deg) translateY(-3px)}}
 @keyframes sad-droop{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(-6deg)}}
 @keyframes cry-shake{0%,100%{transform:translateY(0)}25%{transform:translateY(-1px)}75%{transform:translateY(1px)}}
 @keyframes idle-breath{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
 
-/* 排除 boot-boot 与 bot-success 容器,让它们各自的 dock/bounce 规则生效 */
-#boot-bot[data-state=idle],#boot-bot[data-mood=idle]{animation-name:idle-breath;animation-duration:2.4s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
-#boot-bot[data-state=complete],#boot-bot[data-mood=happy]{animation-name:happy-sway;animation-duration:1.6s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 90%}
-#boot-bot[data-state=thinking],#boot-bot[data-mood=sad]{animation-name:sad-droop;animation-duration:2.2s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 50%}
-#boot-bot[data-state=angry],#boot-bot[data-mood=cry]{animation-name:cry-shake;animation-duration:.5s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+/* 主页 / 首次页 greet 小 bot 走 micro 动画 */
+.bot-greet[data-state=idle],.bot-greet[data-mood=idle]{animation-name:idle-breath;animation-duration:2.4s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+.bot-greet[data-state=complete],.bot-greet[data-mood=happy]{animation-name:happy-sway;animation-duration:1.6s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 90%}
+.bot-greet[data-state=thinking],.bot-greet[data-mood=sad]{animation-name:sad-droop;animation-duration:2.2s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;transform-origin:50% 50%}
+.bot-greet[data-state=angry],.bot-greet[data-mood=cry]{animation-name:cry-shake;animation-duration:.5s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
 /* 庆祝页大 bot(独立容器,自己 bounce)— 自身已挂 .bot-success happy 状态
    注意:此规则被 .v-success-stage.in .bot-success 覆盖(那个有更高特异性) */
 .v-success-stage.in .bot-success[data-state=complete]{animation-name:botIn, happy-bounce;animation-duration:.55s, .9s;animation-delay:0s, .55s;animation-timing-function:cubic-bezier(.22,1,.36,1), ease-in-out;animation-iteration-count:1, infinite;animation-fill-mode:both, none;transform-origin:50% 50%}
