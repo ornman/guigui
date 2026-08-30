@@ -32,7 +32,7 @@ const S={
   cfg:JSON.parse(localStorage.getItem(LS_CFG)||'null')||{
     trigger_time:'07:00',boot_login:true,heartbeat_minutes:5,
     wifi_fallback_enabled:false,wifi_fallback_ssid:null,
-    patrol_enabled:false,patrol_minutes:30,wake_login:true,
+    patrol_enabled:false,patrol_minutes:30,wake_login:false,
     vacation_silence:true,notifications:true,show_gui:true,master:true,
     login_retries:3,retry_seconds:5},
   last:{when:'今早',time:'07:00',tries:1,outcome:'ok'},

@@ -96,7 +96,7 @@
   "wifi_fallback_ssid": null,     // 兜底目标网络(选不填,来自扫描)
   "patrol_enabled": false,        // 白天巡逻(L3)
   "patrol_minutes": 30,           // ∈ 15|30|60
-  "wake_login": true,             // 睡眠唤醒补登录(L5)
+  "wake_login": false,            // 睡眠唤醒补登录(L5)· 默认关(PRD §5)
   "vacation_silence": true,       // 假期静默
   "notifications": true,          // 弹通知
   "show_gui": true,               // 显示桂桂
@@ -164,6 +164,7 @@
 1. 前端加载 → 立即 `probe()`(期间 v-boot 仪式照常播)。
 2. `configured=false` → 首装单行道(仪式→三分支);`configured=true` → 日常页,`net.state=waiting` 时停在等门 UI 等 `net:state`。
 3. 首装「开启每日自动登录」= `saveConfig`(学号+触发时间等)→ `login`(带密码)→ 成功进庆祝页;`AUTH_REJECTED` → 密码警告,不进庆祝。
+4. **深链注入(1.0.2 收编)**:壳可在页面 loaded 前注入 `window.__guigui_launch`(一次性,`'main'|'creds'|'settings'`),前端在启动路由完成后消费并清除;未完成首装时忽略(单行道优先)。通知点击路由(`guigui://main` / `guigui://creds`)依赖此机制。
 
 ## 5. 版本与变更记录
 
@@ -171,6 +172,7 @@
 |---|---|---|---|
 | 1.0.0 | 2026-08-31 | 初版:11 方法 + 4 事件 + 8 错误码 | 已被 1.0.1 取代 |
 | 1.0.1 | 2026-08-31 | mock 移入 `static/dev/`,仅 `?dev=1` 加载;生产无绑定返回 `BRIDGE_MISSING` 诚实报错(错误码 +1);打包必须排除 `static/dev/` | 前端已实现;后端已适配(guigui.spec 递归排除 dev/,commit 2026-08-31)— **生效** |
+| 1.0.2 | 2026-08-31 | `wake_login` 默认值对齐 PRD §5(→ false,清待办#1);§4 收编深链注入 `window.__guigui_launch`(清待办#2,后端已按此注入) | 前端已实现(mock+applyLaunch);待后端回注 |
 
 ## 6. 集成待办(联调问题记这里)
 

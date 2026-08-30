@@ -693,7 +693,7 @@ async function firstRun(){
     mainState=s==='logged_in'?'ok':(s==='not_logged_in'?'out':'down');
     if(configured){
       if(s==='waiting'){setTimeout(bootWait,Math.max(0,700-el));return}   /* 等门:开门事件接手 */
-      setTimeout(goDaily,Math.max(0,1500-el));return
+      setTimeout(()=>{goDaily();applyLaunch()},Math.max(0,1500-el));return
     }
   }else{mainState='down'}
   setTimeout(()=>{mood(b,mainState==='ok'?'idle':(mainState==='out'?'sad':'cry'))},Math.max(0,700-el));
@@ -709,6 +709,15 @@ function bootWait(){
   $('boot-cap').innerHTML='校园网 06:50 才开门,桂桂在门口等着…<br><span style="font-size:11px;opacity:.7">每 30 秒看一次,开了就替你登好</span>';
   show('v-boot');
   /* 开门后端会推 net:state(契约 §3),事件监听接手进日常页 */
+}
+/* 深链(契约 §4):壳在 loaded 前注入 window.__guigui_launch('main'|'creds'|'settings'),
+   前端启动路由完成后消费一次即清除;未完成首装时忽略,单行道优先 */
+function applyLaunch(){
+  const L=window.__guigui_launch;
+  if(!L)return;
+  try{delete window.__guigui_launch}catch(e){window.__guigui_launch=undefined}
+  if(L==='creds')openDetail('v-login');
+  else if(L==='settings')openDetail('v-settings')
 }
 function goSetup(){
   if(mainState==='out')show('v-login');
