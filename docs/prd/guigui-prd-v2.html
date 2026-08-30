@@ -90,16 +90,15 @@ body{
 .bot svg{display:block;overflow:visible;width:100%;height:100%}
 
 /* 首次仪式:bot 居中 140px + 归位到左上角问候块左侧(58px) */
-/* boot-bot 容器:始终 fixed 58x58 在左上角(归宿),firstRun 时 JS 加 .centered
-   临时切到中央 140x140(用 transform 平移 + 缩放,left/top 不变,避免跳变) */
-#boot-bot{position:fixed;left:36px;top:84px;width:58px;height:58px;z-index:10;
-  transform-origin:50% 50%;transform:translate(0,0) scale(1);transition:transform .4s cubic-bezier(.22,1,.36,1), width .4s, height .4s, left .4s, top .4s}
-/* 仪式态:.centered 切到中央 140x140 — 用 transform 平移 + width/height 一起过渡
-   这样 firstRun 加 .centered 时不会"跳",而是 58x58 → 140x140 平滑放大
-   注:translate(204,232) 是 70% viewport 位置(560x800 时中央) */
+/* boot-bot 容器:absolute 58x58 在 #win 左上角(归宿)
+   挂到 #win 子元素;base 不带 transition(避免 SVG attribute 变化触发的过渡卡住) */
+#boot-bot{position:absolute;left:36px;top:84px;width:58px;height:58px;z-index:10;
+  transform-origin:50% 50%;transform:translate(0,0) scale(1)}
+/* 仪式态:.centered 用 transform 平移 + 缩放到 #win 中央(560x640 卡片中) */
 #boot-bot.centered{width:140px;height:140px;left:36px;top:84px;
-  transform:translate(204px,232px) scale(1);transition:transform .4s cubic-bezier(.22,1,.36,1), width .4s, height .4s}
-/* 仪式动画:.entering 阶段执行;不要 forwards/both,让 .centered 的 transform 持续生效 */
+  transform:translate(204px,232px) scale(1);
+  transition:transform .4s cubic-bezier(.22,1,.36,1), width .4s, height .4s}
+/* 仪式动画:entering 阶段执行;不要 forwards/both,让 .centered 的 transform 持续生效 */
 #boot-bot.centered.entering{animation:botSettle 1.4s cubic-bezier(.22,1,.36,1)}
 @keyframes botSettle{
   0%{opacity:0;transform:translate(204px,252px) scale(.78)}
@@ -107,7 +106,8 @@ body{
   100%{opacity:1;transform:translate(204px,232px) scale(1)}
 }
 /* 归位动画:从中央 → 左上角 58x58,过渡 + ease-out-quint */
-#boot-bot.dock-in{transform:translate(0,0) scale(1);transition:transform .9s cubic-bezier(.22,1,.36,1), width .9s, height .9s}
+#boot-bot.dock-in{transform:translate(0,0) scale(1);
+  transition:transform .9s cubic-bezier(.22,1,.36,1), width .9s, height .9s}
 /* 庆祝页大 bot(固定大尺寸,无归位) */
 .bot-success{width:140px;height:140px;margin:0 auto 10px}
 /* v-success 内容层:卡片光晕脉冲 + bot 弹入 + 4 行文字逐行浮入 + 背景渐显
@@ -397,7 +397,7 @@ body.backdrop-black .taskbar{display:none}
 
     <!-- 开机仪式(首次/等网络共用) -->
     <div class="v on" id="v-boot">
-      <div class="bot bot-boot" id="boot-bot" data-state="sleep" data-size="140" onclick="mood(this,'happy')" style="cursor:pointer"></div>
+      <div class="bot bot-boot" id="boot-bot" data-state="sleep" data-size="58" onclick="mood(this,'happy')" style="cursor:pointer"></div>
       <div class="boot-cap" id="boot-cap">桂桂伸了个懒腰,正在检查网络…</div>
     </div>
 
@@ -684,10 +684,10 @@ function firstRun(state){
   mainState=state||'ok';
   document.body.classList.add('setup');
   const b=$('boot-bot');
-  /* 把 boot-bot 移到 body 下,确保 fixed 定位不被 v-boot display:none 影响 */
-  if(b.parentElement!==document.body)document.body.appendChild(b);
+  if(b.parentElement!==$("win"))$("win").appendChild(b);
+  /* 仪式时 data-size=140 让 SVG 渲染为 140x140;goSetup 时改回 58 */
+  b.dataset.size=140;reinitBot(b);
   $('boot-cap').textContent='桂桂伸了个懒腰,正在检查网络…';
-  /* 加 .centered(过渡到中央)+ .entering(触发 botSettle 仪式弹跳)*/
   b.classList.remove('awake');b.dataset.mood='sleep';
   b.classList.add('centered','entering');
   show('v-boot');
@@ -695,11 +695,18 @@ function firstRun(state){
   setTimeout(()=>{mood(b,mainState==='ok'?'idle':(mainState==='out'?'sad':'cry'));b.classList.add('awake')},1300);
   setTimeout(goSetup,2100);
 }
+/* 重新初始化 bot(改了 data-size 后重建 SVG) */
+function reinitBot(b){
+  if(b.__xj)b.__xj=null;
+  b.innerHTML='';
+  initBot(b);
+}
 /* 开机等网络:无典礼(每天开机都走),桂桂睡着在门口等,就绪直接落日常页 */
 function bootWait(){
   mainState='ok';document.body.classList.remove('setup');
   const b=$('boot-bot');
-  if(b.parentElement!==document.body)document.body.appendChild(b);
+  if(b.parentElement!==$("win"))$("win").appendChild(b);
+  b.dataset.size=140;reinitBot(b);
   b.classList.add('centered','entering');
   setTimeout(()=>{b.classList.remove('entering')},1500);
   b.classList.remove('awake');b.dataset.mood='sleep';
@@ -713,12 +720,13 @@ function goSetup(){
   else if(mainState==='down')show('v-guide');
   else show('v-ok');
   greet();
-  /* 仪式结束:boot-bot 从 v-boot 中央 fixed→左上角 fixed(0.9s ease-out-quint 缩放曲线) */
   const b=$('boot-bot');if(b){
     b.classList.remove('centered');
     b.classList.remove('dock-in');void b.offsetWidth;
     b.classList.add('dock-in');
-    /* dock-in 完成后清掉 class,避免重放 */
+    /* 仪式后回到 58x58:改 data-size 重新初始化 SVG */
+    b.dataset.size=58;
+    setTimeout(()=>reinitBot(b),950);  /* 等 dock-in 动画接近完成再切 */
     setTimeout(()=>{b.classList.remove('dock-in')},1000);
   }
 }
@@ -730,6 +738,8 @@ function goDaily(){
     b.classList.remove('centered');
     b.classList.remove('dock-in');void b.offsetWidth;
     b.classList.add('dock-in');
+    b.dataset.size=58;
+    setTimeout(()=>reinitBot(b),950);
     setTimeout(()=>{b.classList.remove('dock-in')},1000);
   }
   renderMain();show('v-main');greet();
