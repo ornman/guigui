@@ -11,8 +11,21 @@ GUIGUI_DIR = Path(SPECPATH)            # .../guigui
 PROJECT_ROOT = GUIGUI_DIR.parent       # 仓库根(保证 `import guigui` 可解析)
 
 static = GUIGUI_DIR / "app" / "static"
-# 前端仍在迭代:static 缺席时打出无前端资源的包(GUI 启动会提示缺资源)
-datas = [(str(static), "guigui/app/static")] if static.exists() else []
+
+
+def _static_datas():
+    """static 全量打包,但排除 dev/ 目录(契约 1.0.1:mock 只许活在开发目录)。"""
+    if not static.exists():
+        return []
+    out = []
+    for p in static.rglob("*"):
+        rel = p.relative_to(static)
+        if p.is_file() and "dev" not in rel.parts:
+            out.append((str(p), "guigui/app/static/" + str(rel.parent)))
+    return out
+
+
+datas = _static_datas()
 
 a = Analysis(
     [str(GUIGUI_DIR / "__main__.py")],
