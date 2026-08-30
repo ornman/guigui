@@ -159,6 +159,33 @@ def _today() -> str:
     return _now().strftime("%Y-%m-%d")
 
 
+def _apply_settle(cfg: dict, state: dict, today: str, uid: str, tries: int) -> None:
+    """当日首次成功:收工三行 + 计数复位 + last_result + 通知判断(不落盘)。"""
+    _settle_rows(cfg, uid, tries)
+    state.update({
+        "last_settle_date": today,
+        "consecutive_fail": 0, "fail_notify_sent": False,
+        "unreachable_streak": 0, "silent": False,
+        "last_result": {"date": today, "time": _now().strftime("%H:%M"),
+                        "tries": tries, "outcome": "ok"},
+    })
+    _apply_notify(cfg, state, connected=True,
+                  login_attempted=tries > 0, login_succeeded=True)
+
+
+def settle_from_gui(cfg: dict, uid: str, tries: int) -> None:
+    """GUI 登录成功后的收工入口 — 与 ensure 同一套日志/状态/通知语义。
+
+    同日已收工则不动(手动重登不重复写收工行)。
+    """
+    state = load_state()
+    today = _today()
+    if state.get("last_settle_date") == today:
+        return
+    _apply_settle(cfg, state, today, uid, tries)
+    save_state(state)
+
+
 def run() -> int:
     """静默主流程;任何分支结束前统一落 state(原子写)。"""
     cfg = config.load()
@@ -177,16 +204,7 @@ def run() -> int:
     if outcome == "settled":
         if state.get("last_settle_date") == today:
             return 0  # 登上就停:后续拍零日志零通知
-        _settle_rows(cfg, uid, tries)
-        state.update({
-            "last_settle_date": today,
-            "consecutive_fail": 0, "fail_notify_sent": False,
-            "unreachable_streak": 0, "silent": False,
-            "last_result": {"date": today, "time": _now().strftime("%H:%M"),
-                            "tries": tries, "outcome": "ok"},
-        })
-        _apply_notify(cfg, state, connected=True,
-                      login_attempted=tries > 0, login_succeeded=True)
+        _apply_settle(cfg, state, today, uid, tries)
         save_state(state)
         return 0
 
