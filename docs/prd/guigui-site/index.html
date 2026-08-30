@@ -16,7 +16,7 @@
    · 背景:流动渐变 mesh(紫/品红/蓝),光标视差
    · 能量曲线:Hero 高光 → 中段收敛 → 信号二高潮 → 收敛 → 按钮焦点
        Fig.00 Hero  — 高光① 点阵网格,光标排斥 + 点亮
-       Fig.01 用法   — 极简四步(编号+短标题+一句话)+ 真实 PRD 原型横板分栏
+       Fig.01 用法   — 四帧横向预览:下载/配置/成功/日常 状态快照 + 光标动效
        Fig.02 触发器 — 无背景 canvas,行 hover 高亮即内容交互
        Fig.03 信号   — 高光② 电磁波全案 · 光标即波源:波在光标处隆起、
                         被拉向光标,光标持续发涟漪,点击脉冲爆发
@@ -298,87 +298,108 @@ section.sc > canvas.scene{
 .sec-head h2{max-width:24ch}
 .sec-head .lede{margin-top:14px}
 
-/* ═══ Fig.02 用法 · 四步 walkthrough(时间轴脊柱 + 界面小道具) ═══ */
-.steps{padding:40px 44px 32px}
-.step{
-  display:grid;grid-template-columns:64px minmax(0,1fr);gap:30px;
-  position:relative;padding-bottom:40px;
+/* ═══ Fig.01 用法 · 四帧横向预览(产品状态快照 + 光标动效) ═══ */
+.frames{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.frame{position:relative}
+.frame-win{
+  position:relative;height:330px;border-radius:16px;overflow:hidden;
+  background:
+    radial-gradient(200px 150px at 12% 0%, rgba(255,255,255,0.55), transparent 70%),
+    linear-gradient(168deg, rgba(243,241,249,0.92), rgba(224,220,238,0.84));
+  backdrop-filter:blur(20px) saturate(160%);
+  -webkit-backdrop-filter:blur(20px) saturate(160%);
+  border:1px solid rgba(255,255,255,0.9);
+  box-shadow:0 16px 40px rgba(36,31,51,0.14), inset 0 1px 0 rgba(255,255,255,0.95);
+  color:var(--win-ink);padding:14px;
+  display:flex;flex-direction:column;
+  transition:transform 300ms cubic-bezier(0.32,0.72,0,1),box-shadow 300ms ease-out;
 }
-.step:last-child{padding-bottom:8px}
-/* 时间轴脊柱:节点之间的连线 */
-.step:not(:last-child)::before{
-  content:"";position:absolute;left:31px;top:52px;bottom:-4px;width:1px;
-  background:linear-gradient(180deg,rgba(109,77,232,0.35),rgba(109,77,232,0.08));
+.frame:hover .frame-win{transform:translateY(-4px);box-shadow:0 22px 52px rgba(36,31,51,0.18), inset 0 1px 0 rgba(255,255,255,0.95)}
+.frame-cap{
+  margin-top:10px;text-align:center;
+  font-family:var(--mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.06em;
 }
-.step-node{
-  width:44px;height:44px;border-radius:50%;
+.frame-cap b{color:var(--ink-2);font-weight:500}
+/* 帧内迷你标题栏 */
+.fw-bar{display:flex;align-items:center;gap:6px;padding-bottom:8px;border-bottom:1px solid var(--win-line);margin-bottom:10px}
+.fw-bar .nm{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.18em;color:var(--win-ink-3)}
+.fw-bar .sp{flex:1}
+.fw-bar .x{
+  width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;
+  font-size:9px;color:var(--win-ink-3);border:1px solid transparent;
+}
+.fw-bar .x.hot{border-color:rgba(109,77,232,0.5);color:var(--accent);box-shadow:0 0 0 3px rgba(109,77,232,0.12)}
+/* 光标动效 */
+.cur{
+  position:absolute;width:14px;height:14px;border-radius:50%;z-index:6;
+  background:#fff;border:2.5px solid var(--accent);
+  box-shadow:0 3px 10px rgba(36,31,51,0.35);
+  pointer-events:none;
+}
+.cur::after{
+  content:"";position:absolute;inset:-7px;border-radius:50%;
+  border:1.5px solid rgba(109,77,232,0.6);
+  animation:cur-click 2.2s ease-out infinite;
+}
+@keyframes cur-click{0%{transform:scale(0.5);opacity:0}25%{opacity:1}60%,100%{transform:scale(1.5);opacity:0}}
+.cur.move{animation:cur-move 3.2s cubic-bezier(0.32,0.72,0,1) infinite}
+@keyframes cur-move{0%,18%{transform:translate(0,0)}60%,100%{transform:translate(30px,52px)}}
+/* 帧1 下载 */
+.f1-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
+.f1-ico{
+  width:44px;height:44px;border-radius:12px;
+  background:linear-gradient(135deg,#6D4DE8,#B84DE8);
+  color:#fff;font-family:var(--serif);font-size:20px;font-weight:600;
   display:flex;align-items:center;justify-content:center;
-  font-family:var(--mono);font-size:13px;color:var(--accent);
-  border:1px solid rgba(109,77,232,0.45);
-  background:rgba(109,77,232,0.07);
-  box-shadow:0 0 0 5px rgba(109,77,232,0.05);
+  box-shadow:0 8px 20px rgba(109,77,232,0.35);
 }
-.step-body h3{font-family:var(--serif);font-size:26px;font-weight:500;letter-spacing:-.015em;padding-top:4px}
-/* 动作行:每步唯一的一句话,主色,直给 */
-.step-body .act{font-size:15.5px;color:var(--ink);line-height:1.6;margin-top:6px}
-/* 界面小道具:与每步内容绑定的迷你组件 */
-.step-prop{
-  margin-top:14px;display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;
-  font-family:var(--mono);font-size:11.5px;color:var(--ink-2);
-  padding:9px 14px;border-radius:10px;
-  border:1px solid var(--line-2);background:rgba(255,255,255,0.5);
-  line-height:1.6;
-}
-.step-prop .ok{color:var(--accent)}
-.step-prop .dot{
-  display:inline-block;width:6px;height:6px;border-radius:50%;
-  background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);
-}
-/* 第二步:迷你首装表单 */
-.step-form{
-  margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;
-  font-family:var(--mono);font-size:11px;
-}
-.step-form .fld{
-  padding:8px 12px;border-radius:9px;border:1px solid var(--line-2);
-  background:rgba(255,255,255,0.55);color:var(--ink-3);letter-spacing:.04em;
-}
-.step-form .fld b{color:var(--ink);font-weight:400;margin-left:6px}
-.step-form .go{
-  padding:8px 16px;border-radius:9px;border:none;
+.f1-nm{font-family:var(--mono);font-size:10.5px;color:var(--win-ink-2);letter-spacing:.04em}
+.f1-btns{display:flex;gap:8px;margin-top:6px}
+.f1-dl{
+  padding:8px 22px;border-radius:99px;border:none;
   background:linear-gradient(135deg,#6D4DE8,#B84DE8);color:#fff;
-  font-family:var(--sans);font-size:11.5px;font-weight:600;letter-spacing:.02em;
+  font-family:var(--sans);font-size:12px;font-weight:600;
 }
-/* 第四步:迷你日志 */
-.step-log{
-  margin-top:14px;display:inline-block;padding:10px 14px;border-radius:10px;
+.f1-x{padding:8px 16px;border-radius:99px;border:1px solid var(--win-line);color:var(--win-ink-2);font-size:12px;background:none}
+/* 帧2/帧4 通用迷你元件 */
+.fw-h{font-family:var(--serif);font-size:16px;font-weight:600;letter-spacing:-.01em}
+.fw-say{font-size:10.5px;color:var(--win-ink-2);margin-top:2px}
+.fw-in{
+  padding:8px 10px;border-radius:8px;border:1px solid rgba(43,37,56,0.14);
+  background:rgba(255,255,255,0.6);
+  font-family:var(--mono);font-size:10px;color:var(--win-ink-3);letter-spacing:.04em;
+}
+.fw-in b{color:var(--win-ink);font-weight:400}
+.fw-go{
+  padding:9px 0;border-radius:9px;border:none;text-align:center;
+  background:linear-gradient(135deg,#6D4DE8,#B84DE8);color:#fff;
+  font-family:var(--sans);font-size:11.5px;font-weight:600;
+}
+/* 帧3 成功 */
+.f3-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;position:relative}
+.f3-h{font-family:var(--serif);font-size:15px;font-weight:600}
+.f3-sub{font-size:10.5px;color:var(--win-ink-2)}
+.f3-conf{position:absolute;font-size:11px;opacity:.85}
+/* 帧4 日常 */
+.f4-status{
+  display:flex;align-items:center;gap:6px;padding:6px 9px;border-radius:8px;
+  background:rgba(109,77,232,0.08);font-size:9.5px;color:var(--win-ink-2);
+}
+.f4-status .d{width:5px;height:5px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px rgba(109,77,232,0.15)}
+.f4-time{
+  font-family:var(--serif);font-size:24px;font-weight:600;letter-spacing:-.01em;
+  padding:1px 10px;border-radius:8px;align-self:flex-start;
+  border:1px solid rgba(109,77,232,0.4);background:rgba(109,77,232,0.07);
+}
+.f4-tg{width:26px;height:15px;border-radius:99px;position:relative;background:linear-gradient(135deg,#6D4DE8,#B84DE8)}
+.f4-tg::after{content:"";position:absolute;top:2px;left:12px;width:11px;height:11px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.25)}
+.f4-row{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;color:var(--win-ink);padding:6px 0;border-bottom:1px solid var(--win-line)}
+.f4-log{
+  margin-top:auto;padding:7px 9px;border-radius:7px;
   background:rgba(30,25,46,0.92);color:#B9B1D6;
-  font-family:var(--mono);font-size:10.5px;line-height:1.9;
+  font-family:var(--mono);font-size:8.5px;line-height:1.8;
 }
-.step-log .t{color:#7A7294;margin-right:8px}
-.step-log .ok{color:#A99BFF}
-
-/* Fig.01 横板分栏:左步骤 walkthrough + 右真实 PRD 原型 */
-.usage-split{display:grid;grid-template-columns:minmax(0,1fr) 620px;gap:52px;align-items:start}
-.prd-frame{
-  position:sticky;top:90px;
-  border-radius:18px;overflow:hidden;
-  border:1px solid var(--line-2);background:#0B0A0F;
-  box-shadow:0 24px 60px rgba(36,31,51,0.20);
-}
-.prd-frame .bar{
-  display:flex;align-items:center;gap:10px;padding:10px 14px;
-  background:#17131F;border-bottom:1px solid rgba(255,255,255,0.08);
-  font-family:var(--mono);font-size:10.5px;color:#8B85A0;letter-spacing:.05em;
-}
-.prd-frame .bar .dots{display:flex;gap:6px}
-.prd-frame .bar .dots span{width:8px;height:8px;border-radius:50%;border:1px solid rgba(255,255,255,0.22)}
-.prd-frame .bar .ttl{flex:1;text-align:right;font-style:italic;color:#A7A1B8}
-.prd-frame iframe{display:block;width:100%;height:800px;border:0;background:#0B0A0F}
-.prd-cap{
-  margin-top:12px;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);
-  letter-spacing:.05em;text-align:center;line-height:1.7;
-}
+.f4-log .ok{color:#A99BFF}
 
 /* ═══ Fig.02 触发器(玻璃面板内) ═══ */
 .ft-rows{padding:8px 36px}
@@ -508,8 +529,6 @@ section.sc > canvas.scene{
 
 /* ═══ 响应式 ═══ */
 @media (max-width: 1120px){
-  .usage-split{grid-template-columns:1fr}
-  .prd-frame{position:static}
   .hero{padding-top:56px}
   .hero-grid{grid-template-columns:1fr;gap:48px}
   .win-stage{width:min(468px,100%)}
@@ -519,10 +538,8 @@ section.sc > canvas.scene{
   .nav{top:10px;gap:16px;padding:12px 22px}
   .nav .links{display:none}
   .sec-head,.dl-head{grid-template-columns:1fr;gap:18px;margin-bottom:32px}
-  .step{grid-template-columns:44px minmax(0,1fr);gap:16px;padding-bottom:28px}
-  .step-node{width:36px;height:36px;font-size:11px}
-  .step:not(:last-child)::before{left:17.5px;top:42px}
-  .steps,.ft-rows,.faq-wrap{padding:24px 20px}
+  .frames{grid-template-columns:repeat(2,1fr)}
+  .ft-rows,.faq-wrap{padding:24px 20px}
   .ft-row{grid-template-columns:70px 1fr;gap:14px}
   .ft-row .d{grid-column:2}
   .faq summary{grid-template-columns:70px 1fr 16px;gap:14px;font-size:16.5px}
@@ -536,6 +553,8 @@ section.sc > canvas.scene{
 }
 @media (max-width: 520px){
   h1{font-size:clamp(36px,11vw,54px)}
+  .frames{grid-template-columns:1fr}
+  .frame-win{height:auto;min-height:300px}
   .win{width:100%}
   .win-body{min-height:0}
   .faq .answer{padding-left:0}
@@ -648,71 +667,76 @@ section.sc > canvas.scene{
   </div>
 </section>
 
-<!-- ═══ Fig.01 用法 · 横板分栏:左极简四步 + 右真实 PRD 原型(可交互) ═══ -->
+<!-- ═══ Fig.01 用法 · 四帧横向预览:下载 → 配置 → 成功 → 日常(状态快照 + 光标动效) ═══ -->
 <section class="sc" id="fig-01" data-scene="threads">
   <canvas class="scene" aria-hidden="true"></canvas>
   <div class="wrap">
     <div class="sec-head">
-      <div class="fig-label"><b>Fig. 01</b><br>How to use<br>· 4 步</div>
+      <div class="fig-label"><b>Fig. 01</b><br>How to use<br>· 4 帧</div>
       <div>
-        <h2 class="rv">四步,之后不用管。</h2>
-        <p class="lede rv">右边就是真实界面,点底部按钮可切换场景。</p>
+        <h2 class="rv">看这四帧,就会用了。</h2>
+        <p class="lede rv">从下载到每天自动登录,全部过程就这些。</p>
       </div>
     </div>
-    <div class="usage-split">
-      <div class="panel rv">
-        <ol class="steps">
-          <li class="step">
-            <div class="step-node">01</div>
-            <div class="step-body">
-              <h3>下载安装</h3>
-              <p class="act">双击,装完。</p>
-              <div class="step-prop"><span class="ok">$</span> guig install · 32 MB</div>
+    <div class="frames">
+
+      <div class="frame rv">
+        <div class="frame-win">
+          <div class="f1-body">
+            <div class="f1-ico" aria-hidden="true">桂</div>
+            <div class="f1-nm">GuiGui-Setup.exe · 32 MB</div>
+            <div class="f1-btns">
+              <span class="f1-dl">下载</span>
+              <span class="f1-x">关闭</span>
             </div>
-          </li>
-          <li class="step">
-            <div class="step-node">02</div>
-            <div class="step-body">
-              <h3>首次配置</h3>
-              <p class="act">学号、密码、时间,填一次。</p>
-              <div class="step-form" aria-hidden="true">
-                <span class="fld">学号<b>2023xxxx</b></span>
-                <span class="fld">密码<b>••••••</b></span>
-                <span class="fld">时间<b>07:00</b></span>
-                <span class="go">开启</span>
-              </div>
-            </div>
-          </li>
-          <li class="step">
-            <div class="step-node">03</div>
-            <div class="step-body">
-              <h3>静默运行</h3>
-              <p class="act">之后,什么都不用做。</p>
-              <div class="step-prop"><span class="dot"></span>已连接 · 07:00:02</div>
-            </div>
-          </li>
-          <li class="step">
-            <div class="step-node">04</div>
-            <div class="step-body">
-              <h3>想改再打开</h3>
-              <p class="act">改完关掉,照样自动。</p>
-              <div class="step-log" aria-hidden="true">
-                <div><span class="t">07:00:02</span><span class="ok">✓ login ok</span></div>
-              </div>
-            </div>
-          </li>
-        </ol>
-      </div>
-      <div class="rv">
-        <div class="prd-frame">
-          <div class="bar">
-            <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
-            <div class="ttl">guigui-prd-v2.html</div>
           </div>
-          <iframe src="assets/prd/index.html" title="桂桂 v2 真实界面原型,点底部演示按钮切换场景" loading="lazy"></iframe>
+          <span class="cur" style="left:56%;top:62%" aria-hidden="true"></span>
         </div>
-        <div class="prd-cap">真实界面原型 · 底部按钮可切换「首次仪式 / 日常主页 / 掉线」</div>
+        <div class="frame-cap"><b>01 下载</b> · 点下载,装完打开</div>
       </div>
+
+      <div class="frame rv">
+        <div class="frame-win">
+          <div class="fw-h">早上好。</div>
+          <div class="fw-say">把账号交给桂桂,以后不用再输。</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+            <span class="fw-in">学号 <b>2023xxxx</b></span>
+            <span class="fw-in">密码 <b>••••••</b></span>
+          </div>
+          <div class="fw-go" style="margin-top:12px">开启每日自动登录</div>
+          <span class="cur move" style="left:32%;top:64%" aria-hidden="true"></span>
+        </div>
+        <div class="frame-cap"><b>02 配置</b> · 学号密码,填一次</div>
+      </div>
+
+      <div class="frame rv">
+        <div class="frame-win">
+          <div class="fw-bar"><span class="nm">GUIGUI</span><span class="sp"></span><span class="x hot" aria-hidden="true">×</span></div>
+          <div class="f3-body">
+            <span class="f3-conf" style="left:16%;top:14%" aria-hidden="true">✦</span>
+            <span class="f3-conf" style="right:18%;top:24%;color:#D946EF" aria-hidden="true">✧</span>
+            <span class="f3-conf" style="left:24%;bottom:20%;color:#4F7CFF" aria-hidden="true">✦</span>
+            <div class="f3-h">网,已经帮你连好啦</div>
+            <div class="f3-sub">以后每天都会自动登好。</div>
+          </div>
+          <span class="cur" style="right:7%;top:6%" aria-hidden="true"></span>
+        </div>
+        <div class="frame-cap"><b>03 完成</b> · 点 × 关掉就好</div>
+      </div>
+
+      <div class="frame rv">
+        <div class="frame-win">
+          <div class="fw-h" style="font-size:14px">早上好。</div>
+          <div class="f4-status" style="margin-top:8px"><span class="d"></span>已连接 · 07:00:02</div>
+          <div class="f4-time" style="margin-top:10px">07:00</div>
+          <div style="margin-top:8px">
+            <div class="f4-row"><span>每日自动登录</span><span class="f4-tg" aria-hidden="true"></span></div>
+          </div>
+          <div class="f4-log"><span class="ok">✓</span> 07:00:02 login ok · 15ms</div>
+        </div>
+        <div class="frame-cap"><b>04 日常</b> · 什么都不用做</div>
+      </div>
+
     </div>
   </div>
 </section>
