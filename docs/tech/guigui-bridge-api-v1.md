@@ -1,0 +1,173 @@
+# 桂桂 v2 · JS↔Python 桥接契约 v1.0.0
+
+> **地位**:前后端通信协议的**唯一权威**(《guigui-work-split.md》§一.2)。后端 bridge 实现以此为准;前端 `mock.js` 是它的可执行规范。
+> **绑定**:命名空间 `window.guigui.*`。pywebview 经 `js_api` 暴露,实现侧自行决定 camelCase 方法名或 snake_case+映射(契约只锁 JS 侧名字)。
+> **变更规则**:改本文必须 bump 版本并登记「变更记录」,对方适配并回注后才生效。禁止静默改。
+
+## 0. 总则
+
+- **传输中立**:契约只定义方法/参数/返回/事件,不绑死 pywebview;前端经 `GG` 适配器三级探测(`window.guigui` → `window.pywebview.api` → mock),后端就位即切真,前端零改动。
+- **统一信封**:所有方法返回 Promise。
+  - 成功:`{ok:true, data:<载荷>}`
+  - 失败:`{ok:false, code:<错误码>, message:<人话,可直显>}` —— 后端**不得抛异常代替信封**。
+- **凭据纪律**:密码**永不下行**(任何返回都不含 password 字段);学号(uid)可以下行。登录时前端把用户键入的密码上行一次,后端存入 OS 凭据管理器。
+- **视图路由不进契约**:三分流(ok/掉线/不可达)、来路栈、庆祝触发时机全部是前端逻辑;契约只供状态数据。
+- **并发**:方法可并发调用;后端不得因一个长动作(登录/连 WiFi)阻塞查询类方法。
+
+## 1. 错误码枚举
+
+| code | 场景 | 前端表现(约定) |
+|---|---|---|
+| `NET_UNREACHABLE` | 认证服务器不可达 | 状态行/引导页,非弹窗 |
+| `AUTH_REJECTED` | `result!=1`,密码被拒 | v-login 内联 `#login-err` |
+| `WIFI_SCAN_FAILED` | netsh 扫描失败 | 列表区显示空态文案 |
+| `WIFI_CONNECT_FAILED` | 连接失败(重试耗尽) | WiFi 行就地提示 |
+| `WIFI_CONNECT_TIMEOUT` | 连接超时(90s) | 同上 |
+| `NOT_CONFIGURED` | 未完成首装就触发动作 | 引导回首装页 |
+| `SAVE_FAILED` | 配置落盘失败 | 设置项回滚 + 提示 |
+| `INTERNAL` | 兜底 | 内联提示,不弹窗 |
+
+## 2. 方法清单
+
+### 2.1 probe() — 开机探测(启动/手动重测共用)
+
+时延承诺:≤10s(不可达判定的 HTTP 超时在内);期间前端停在 v-boot。
+
+```jsonc
+// data
+{
+  "configured": true,          // 首装已完成(学号+密码+任务就位)
+  "net": {
+    "state": "logged_in",      // logged_in | not_logged_in | unreachable | waiting
+                                // waiting = 网络栈未就绪(刚开机/WiFi 还在连),对应 bootWait 等门 UI
+    "ssid": "Campus-WiFi",     // 当前 WiFi,无则 null
+    "server": "10.1.2.3"       // 认证服务器显示名
+  }
+}
+```
+
+### 2.2 identify() — 学号识别(chkstatus 抓取)
+
+```jsonc
+{ "uid": "2025000000001", "source": "chkstatus" }   // source: chkstatus | config | none
+```
+
+### 2.3 login({sid?, password?}) — 登录(首装开启/立即登录/重新登录共用)
+
+- 省略 `password` → 用已存凭据;省略 `sid` → 用已存学号。重试节奏按配置,期间推 `login:progress` 事件。
+- 时延承诺:最坏 ≈ 次数×(10s 超时+间隔),前端以事件驱动 UI,不设本地超时。
+
+```jsonc
+{ "result": "success", "uid": "2025…7209", "attempts": 1 }
+// result: success | already | rejected | unreachable
+// already = 探测发现已登录(等效成功,不算失败)
+```
+
+失败:`AUTH_REJECTED` / `NET_UNREACHABLE`(信封),`result` 不出现在失败信封里。
+
+### 2.4 scanWifi() — 扫描可用网络(v-guide 列表 / 设置 WiFi 兜底选择)
+
+```jsonc
+{ "networks": [ { "ssid": "Campus-WiFi", "signal": "strong" } ] }
+// signal: strong | medium | weak  → 前端映射 信号强/中/弱
+// 已排除隐藏/空 SSID;重复 SSID 去重
+```
+
+### 2.5 connectWifi({ssid}) — 连接指定网络
+
+- 时延承诺:最坏 90s;进度走 `login:progress`(`phase:"connecting_wifi"`)。
+- 成功后后端继续探测并推 `net:state`;前端据此决定落 v-login 还是回 v-main。
+
+```jsonc
+{ "connected": true, "ssid": "Campus-WiFi" }
+```
+
+### 2.6 getConfig() — 读设置(不含密码)
+
+```jsonc
+{
+  "trigger_time": "07:00",        // HH:MM,每日自动登录时刻(L1 中心)
+  "boot_login": true,             // 开机时补登录(L2 AtLogon)
+  "heartbeat_minutes": 5,         // 窗口内重试间隔 ∈ 5|10|15
+  "wifi_fallback_enabled": false, // WiFi 兜底开关
+  "wifi_fallback_ssid": null,     // 兜底目标网络(选不填,来自扫描)
+  "patrol_enabled": false,        // 白天巡逻(L3)
+  "patrol_minutes": 30,           // ∈ 15|30|60
+  "wake_login": true,             // 睡眠唤醒补登录(L5)
+  "vacation_silence": true,       // 假期静默
+  "notifications": true,          // 弹通知
+  "show_gui": true,               // 显示桂桂
+  "master": true,                 // 后台自动化总开关(与主页开关同步)
+  "login_retries": 3,             // ∈ 1|3|5
+  "retry_seconds": 5              // ∈ 5|10|30
+}
+```
+
+> 字段名是**桥接层契约名**;后端磁盘 `config_v2.json` schema 可自行映射,不必同名。
+
+### 2.7 saveConfig(patch) — 保存设置(增量)
+
+- 入参 = 2.6 的任意子集(不含密码;凭据只经 `login` 上行)。后端保存后**负责任务计划/selfheal 对齐**。
+- 返回**完整**新配置(同 2.6 形状),前端用返回值刷新全 UI(避免本地推算漂移)。
+
+### 2.8 masterToggle(on) — 总开关(独立于 saveConfig,语义重:建/删任务)
+
+```jsonc
+{ "master": false }
+```
+
+### 2.9 logs({days}) — 按天查日志(v-log 全量 / v-main 内嵌取今天)
+
+```jsonc
+{ "days": [
+  { "label": "今天",              // 现成标签:今天 | 昨天 · 8月29日 | 8月28日 · 假期静默
+    "entries": [
+      { "ts": "07:00:01", "level": "ok",   "text": "网络可达" },
+      { "ts": "07:00:02", "level": "ok",   "text": "已登录 · 2025…7209" },   // 学号打码由后端完成
+      { "ts": "07:00:03", "level": "note", "text": "今天到这就下班啦 ☕" },
+      { "ts": "07:00:01", "level": "silent", "text": "连不上,今天先不打扰,明天再试一次" }
+    ] }
+] }
+// level: ok → [OK] 绿标签;note/silent/fail → 无标签纯文本(fail 的措辞写在 text 里)
+// days 默认 14,上限 90;空天不返回
+```
+
+### 2.10 recentResult() — 「昨晚」一行(主页第三行体检)
+
+```jsonc
+{ "when": "今早", "time": "07:00", "tries": 1, "outcome": "ok" }
+// outcome: ok | fail | silent | none(无记录)
+// 前端映射示例:ok+tries=1 →「07:00 第一次就登好了 ✓」
+```
+
+### 2.11 winMinimize() / winClose() — 窗口控制
+
+- 最小化=真最小化;关闭=退出 GUI(自动化不受影响,胶囊悬案以后端方案 §三.10 为准)。
+- 拖拽不走方法:titlebar 挂 `pywebview-drag` 类,由壳处理。
+
+## 3. 事件推送(后端 → 前端)
+
+后端经 `evaluate_js` 调用 `window.guiguiEmit(type, payload)`;payload 一律为对象。前端忽略未知 type(向前兼容)。
+
+| type | payload | 触发 |
+|---|---|---|
+| `net:state` | `{state, ssid}`(同 probe.net 子集) | GUI 打开期间网络状态变化(含 connectWifi 之后、等待开门开门后) |
+| `login:progress` | `{phase, attempt?, attempts?}`;phase ∈ probe\|connecting_wifi\|requesting\|retrying | login/connectWifi 执行中 |
+| `log:appended` | `{day_label, entry}`(entry 同 2.9) | 静默 ensure 落日志(GUI 开着时主页内嵌日志追加) |
+| `schedule:changed` | `{master, trigger_time}` | selfheal 对齐/外部变更后,前端同步两处开关与 desc |
+
+## 4. 启动时序(约定,非方法)
+
+1. 前端加载 → 立即 `probe()`(期间 v-boot 仪式照常播)。
+2. `configured=false` → 首装单行道(仪式→三分支);`configured=true` → 日常页,`net.state=waiting` 时停在等门 UI 等 `net:state`。
+3. 首装「开启每日自动登录」= `saveConfig`(学号+触发时间等)→ `login`(带密码)→ 成功进庆祝页;`AUTH_REJECTED` → 密码警告,不进庆祝。
+
+## 5. 版本与变更记录
+
+| 版本 | 日期 | 变更 | 状态 |
+|---|---|---|---|
+| 1.0.0 | 2026-08-31 | 初版:11 方法 + 4 事件 + 8 错误码 | 前端已按此实现 mock;待后端回注适配 |
+
+## 6. 集成待办(联调问题记这里)
+
+- (空)
