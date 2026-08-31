@@ -252,6 +252,13 @@ input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--a
   cursor:pointer;transition:border-color .15s,background .15s,color .15s}
 .preset:hover{border-color:var(--accent-2)}
 .preset.on{background:var(--ink);color:oklch(97% 0.005 295);border-color:var(--ink)}
+/* 运营商三胶囊:首装/改密码页单选,同 .preset 药丸语言,三等分占满表单行 */
+.op-pick{display:flex;gap:6px}
+.op-cap{flex:1;padding:9px 12px;border-radius:99px;border:1px solid oklch(60% 0.01 295 / 0.3);
+  background:oklch(100% 0 0 / 0.5);font:500 12.5px/1 Inter,"PingFang SC",sans-serif;color:var(--ink-2);
+  cursor:pointer;text-align:center;transition:border-color .15s,background .15s,color .15s}
+.op-cap:hover{border-color:var(--accent-2)}
+.op-cap.on{background:var(--ink);color:oklch(97% 0.005 295);border-color:var(--ink)}
 /* 历史日志视图 */
 .day{margin-bottom:16px}
 .day-h{font-family:Inter,"PingFang SC",sans-serif;font-size:10.5px;font-weight:600;
@@ -451,6 +458,12 @@ html.in-app #fx{border-radius:8px}
             <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><path d="M4 4l16 16"/></svg>
           </button></div>
         <div class="pwd-warn" id="pwd-warn" style="display:none"><span>⚠</span><span>密码还没填呢</span></div></div>
+      <div class="f"><label>运营商</label>
+        <div class="op-pick" id="op-pick">
+          <button type="button" class="op-cap on" data-op="校园用户">校园用户</button>
+          <button type="button" class="op-cap" data-op="校园电信">电信</button>
+          <button type="button" class="op-cap" data-op="校园联通">联通</button>
+        </div></div>
       <button class="btn" onclick="enableDaily()">开启每日自动登录</button>
     </div>
 
@@ -468,6 +481,12 @@ html.in-app #fx{border-radius:8px}
             <svg class="i-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
             <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><path d="M4 4l16 16"/></svg>
           </button></div></div>
+      <div class="f"><label>运营商</label>
+        <div class="op-pick" id="op-pick-login">
+          <button type="button" class="op-cap on" data-op="校园用户">校园用户</button>
+          <button type="button" class="op-cap" data-op="校园电信">电信</button>
+          <button type="button" class="op-cap" data-op="校园联通">联通</button>
+        </div></div>
       <button class="btn" onclick="loginNow()">立即登录</button>
     </div>
 
@@ -791,6 +810,18 @@ function togglePw(id,btn){
   const inp=$(id);const showPw=inp.type==='password';
   inp.type=showPw?'text':'password';btn.classList.toggle('off',!showPw);
 }
+/* 运营商三胶囊:首装/改密码页共用;data-op 为后端契约值,默认校园用户 */
+function pickedOperator(sel){
+  const c=document.querySelector((sel||'#op-pick')+' .op-cap.on');
+  return (c&&c.dataset.op)||'校园用户';
+}
+function setOperatorPick(sel,op){
+  document.querySelectorAll(sel+' .op-cap').forEach(c=>c.classList.toggle('on',c.dataset.op===op));
+}
+document.querySelectorAll('.op-pick').forEach(box=>box.addEventListener('click',ev=>{
+  const cap=ev.target.closest('.op-cap');if(!cap)return;
+  box.querySelectorAll('.op-cap').forEach(c=>c.classList.toggle('on',c===cap));
+}));
 /* 自定义时间:两位一格直接键入,自动跳格 + 范围约束(比滚轮快,比原生控件美)
    注:同一份监听器在文件下方"自定义时间"段又重复注册了一次(原代码遗留),已合并到单点;
    这里仅保留 mainAction,详见下方唯一一份 ct-h/ct-m 监听。 */
@@ -808,11 +839,14 @@ async function quickLogin(){
   if(!r.ok&&r.code==='AUTH_REJECTED'){$('main-lede').textContent='密码好像不对,去登录页改一下吧'}
 }
 /* 流程动作 */
-/* 庆祝页入场:重新给 stage 加 .in class 触发 CSS animation(display:none→block 不会自动重启动画) */
-function showSuccess(){
+/* 庆祝页入场:重新给 stage 加 .in class 触发 CSS animation(display:none→block 不会自动重启动画)
+   verified===false:存密码时本来就在线,还没真验证过,如实说一句 */
+function showSuccess(verified){
   renderTriggerTime();   /* 同步最新触发时间,避免 lede 写死 07:00 */
   const lede=$('success-time');
-  if(lede)lede.innerHTML='明早 '+currentTriggerTime+' 开始。现在关掉就行。';
+  if(lede)lede.innerHTML=verified===false
+    ?'现在已在线 ✓ 密码也存好了。明早 '+currentTriggerTime+' 第一次自动登录时会真验证一遍,万一不对会弹通知提醒你改。'
+    :'明早 '+currentTriggerTime+' 开始。现在关掉就行。';
   show('v-success');
   const stage=document.querySelector('#v-success .v-success-stage');
   if(stage){
@@ -828,15 +862,15 @@ async function enableDaily(){
   const warn=$('pwd-warn'),warnTxt=warn.lastElementChild;
   if(!pwd){warnTxt.textContent='密码还没填呢';warn.style.display='block';return}
   await GG.api.saveConfig({trigger_time:currentTriggerTime});
-  const r=await GG.api.login({sid:$('f-sid').value.trim()||undefined,password:pwd});
-  if(r.ok){configured=true;hasPwd=true;showSuccess();return}
+  const r=await GG.api.login({sid:$('f-sid').value.trim()||undefined,password:pwd,operator:pickedOperator()});
+  if(r.ok){configured=true;hasPwd=true;showSuccess(r.data.verified);return}
   if(r.code==='AUTH_REJECTED'){warnTxt.textContent='密码被服务器拒绝了,核对一下再试';warn.style.display='block';return}
   if(r.code==='NET_UNREACHABLE'){goDaily();return}
 }
 async function loginNow(){
   $('login-err').style.display='none';
-  const r=await GG.api.login({password:$('f-pwd-login').value||undefined});
-  if(r.ok){configured=true;hasPwd=true;showSuccess();return}
+  const r=await GG.api.login({password:$('f-pwd-login').value||undefined,operator:pickedOperator('#op-pick-login')});
+  if(r.ok){configured=true;hasPwd=true;showSuccess(r.data.verified===false?false:true);return}
   if(r.code==='AUTH_REJECTED'){$('login-err').style.display='block';return}
   if(r.code==='NET_UNREACHABLE'){openDetail('v-guide');return}
 }
@@ -987,6 +1021,8 @@ async function fillLoginLanding(){
   $('login-status').textContent=(net.ssid||'校园网')+' · 未认证';
   const id=await GG.api.identify();
   if(id.ok&&id.data.uid&&!$('f-sid-login').value)$('f-sid-login').value=id.data.uid;
+  const c=await GG.api.getConfig();   /* 运营商胶囊按已存选择回填 */
+  if(c.ok&&c.data.operator)setOperatorPick('#op-pick-login',c.data.operator);
 }
 async function fillLanding(){
   const net=lastNet||{};

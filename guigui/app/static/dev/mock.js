@@ -30,7 +30,7 @@ const S={
   configured:false,pwd:null,
   net:{state:'logged_in',ssid:'Campus-WiFi',server:SERVER},
   cfg:JSON.parse(localStorage.getItem(LS_CFG)||'null')||{
-    trigger_time:'07:00',boot_login:true,heartbeat_minutes:5,
+    trigger_time:'07:00',boot_login:true,heartbeat_minutes:5,operator:'校园用户',
     wifi_fallback_enabled:false,wifi_fallback_ssid:null,
     patrol_enabled:false,patrol_minutes:30,wake_login:false,
     vacation_silence:true,notifications:true,show_gui:true,master:true,
@@ -70,7 +70,8 @@ window.GGMock={
     emit('login:progress',{phase:'probe'});
     if(S.net.state==='unreachable')return ERR('NET_UNREACHABLE',SERVER+' 不可达,先连校园网');
     if(S.net.state==='waiting')return ERR('NET_UNREACHABLE','网络还没就绪,稍等一下再试');
-    if(S.net.state==='logged_in')return OK({result:'already',uid:UID_MASK,attempts:0});
+    if(a&&a.operator){S.cfg.operator=a.operator;saveCfg()}   /* 登录即存,getConfig 回填胶囊 */
+    if(S.net.state==='logged_in')return OK({result:'already',uid:UID_MASK,attempts:0,verified:false});
     const pwd=(a&&a.password)!=null&&a.password!==''?a.password:S.pwd;
     if(!pwd)return ERR('NOT_CONFIGURED','还没存密码,先填一次');
     emit('login:progress',{phase:'requesting',attempt:1,attempts:S.cfg.login_retries});
@@ -81,7 +82,7 @@ window.GGMock={
     S.logs[0].entries.push(e);
     emit('log:appended',{day_label:'今天',entry:e});
     netEmit();
-    return OK({result:'success',uid:UID_MASK,attempts:1});
+    return OK({result:'success',uid:UID_MASK,attempts:1,verified:true});
   },
   async scanWifi(){
     await delay(400);
