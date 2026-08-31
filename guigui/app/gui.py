@@ -183,8 +183,11 @@ def _apply_rounded_region(window):
         scale = (user32.GetDpiForWindow(hwnd) or 96) / 96.0
         r = int(round(CORNER_CSS_PX * scale))
         hrgn = ctypes.windll.gdi32.CreateRoundRectRgn(
-            0, 0, form.ClientSize.Width + 1, form.ClientSize.Height + 1, r * 2, r * 2)
-        user32.SetWindowRgn(hwnd, hrgn, True)
+            0, 0, form.ClientSize.Width + 1, form.ClientSize.Height + 1,
+            r * 2, r * 2)
+        if not user32.SetWindowRgn(hwnd, hrgn, True):
+            # 成功后 region 归系统;失败必须自删,keeper 每 1.5s 重贴会累积泄漏
+            ctypes.windll.gdi32.DeleteObject(hrgn)
     except Exception as e:
         log.warning("gui: 圆角裁剪失败(退化为直角): %s", e)
 
