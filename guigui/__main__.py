@@ -26,6 +26,18 @@ def main(argv: list[str] | None = None) -> int:
         from guigui.core import ensure
         return ensure.run()
 
+    if "--clear-creds" in argv:
+        # 卸载器「彻底清理」用:删当前配置学号的凭据;无配置/无凭据静默成功
+        from guigui.core import config, vault
+
+        uid = config.load().get("uid") or ""
+        if uid:
+            try:
+                vault.delete_password(uid)
+            except Exception:
+                pass
+        return 0
+
     deep = next((a for a in argv if a.startswith("guigui://")), None)
     view = deep.split("guigui://", 1)[1].strip("/ ").lower() or None if deep else None
     if view not in (None, "main", "creds", "settings"):

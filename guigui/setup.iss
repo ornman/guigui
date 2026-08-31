@@ -87,9 +87,11 @@ begin
         mbConfirmation, MB_YESNO, IDNO) = IDYES);
     if DelUserData then
     begin
-      DelTree(dataDir, True, True, True);
-      Exec(ExpandConstant('{cmd}'), '/C cmdkey /delete:GuiGui', '',
+      // 凭据目标名是「学号@GuiGui」(keyring Windows 后端格式),学号只有
+      // 桂桂自己认得 —— 趁 exe 还没删,让它清(顺序:先清凭据再删数据)
+      Exec(ExpandConstant('{app}\guigui.exe'), '--clear-creds', '',
            SW_HIDE, ewWaitUntilTerminated, rc);
+      DelTree(dataDir, True, True, True);
     end;
   end;
 end;
