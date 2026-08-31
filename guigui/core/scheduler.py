@@ -260,9 +260,26 @@ def action_target_exists(xml: str) -> bool:
     return Path(m.group(1).strip()).exists()
 
 
-def is_task_current(task_name: str, cfg: dict) -> bool:
-    """任务存在 && rev 与 config 一致 && Action 目标存在。"""
+def drop_logon_trigger(xml: str) -> str:
+    """去掉任务 XML 里的 LogonTrigger(降级注册用)。
+
+    实测(2026-08-31,火绒严格配置):部分安全软件按内容拦「未知程序注册
+    登录触发任务」,同款 XML 去掉 LogonTrigger 即放行。降级只损失
+    boot_login(开机补登录),每日日历触发不受影响。
+    """
+    return re.sub(r"<LogonTrigger>.*?</LogonTrigger>", "", xml, flags=re.DOTALL)
+
+
+def is_task_current(task_name: str, cfg: dict, require_logon: bool = False) -> bool:
+    """任务存在 && rev 与 config 一致 && Action 目标存在。
+
+    require_logon=True 时额外要求含 LogonTrigger:降级注册的任务(完整版
+    被安全软件拒、只注册了无开机触发版)不算最新,每次对齐自动重试完整版,
+    放行后即无缝升级。
+    """
     xml = query_xml(task_name)
     if not xml:
+        return False
+    if require_logon and "<LogonTrigger>" not in xml:
         return False
     return parse_rev(xml) == cfg["tasks_rev"] and action_target_exists(xml)

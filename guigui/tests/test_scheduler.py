@@ -155,3 +155,13 @@ def test_is_task_current_action_target_gone(fake):
 def test_parse_rev_absent():
     assert scheduler.parse_rev("<Description>别的</Description>") is None
     assert scheduler.parse_rev(None) is None
+
+
+def test_drop_logon_trigger():
+    """剥离 LogonTrigger(降级注册);其他触发器原样保留。"""
+    from guigui.core.scheduler import drop_logon_trigger
+    xml = ("<Triggers><CalendarTrigger><StartBoundary>2026-08-31T06:30:00</StartBoundary></CalendarTrigger>"
+           "<LogonTrigger><Enabled>true</Enabled></LogonTrigger></Triggers>")
+    out = drop_logon_trigger(xml)
+    assert "<LogonTrigger>" not in out
+    assert "<CalendarTrigger>" in out

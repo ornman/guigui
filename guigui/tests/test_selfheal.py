@@ -7,15 +7,22 @@ class FakeScheduler:
     def __init__(self):
         self.tasks: dict[str, str] = {}     # name → xml
         self.rev = 0
+        self.block_logon_trigger = False    # 模拟安全软件拦「登录触发」任务
 
-    def is_task_current(self, name, cfg):
+    def is_task_current(self, name, cfg, require_logon=False):
         xml = self.tasks.get(name)
-        return xml is not None and f'rev={cfg["tasks_rev"]}' in xml
+        if xml is None or f'rev={cfg["tasks_rev"]}' not in xml:
+            return False
+        if require_logon and "<LogonTrigger>" not in xml:
+            return False
+        return True
 
     def query_xml(self, name):
         return self.tasks.get(name)
 
     def create_task(self, name, xml):
+        if self.block_logon_trigger and "<LogonTrigger>" in xml:
+            return False
         self.tasks[name] = xml
         return True
 
@@ -101,3 +108,26 @@ def test_remove_blocked_reports_misaligned(monkeypatch):
         selfheal.scheduler, "remove_task", lambda name: False)
     changed, misaligned = selfheal.reconcile(_cfg(master=False, tasks_rev=2))
     assert changed is False and misaligned is True
+
+
+def test_degraded_registration_when_logon_blocked(monkeypatch):
+    """安全软件拦登录触发 → 自动降级注册无 LogonTrigger 版,每日定时不受影响。"""
+    fake = FakeScheduler()
+    fake.block_logon_trigger = True
+    _wire(monkeypatch, fake)
+    changed, misaligned = selfheal.reconcile(_cfg())     # boot_login=True
+    assert changed is True and misaligned is False       # 降级成功,不算失配
+    assert "<LogonTrigger>" not in fake.tasks["GuiGui"]  # 注册的是降级版
+    assert "CalendarTrigger" in fake.tasks["GuiGui"]     # 每日触发还在
+
+
+def test_degraded_task_upgrades_after_unblock(monkeypatch):
+    """降级任务不算最新(rev 同但缺登录触发);放行后下一次对齐自动升级完整版。"""
+    fake = FakeScheduler()
+    fake.block_logon_trigger = True
+    _wire(monkeypatch, fake)
+    selfheal.reconcile(_cfg())
+    fake.block_logon_trigger = False                      # 安全软件放行
+    changed, _ = selfheal.reconcile(_cfg())               # rev 未变仍要重建
+    assert changed is True
+    assert "<LogonTrigger>" in fake.tasks["GuiGui"]       # 已升级回完整版
