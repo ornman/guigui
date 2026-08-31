@@ -526,21 +526,23 @@ section.sc > canvas.scene{
 
 /* ═══ Fig.04 下半:排障清单 + 反馈入口 ═══ */
 .support-head{margin-top:72px}
-/* 反馈入口行:虚线框=通道建设中,渠道确认后换实线 */
+/* 反馈入口行:邮箱已启用(实线) */
 .fb-row{
   display:flex;align-items:center;justify-content:space-between;gap:28px;flex-wrap:wrap;
   margin-top:18px;padding:22px 30px;border-radius:16px;
-  border:1px dashed rgba(109,77,232,0.45);background:rgba(109,77,232,0.03);
+  border:1px solid rgba(109,77,232,0.35);background:rgba(109,77,232,0.03);
   scroll-margin-top:96px;
 }
 .fb-row .fb-t{font-family:var(--serif);font-size:17.5px;font-weight:500;letter-spacing:-.01em}
 .fb-row .fb-d{font-size:13px;color:var(--ink-2);margin-top:5px;line-height:1.7;max-width:52ch}
 .fb-mail{
-  display:inline-flex;align-items:center;gap:9px;flex-shrink:0;
+  display:inline-flex;align-items:center;gap:9px;flex-shrink:0;text-decoration:none;
   padding:13px 22px;border-radius:11px;
-  border:1.5px dashed var(--accent);background:rgba(109,77,232,0.06);color:var(--accent);
+  border:1.5px solid var(--accent);background:rgba(109,77,232,0.06);color:var(--accent);
   font-family:var(--mono);font-size:12px;letter-spacing:.04em;
+  transition:background 180ms ease-out,transform 180ms ease-out;
 }
+.fb-mail:hover{background:rgba(109,77,232,0.14);transform:translateY(-1px)}
 .fb-mail svg{width:15px;height:15px;flex-shrink:0}
 .nav .links a.fb-link{color:var(--accent)}
 .ft-row .d code{
@@ -981,16 +983,15 @@ section.sc > canvas.scene{
       </div>
     </div>
 
-    <!-- TODO(user): 反馈邮箱确认后,把下面 .fb-mail 换成 <a class="fb-mail" href="mailto:真实地址">真实地址</a>,并把 .fb-row 虚线边框换实线 -->
     <div class="fb-row rv" id="feedback">
       <div>
         <div class="fb-t">对不上号?直接说给桂桂听。</div>
         <div class="fb-d">说明哪天早上、当时什么情况,顺手带上日志(桂桂主页 → 历史日志,复制最后几行)。看到就回。</div>
       </div>
-      <span class="fb-mail" aria-label="反馈邮箱待填,渠道确认后启用">
+      <a class="fb-mail" href="mailto:kdy233@qq.com?subject=%E6%A1%82%E6%A1%82%E5%8F%8D%E9%A6%88">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 7.5l8 6 8-6"/></svg>
-        邮箱地址待填
-      </span>
+        kdy233@qq.com
+      </a>
     </div>
   </div>
 </section>
