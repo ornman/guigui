@@ -586,6 +586,9 @@ section.sc > canvas.scene{
 }
 .fb-gen:hover{transform:translateY(-1px)}
 .fb-note{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);line-height:1.7}
+.fb-ok{display:none;font-family:var(--mono);font-size:12px;letter-spacing:.02em}
+.fb-ok.on{display:block;color:var(--accent)}
+.fb-ok.warn{display:block;color:oklch(52% 0.12 70)}
 .fb-mail svg{width:15px;height:15px;flex-shrink:0}
 .nav .links a.fb-link{color:var(--accent)}
 .ft-row .d code{
@@ -1062,13 +1065,18 @@ section.sc > canvas.scene{
         </select>
       </div>
       <div class="fb-f fb-wide">
+        <label for="fb-contact">联系方式(可选)</label>
+        <input id="fb-contact" type="text" placeholder="QQ 或邮箱,想被回访就填" autocomplete="off">
+      </div>
+      <div class="fb-f fb-wide">
         <label for="fb-log">日志末尾(可选)</label>
         <textarea id="fb-log" rows="3" placeholder="桂桂主页 → 历史日志,复制最后几行贴这里"></textarea>
       </div>
       <div class="fb-f fb-act">
-        <button class="fb-gen" id="fb-gen" type="button">生成邮件 →</button>
-        <span class="fb-note">不会上传任何东西——只是帮你把这封邮件写好。</span>
+        <button class="fb-gen" id="fb-gen" type="button">提交反馈 →</button>
+        <span class="fb-note">在线提交失败会自动转为邮件。</span>
       </div>
+      <div class="fb-ok" id="fb-ok" role="status" aria-live="polite"></div>
     </div>
   </div>
 </section>
@@ -1573,25 +1581,60 @@ if(typeof XiaojiangMotion === 'function'){
   show(0); arm();
 })();
 
-/* ═══ 反馈模板面板:三栏预填 → 生成邮件(纯前端 mailto,无上传) ═══ */
+/* ═══ 反馈面板:在线提交优先(Worker+D1),失败或未部署转邮件 ═══ */
+var FB_ENDPOINT = window.FB_ENDPOINT || ''; /* 部署 feedback-worker 后填,如 https://guigui-feedback.xxx.workers.dev/fb */
 (function(){
   var tg = document.getElementById('fb-toggle'), pn = document.getElementById('fb-panel');
-  if(!tg || !pn) return;
+  var gen = document.getElementById('fb-gen'), ok = document.getElementById('fb-ok');
+  if(!tg || !pn || !gen) return;
+  function val(id){ var el = document.getElementById(id); return el ? el.value : ''; }
+  function collect(){
+    return {
+      when:   val('fb-when').trim(),
+      what:   val('fb-what') || '',
+      contact:val('fb-contact').trim(),
+      log:    val('fb-log').trim()
+    };
+  }
+  window.__fbBuild = function(){
+    var d = collect();
+    var body = '哪天早上:' + (d.when || '(没填)') + '\n什么现象:' + d.what +
+               '\n联系方式:' + (d.contact || '(没留)') + '\n\n日志末尾:\n' + (d.log || '(没带)');
+    return 'mailto:kdy233@qq.com?subject=' + encodeURIComponent('桂桂反馈·' + d.what) + '&body=' + encodeURIComponent(body);
+  };
   tg.addEventListener('click', function(){
     var open = pn.classList.toggle('open');
     tg.classList.toggle('on', open);
     tg.setAttribute('aria-expanded', open ? 'true' : 'false');
     if(open){ var f = pn.querySelector('input'); if(f) f.focus(); }
   });
-  window.__fbBuild = function(){
-    var when = (document.getElementById('fb-when').value || '').trim();
-    var what = document.getElementById('fb-what').value;
-    var log  = (document.getElementById('fb-log').value || '').trim();
-    var body = '哪天早上:' + (when || '(没填)') + '\n什么现象:' + what + '\n\n日志末尾:\n' + (log || '(没带)');
-    return 'mailto:kdy233@qq.com?subject=' + encodeURIComponent('桂桂反馈·' + what) + '&body=' + encodeURIComponent(body);
-  };
-  var gen = document.getElementById('fb-gen');
-  if(gen) gen.addEventListener('click', function(){ window.location.href = window.__fbBuild(); });
+  function reset(){ gen.disabled = false; gen.textContent = '提交反馈 →'; }
+  gen.addEventListener('click', function(){
+    var d = collect();
+    ok.className = 'fb-ok'; ok.textContent = '';
+    if(!d.what){ ok.textContent = '先选一下「什么现象」'; ok.className = 'fb-ok warn'; return; }
+    if(!FB_ENDPOINT){ window.location.href = window.__fbBuild(); return; }
+    gen.disabled = true; gen.textContent = '提交中…';
+    fetch(FB_ENDPOINT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(d)
+    }).then(function(r){
+      return r.json().then(function(j){ return { s: r.status, j: j }; });
+    }).then(function(res){
+      if(res.s === 200 && res.j.ok){
+        ok.textContent = '已收到,编号 ' + res.j.id + '。想补充就回邮件 kdy233@qq.com。';
+        ok.className = 'fb-ok on';
+        ['fb-when','fb-contact','fb-log'].forEach(function(id){ var el = document.getElementById(id); if(el) el.value = ''; });
+        reset();
+      } else { throw new Error(res.j && res.j.error || '提交失败'); }
+    }).catch(function(){
+      ok.textContent = '提交服务连不上,已切到邮件——邮件已备好,发送即可。';
+      ok.className = 'fb-ok warn';
+      reset();
+      window.location.href = window.__fbBuild();
+    });
+  });
 })();
 
 /* ═══ 入场动效 ═══ */
