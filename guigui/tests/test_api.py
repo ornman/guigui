@@ -1,6 +1,7 @@
 """bridge api:契约形状(信封/错误码/事件/密码纪律)+ 关键分支。"""
 
 import json
+import time
 
 import pytest
 
@@ -60,6 +61,10 @@ class Ctx:
         monkeypatch.setattr(api_mod.selfheal, "reconcile",
                             lambda cfg: (self.reconciled.append(cfg["master"]), False))
         monkeypatch.setattr(api_mod.time, "sleep", lambda s: None)
+
+    def _raise_nothing(self):
+        """凭据写入桩:什么都不抛 = 存储成功。"""
+        return None
 
 
 def parse_emitted(window) -> list[tuple[str, dict]]:
@@ -281,3 +286,40 @@ def test_all_failures_are_envelopes_never_exceptions(ctx, monkeypatch):
         assert out["ok"] is False and out["code"] == "INTERNAL"
     # 扫描的任何异常都归 WIFI_SCAN_FAILED(对用户更直接,契约该码即此义)
     assert ctx.api.scanWifi()["code"] == "WIFI_SCAN_FAILED"
+
+
+# ── 任务对齐守卫:首装未完成不建任务;login 存凭据后首建 ──────
+
+
+def _wait_for(predicate, timeout=2.0):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return predicate()
+
+
+def test_save_config_unconfigured_skips_task_creation(monkeypatch):
+    c = Ctx(monkeypatch, cfg_over={"uid": ""})
+    out = c.api.saveConfig({"trigger_time": "06:45"})
+    assert out["ok"] is True
+    # schedule:changed 无条件推(对齐函数已跑完),此刻 reconcile 应未被调
+    assert _wait_for(
+        lambda: any(t == "schedule:changed" for t, _ in parse_emitted(c.window)))
+    assert c.reconciled == []
+
+
+def test_login_with_password_triggers_alignment(ctx):
+    ctx.probe_state = {"state": "not_logged_in", "ssid": "x", "detail": ""}
+    ctx.login_seq = [("success", "")]
+    out = ctx.api.login({"sid": "2025000000001", "password": "pw"})
+    assert out["ok"] is True
+    assert _wait_for(lambda: ctx.reconciled == [True])
+
+
+def test_master_toggle_unconfigured_skips_create(monkeypatch):
+    c = Ctx(monkeypatch, cfg_over={"uid": ""})
+    out = c.api.masterToggle(True)
+    assert out["ok"] is True and out["data"]["master"] is True
+    assert c.reconciled == []

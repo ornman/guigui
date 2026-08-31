@@ -51,6 +51,27 @@ class GuiGuiApi:
     def attach_window(self, window) -> None:
         self._window = window
 
+    def _align_saved(self, saved: dict) -> None:
+        """后台对齐任务计划(saveConfig / login 共用)。
+
+        守卫:首装未完成(uid 空或密码未存)时不建任务 —— 任务属于
+        「开启每日自动登录」那一步,由 login 存完凭据后首次对齐;
+        master 关 → 删任务不受守卫影响。"""
+        misaligned = False
+        try:
+            if saved.get("master", True) and not (
+                    saved.get("uid") and vault.has_password(saved["uid"])):
+                log.info("api: 首装未完成,暂不建任务(等 login 存凭据后再对齐)")
+            else:
+                _, misaligned = selfheal.reconcile(saved)
+        except Exception:
+            log.exception("api: selfheal 对齐失败")
+            misaligned = bool(saved.get("master", True))
+        if misaligned and saved.get("master", True):
+            notify.task_blocked()
+        self._emit("schedule:changed",
+                   {"master": saved["master"], "trigger_time": saved["trigger_time"]})
+
     # ── 事件(契约 §3)──────────────────────────────
 
     def _emit(self, type_: str, payload: dict) -> None:
@@ -120,6 +141,10 @@ class GuiGuiApi:
                     log.warning("api.login: 凭据存储失败: %s", e)
                     return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
                 cfg = config.save({**cfg, "uid": uid})
+                # 首次存好凭据 = 「开启每日自动登录」落地,任务此刻才属于
+                # 用户(首装单行道终点);reconcile 幂等,已配置时零成本。
+                threading.Thread(target=lambda: self._align_saved(cfg),
+                                 daemon=True, name="guigui-align").start()
             else:
                 uid = cfg.get("uid") or ""
                 if not uid or not vault.has_password(uid):
@@ -221,18 +246,8 @@ class GuiGuiApi:
             return _err(INTERNAL, "设置没存上,再试一次")
 
         # 任务计划对齐放后台线程(PS 调用秒级),完成后推 schedule:changed
-        def _align():
-            try:
-                _, misaligned = selfheal.reconcile(saved)
-            except Exception:
-                log.exception("api.saveConfig: selfheal 对齐失败")
-                misaligned = bool(saved.get("master", True))
-            if misaligned and saved.get("master", True):
-                notify.task_blocked()
-            self._emit("schedule:changed",
-                       {"master": saved["master"], "trigger_time": saved["trigger_time"]})
-
-        threading.Thread(target=_align, daemon=True).start()
+        threading.Thread(target=lambda: self._align_saved(saved),
+                         daemon=True, name="guigui-align").start()
         return _ok(config.to_bridge(saved))
 
     # ── 2.8 masterToggle ──────────────────────────
@@ -243,7 +258,10 @@ class GuiGuiApi:
             cfg = config.load()
             saved = config.save(config.apply_patch(cfg, {"master": value}))
             # 语义重(建/删任务):同步做完再回话
-            _, misaligned = selfheal.reconcile(saved)
+            if value and not (saved.get("uid") and vault.has_password(saved["uid"])):
+                misaligned = False   # 首装未完成不建任务(与 _align_saved 同口径)
+            else:
+                _, misaligned = selfheal.reconcile(saved)
             if misaligned and value:
                 notify.task_blocked()
             self._emit("schedule:changed",
