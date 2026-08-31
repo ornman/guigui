@@ -40,6 +40,7 @@ def _default_route_exists() -> bool:
         r = subprocess.run(
             ["route", "print", "-4"], capture_output=True, text=True,
             encoding="gbk", errors="replace", timeout=10,
+            creationflags=subprocess.CREATE_NO_WINDOW,  # 不弹终端窗口
         )
     except Exception as e:
         log.warning("detect: route 查询失败: %s", e)

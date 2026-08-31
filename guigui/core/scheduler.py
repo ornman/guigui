@@ -185,9 +185,11 @@ def build_patrol_task_xml(cfg: dict, rev: int, now=None) -> str:
 
 
 def _run(args: list[str], timeout: int = 30) -> subprocess.CompletedProcess:
+    # CREATE_NO_WINDOW:GUI 是无窗口进程,不加会为每个 schtasks 弹一个终端
     return subprocess.run(
         ["schtasks", *args], capture_output=True, text=True,
         encoding="gbk", errors="replace", timeout=timeout,
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
 
 

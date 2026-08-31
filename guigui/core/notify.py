@@ -57,6 +57,7 @@ def send(title: str, message: str, launch: str = LAUNCH_MAIN) -> None:
         r = subprocess.run(
             ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps],
             capture_output=True, text=True, timeout=10,
+            creationflags=subprocess.CREATE_NO_WINDOW,  # 不弹终端窗口
         )
         if r.returncode != 0:
             log.warning("notify: 发送失败(rc=%d): %s", r.returncode, r.stderr.strip()[:120])

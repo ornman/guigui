@@ -28,9 +28,11 @@ class WifiConnectError(RuntimeError):
 
 def _run(args: list[str], timeout: int = 15) -> subprocess.CompletedProcess:
     # 中文系统 netsh 输出为 GBK;errors=replace 保证任何代码页都不炸
+    # CREATE_NO_WINDOW:GUI 是无窗口进程,不加会为每个 netsh 弹一个终端
     return subprocess.run(
         ["netsh", *args], capture_output=True, text=True,
         encoding="gbk", errors="replace", timeout=timeout,
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
 
 
