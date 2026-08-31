@@ -209,22 +209,23 @@ section.sc > canvas.scene{
 .hero .eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:26px;position:relative;z-index:1}
 .hero .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft),0 0 18px rgba(139,92,246,0.8)}
 .hero h1{max-width:12ch;position:relative;z-index:1}
-.hero h1 .em{font-weight:500;background:linear-gradient(120deg,#6D4DE8,#D946EF);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* 减法:标题实色,CTA 是唯一发光体;渐变字已移除 */
+.hero h1 .em{font-weight:500;color:var(--ink)}
 .hero .lede{margin-top:24px;position:relative;z-index:1}
 .hero .cta-row{display:flex;align-items:center;gap:34px;margin-top:38px;flex-wrap:wrap;position:relative;z-index:1}
 .hero .hero-meta{
-  display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:36px;
-  padding:26px 32px;margin-top:56px;border-radius:18px;position:relative;z-index:1;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:28px;
+  padding:20px 26px;margin-top:48px;border-radius:18px;position:relative;z-index:1;
 }
 .hero .hero-meta .cell .fig-label{margin-bottom:8px}
-.hero .hero-meta .cell p{font-family:var(--serif);font-size:14.5px;color:var(--ink-2);line-height:1.65}
+.hero .hero-meta .cell p{font-family:var(--serif);font-size:13.5px;color:var(--ink-2);line-height:1.6}
 
 /* ═══ 产品窗口(真磨砂玻璃) ═══ */
 .win-stage{position:relative;width:468px;flex-shrink:0;z-index:1}
 .win-stage .win-halo{
   position:absolute;inset:-10%;z-index:0;pointer-events:none;
-  background:radial-gradient(closest-side, rgba(139,92,246,0.28), transparent 70%);
-  filter:blur(30px);
+  background:radial-gradient(closest-side, rgba(139,92,246,0.12), transparent 70%);
+  filter:blur(26px);
 }
 .win{
   position:relative;z-index:1;width:468px;border-radius:18px;overflow:hidden;
@@ -262,31 +263,7 @@ section.sc > canvas.scene{
 .win-status .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);animation:st-pulse 2.4s ease-in-out infinite}
 @keyframes st-pulse{0%,100%{box-shadow:0 0 0 3px rgba(109,77,232,0.14)}50%{box-shadow:0 0 0 6px rgba(109,77,232,0.05)}}
 .win-status b{color:var(--win-ink);font-weight:500}
-.win-time{margin:6px 0 14px}
-.win-time .lab{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--win-ink-3);margin-bottom:8px;display:block}
-.win-time .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.win-time .slot{
-  font-family:var(--serif);font-size:34px;font-weight:600;letter-spacing:-.01em;
-  padding:2px 14px;border-radius:11px;
-  border:1px solid rgba(109,77,232,0.45);background:rgba(109,77,232,0.08);color:var(--win-ink);
-}
-.win-time .win-pill{font-family:var(--mono);font-size:10.5px;color:var(--win-ink-2);padding:5px 11px;border-radius:99px;border:1px solid var(--win-line)}
-.win-time .presets{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-.win-time .preset{font-family:var(--mono);font-size:10.5px;padding:5px 11px;border-radius:99px;border:1px solid var(--win-line);color:var(--win-ink-2)}
-.win-time .preset.on{background:linear-gradient(135deg,#6D4DE8,#B84DE8);color:#fff;border-color:transparent}
-.win-svc{display:flex;flex-direction:column;margin-bottom:6px}
-.win-svc .row{display:flex;align-items:center;justify-content:space-between;padding:10px 2px;border-bottom:1px solid var(--win-line)}
-.win-svc .row .t{font-size:13px;color:var(--win-ink)}
-.win-svc .row .t i{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--win-ink-3);margin-left:8px}
-.win-svc .tg{width:30px;height:17px;border-radius:99px;position:relative;flex-shrink:0;background:rgba(43,37,56,0.14);transition:background 200ms ease-out}
-.win-svc .tg::after{
-  content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;
-  background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.25);
-  transition:transform 200ms cubic-bezier(0.32,0.72,0,1);
-}
-.win-svc .tg.on{background:linear-gradient(135deg,#6D4DE8,#B84DE8)}
-.win-svc .tg.on::after{transform:translateX(13px)}
-.win-svc .row.off .t,.win-svc .row.off .t i{color:var(--win-ink-3)}
+/* 减法:时间槽/presets/服务开关/悬浮标注已移除——完整功能演示在 Fig.01 舞台帧 04 */
 .win-log{
   margin-top:auto;padding:11px 13px;border-radius:10px;
   background:rgba(30,25,46,0.92);color:#B9B1D6;
@@ -295,11 +272,6 @@ section.sc > canvas.scene{
 .win-log .l{display:flex;gap:10px}
 .win-log .l .t{color:#7A7294;flex-shrink:0}
 .win-log .l .ok{color:#A99BFF}
-.win-note{
-  position:absolute;right:-10px;top:-30px;z-index:2;
-  font-family:var(--mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.06em;text-align:right;line-height:1.7;
-}
-.win-note b{color:var(--ink-2);font-weight:400}
 
 /* ═══ 通用 section 头 ═══ */
 .sec-head{display:grid;grid-template-columns:150px 1fr;gap:56px;margin-bottom:44px;align-items:start}
@@ -678,7 +650,6 @@ section.sc > canvas.scene{
   section.sc{padding:72px 0}
   .sig .inner{padding:40px 30px}
   .sig{min-height:480px}
-  .win-note{display:none}
 }
 @media (max-width: 520px){
   h1{font-size:clamp(36px,11vw,54px)}
@@ -740,8 +711,7 @@ section.sc > canvas.scene{
 
     <div class="win-stage rv">
       <div class="win-halo" aria-hidden="true"></div>
-      <div class="win-note" aria-hidden="true"><b>GuiGui.exe</b><br>560 × 640 · 磨砂玻璃</div>
-      <div class="win" role="img" aria-label="桂桂主界面预览:桂桂问候、连接状态、登录时间 07:00、三行服务开关与今日日志">
+      <div class="win" role="img" aria-label="桂桂主界面预览:桂桂问候、已连接状态与今日日志">
         <div class="win-bar">
           <div class="win-bot bot" data-size="26" aria-hidden="true"></div>
           <span class="name">GUIGUI</span>
@@ -761,27 +731,8 @@ section.sc > canvas.scene{
             <span class="dot" aria-hidden="true"></span>
             <span>已连接 · <b>今天 07:00:02 登录成功</b></span>
           </div>
-          <div class="win-time">
-            <span class="lab">登录时间</span>
-            <div class="row">
-              <span class="slot">07:00</span>
-              <span class="win-pill">±30 min · 6 次心跳</span>
-            </div>
-            <div class="presets" aria-hidden="true">
-              <span class="preset">06:50</span>
-              <span class="preset on">07:00</span>
-              <span class="preset">07:30</span>
-              <span class="preset">08:00</span>
-            </div>
-          </div>
-          <div class="win-svc" aria-hidden="true">
-            <div class="row"><span class="t">每日自动登录<i>DAILY</i></span><span class="tg on"></span></div>
-            <div class="row"><span class="t">开机补登录<i>AT LOGON</i></span><span class="tg on"></span></div>
-            <div class="row off"><span class="t">白天巡逻<i>PATROL 30MIN</i></span><span class="tg"></span></div>
-          </div>
           <div class="win-log" aria-hidden="true">
             <div class="l"><span class="t">07:00:02</span><span class="ok">✓ dr.com login ok · 15ms</span></div>
-            <div class="l"><span class="t">06:55:01</span><span class="ok">✓ retry ok · 210ms</span></div>
             <div class="l"><span class="t">06:50:03</span><span>· 校园网尚未开门,30 分钟后重试</span></div>
           </div>
         </div>
@@ -1194,28 +1145,28 @@ function localMouse(cv){
   return { x: MX - r.left, y: MY - r.top };
 }
 
-/* ═══ 1. 全局渐变 mesh(流动 blob,光标视差) ═══ */
+/* ═══ 1. 全局渐变 mesh(静态底;流动已按减法移除,仅保留光标视差,按需重绘) ═══ */
 (function(){
   var cv = document.getElementById('mesh');
   if(!cv || reduce) return;
   var S = fitCanvas(cv), ctx = S.ctx;
   var blobs = [
-    { x:.12, y:.10, r:.46, c:'139,92,246', a:.22, dx:.00005, dy:.00004, ph:0,   par:26 },
-    { x:.88, y:.16, r:.42, c:'217,70,239', a:.16, dx:.00004, dy:.00006, ph:1.9, par:40 },
-    { x:.80, y:.86, r:.48, c:'79,124,255', a:.17, dx:.00006, dy:.00003, ph:3.6, par:20 },
-    { x:.08, y:.88, r:.40, c:'139,92,246', a:.15, dx:.00005, dy:.00005, ph:5.1, par:34 },
-    { x:.50, y:.50, r:.36, c:'196,121,255',a:.10, dx:.00003, dy:.00004, ph:2.7, par:14 }
+    { x:.12, y:.10, r:.46, c:'139,92,246', a:.22, par:26 },
+    { x:.88, y:.16, r:.42, c:'217,70,239', a:.16, par:40 },
+    { x:.80, y:.86, r:.48, c:'79,124,255', a:.17, par:20 },
+    { x:.08, y:.88, r:.40, c:'139,92,246', a:.15, par:34 },
+    { x:.50, y:.50, r:.36, c:'196,121,255',a:.10, par:14 }
   ];
-  var t0 = performance.now();
+  var queued = false;
   function draw(){
-    var t = performance.now() - t0;
+    queued = false;
     var W = S.w, H = S.h;
     ctx.clearRect(0,0,W,H);
     var nx = MX/innerWidth - .5, ny = MY/innerHeight - .5;
     for(var i=0;i<blobs.length;i++){
       var b = blobs[i];
-      var x = (b.x + Math.sin(t*b.dx + b.ph)*.05)*W - nx*b.par;
-      var y = (b.y + Math.cos(t*b.dy + b.ph)*.05)*H - ny*b.par;
+      var x = b.x*W - nx*b.par;
+      var y = b.y*H - ny*b.par;
       var r = b.r * Math.min(W,H);
       var g = ctx.createRadialGradient(x,y,0,x,y,r);
       g.addColorStop(0,'rgba('+b.c+','+b.a+')');
@@ -1224,9 +1175,10 @@ function localMouse(cv){
       ctx.fillStyle = g;
       ctx.fillRect(x-r, y-r, r*2, r*2);
     }
-    requestAnimationFrame(draw);
   }
-  addEventListener('resize', function(){ S = fitCanvas(cv); });
+  function queue(){ if(!queued){ queued = true; requestAnimationFrame(draw); } }
+  addEventListener('mousemove', queue, {passive:true});
+  addEventListener('resize', function(){ S = fitCanvas(cv); queue(); });
   draw();
 })();
 
