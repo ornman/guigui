@@ -240,6 +240,26 @@ def test_recent_result_when_labels(ctx):
 # ── 窗口控制 ──────────────────────────────────────────────
 
 
+def test_feedback_returns_masked_text(ctx, monkeypatch):
+    from guigui.core import diagnostics as diag_mod
+
+    def fake_build():
+        return "桂桂 v2.0.0 诊断信息\n学号:2025…0001"
+    monkeypatch.setattr(diag_mod, "build_text", fake_build)
+    out = ctx.api.feedback()
+    assert out["ok"] is True and "诊断信息" in out["data"]["text"]
+
+
+def test_feedback_internal_on_failure(ctx, monkeypatch):
+    from guigui.core import diagnostics as diag_mod
+
+    def boom():
+        raise RuntimeError("diag down")
+    monkeypatch.setattr(api_mod.diagnostics, "build_text", boom)
+    out = ctx.api.feedback()
+    assert out["ok"] is False and out["code"] == "INTERNAL"
+
+
 def test_window_controls(ctx):
     ctx.api.winMinimize()
     ctx.api.winClose()

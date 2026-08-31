@@ -16,7 +16,7 @@ import logging
 import threading
 import time
 
-from guigui.core import config, detect, drcom, ensure, logstore, selfheal, vault, wifictl
+from guigui.core import config, detect, diagnostics, drcom, ensure, logstore, selfheal, vault, wifictl
 from guigui.core.config import ConfigError
 from guigui.core.vault import VaultError
 from guigui.core.wifictl import WifiConnectError, WifiScanError
@@ -284,6 +284,15 @@ class GuiGuiApi:
         except Exception:
             log.exception("api.recentResult")
             return _err(INTERNAL, "昨晚的记录读不出来")
+
+    # ── 2.12 feedback(1.1.0 新增)─────────────────
+
+    def feedback(self) -> dict:
+        try:
+            return _ok({"text": diagnostics.build_text()})
+        except Exception:
+            log.exception("api.feedback")
+            return _err(INTERNAL, "诊断信息没生成出来,再试一次")
 
     # ── 2.11 winMinimize / winClose ───────────────
 
