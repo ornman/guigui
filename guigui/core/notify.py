@@ -19,6 +19,7 @@ FAILED = "failed"
 
 LAUNCH_MAIN = "guigui://main"
 LAUNCH_CREDS = "guigui://creds"
+LAUNCH_SETTINGS = "guigui://settings"
 
 
 def _xml_escape(text: str) -> str:

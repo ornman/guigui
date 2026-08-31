@@ -44,7 +44,7 @@ def _cfg(**over):
 def test_creates_missing_main_task(monkeypatch):
     fake = FakeScheduler()
     _wire(monkeypatch, fake)
-    assert selfheal.reconcile(_cfg()) is True
+    assert selfheal.reconcile(_cfg()) == (True, False)
     assert "GuiGui" in fake.tasks and "GuiGui-Patrol" not in fake.tasks
 
 
@@ -52,14 +52,14 @@ def test_no_change_when_aligned(monkeypatch):
     fake = FakeScheduler()
     _wire(monkeypatch, fake)
     selfheal.reconcile(_cfg())
-    assert selfheal.reconcile(_cfg()) is False          # 已对齐 → 幂等不动
+    assert selfheal.reconcile(_cfg()) == (False, False)  # 已对齐 → 幂等不动
 
 
 def test_master_off_removes(monkeypatch):
     fake = FakeScheduler()
     _wire(monkeypatch, fake)
     selfheal.reconcile(_cfg())
-    assert selfheal.reconcile(_cfg(master=False, tasks_rev=2)) is True
+    assert selfheal.reconcile(_cfg(master=False, tasks_rev=2)) == (True, False)
     assert fake.tasks == {}
 
 
@@ -68,7 +68,7 @@ def test_rev_bump_rebuilds(monkeypatch):
     _wire(monkeypatch, fake)
     selfheal.reconcile(_cfg(tasks_rev=1))
     # 调度字段变化 → tasks_rev+1 → 旧任务 rev 失配 → 重建
-    assert selfheal.reconcile(_cfg(tasks_rev=2)) is True
+    assert selfheal.reconcile(_cfg(tasks_rev=2)) == (True, False)
     assert "rev=2" in fake.tasks["GuiGui"]
 
 
@@ -80,3 +80,24 @@ def test_patrol_follows_switch(monkeypatch):
     selfheal.reconcile(_cfg(patrol_enabled=False, tasks_rev=3))
     assert "GuiGui-Patrol" not in fake.tasks
     assert "GuiGui" in fake.tasks                          # 主任务不受巡逻开关影响
+
+
+def test_create_blocked_reports_misaligned(monkeypatch):
+    """建任务被安全软件拦截 → (changed=False, misaligned=True),调用方据此 toast。"""
+    fake = FakeScheduler()
+    _wire(monkeypatch, fake)
+    monkeypatch.setattr(
+        selfheal.scheduler, "create_task", lambda name, xml: False)
+    changed, misaligned = selfheal.reconcile(_cfg())
+    assert changed is False and misaligned is True
+    assert fake.tasks == {}                                # 什么都没建成
+
+
+def test_remove_blocked_reports_misaligned(monkeypatch):
+    fake = FakeScheduler()
+    _wire(monkeypatch, fake)
+    selfheal.reconcile(_cfg())
+    monkeypatch.setattr(
+        selfheal.scheduler, "remove_task", lambda name: False)
+    changed, misaligned = selfheal.reconcile(_cfg(master=False, tasks_rev=2))
+    assert changed is False and misaligned is True

@@ -18,13 +18,15 @@ OutputBaseFilename=guigui-setup-{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
-PrivilegesRequired=lowest          ; HKCU 协议注册 + 每用户任务计划,免管理员
+; HKCU 协议注册 + 每用户任务计划,免管理员
+PrivilegesRequired=lowest
 WizardStyle=modern
 DisableProgramGroupPage=yes
 ; TODO 图标资产定稿后:SetupIconFile=guigui.ico / UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Files]
 Source: "..\dist\guigui\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
+Source: "安装说明.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

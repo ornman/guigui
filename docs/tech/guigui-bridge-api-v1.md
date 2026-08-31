@@ -193,4 +193,5 @@
 - **`recentResult` tries=0 文案** → 前端已修复(2026-08-31):`tries===0` 映射「(时间) 已经在线 ✓」。
 - **`recentResult` when 与行标题** → 前端已修复(2026-08-31):行标题改用 `when`(id=main-last-t),缺省「昨晚」。
 - **窗口圆角配方(恢复 + 半径改 8px,2026-08-31 二次拍板)**:原生窗口方案当天试用后弃用(双层标题栏观感差),回到无边框 + `SetWindowRgn` 裁剪,gui.py 现行为 `CORNER_CSS_PX=8`(对齐 Win11 系统圆角;原 22px 是 CSS 卡片 token,已弃)。配方要点不变:①`shadow=False`;②`background_color='#2b2740'` 兜弧线缝隙;③`before_show`/`restored` 双挂,半径 = `round(8 × GetDpiForWindow/96)`,rgn = `ClientSize+1`。**前端自绘标题行保留,无需拆除**——原生窗口中间态(75682e8)已回退。
+- **【增强待办(后端记,2026-08-31)】`schedule:changed` 载荷可扩 `task_ok: bool`**:建/删任务被安全软件拦截时,后端目前只走系统 toast 兜底(api._toast_task_blocked,commit 见 git);前端若想在设置页常驻显示「任务已生效/被拦截」状态,提出即加字段(bump 1.1.1),后端 selfheal.reconcile 已返回 misaligned 供消费。
 - **【已关闭 2026-08-31】拆自绘标题行票**:随原生窗口方案一并作废,前端标题行(`桂桂 / GUIGUI` + `×`/`–` + 拖拽区)是无边框方案的正式组件。§2.11 `winMinimize`/`winClose` 恢复唯一窗口控制通道地位。

@@ -58,7 +58,7 @@ class Ctx:
         monkeypatch.setattr(api_mod.vault, "rekey",
                             lambda old, new, pw: self._raise_nothing())
         monkeypatch.setattr(api_mod.selfheal, "reconcile",
-                            lambda cfg: self.reconciled.append(cfg["master"]))
+                            lambda cfg: (self.reconciled.append(cfg["master"]), False))
         monkeypatch.setattr(api_mod.time, "sleep", lambda s: None)
 
 
