@@ -28,8 +28,8 @@ Desktop.ini
 # Temp
 _notify.ps1
 
-# Screenshots (debug artifacts)
-docs/screenshots/
+# Screenshots (debug artifacts, v1 legacy)
+legacy-v1/docs/screenshots/
 
 # Skill artifacts
 .impeccable.md

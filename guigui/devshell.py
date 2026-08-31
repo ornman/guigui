@@ -1,11 +1,11 @@
 """桂桂前端开发壳(仅开发用,不进打包)。
 
-以 pywebview(WebView2)加载 guigui/app/static,验证无边框窗口下的
+以 pywebview(WebView2)加载 app/static,验证无边框窗口下的
 圆角/字体/拖拽保真;数据走 dev/mock.js(?dev=1 开发开关),窗口控制为真。
 
 窗口圆角:SetWindowRgn 裁剪(实测 WinForms+WebView2 做不到真透明,
 transparent=True 只透到窗体底色,四角露白;配方详见契约「集成待办」)。
-用法:python devshell.py [scene]   scene ∈ ok|out|down|waiting|daily|rejected(默认 ok)
+用法:python guigui/devshell.py [scene]   scene ∈ ok|out|down|waiting|daily|rejected(默认 ok)
 """
 import ctypes
 import functools
@@ -17,7 +17,7 @@ import threading
 
 import webview
 
-ROOT = pathlib.Path(__file__).parent / "guigui" / "app" / "static"
+ROOT = pathlib.Path(__file__).parent / "app" / "static"
 CORNER_CSS_PX = 22  # 设计 token:卡片圆角(PRD 原型 .window border-radius)
 
 
