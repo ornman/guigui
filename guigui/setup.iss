@@ -20,6 +20,9 @@ SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
 ; HKCU 协议注册 + 每用户任务计划,免管理员
 PrivilegesRequired=lowest
+; GUI 正在跑时,安装/卸载先提示关闭桂桂(互斥量定义见 app/instance.py;
+; 不加则 exe 被占用,卸载残留文件、升级报「文件被使用」)
+AppMutex=Local\GuiGui-GUI
 WizardStyle=modern
 DisableProgramGroupPage=yes
 SetupIconFile=guigui.ico
