@@ -270,7 +270,7 @@ PRD §4.1.1 实测记录门户下发:校园用户 `''` / 校园电信 `@dx` / �
 
 ## 10. GUI 壳(`app/gui.py`)与胶囊悬案
 
-- pywebview 5,WebView2 后端:560×640、`resizable=False`、**Win11 原生窗口**(2026-08-31 用户拍板:系统标题栏 + DWM 圆角/阴影/贴边;曾用 frameless+SetWindowRgn 圆角裁剪,已废弃,配方存档见打包测试报告 §2)、`background_color='#2b2740'`(兜 WebView2 首帧闪白)。
+- pywebview 5,WebView2 后端:560×640、`frameless=True`、`resizable=False`、无边框 + `SetWindowRgn` 圆角裁剪,半径 **8 CSS px × DPI**(2026-08-31 二次拍板,对齐 Win11 系统圆角;曾短暂试过原生窗口当日内回退)、`background_color='#2b2740'` 兜弧线缝隙与首帧闪白。配方详见契约 §6。
 - `js_api=GuiGuiApi()`;`winMinimize → window.minimize()`;`winClose → window.destroy()`(= 退出 GUI 进程)。
 - **胶囊悬案裁决(方案 A)**:关闭 = 真退出,无常驻胶囊。理由:胶囊浮标是常驻进程,与 AC-05(关窗后内存 <50MB 的精神是无进程)和 AC-06(未主动打开时主进程不拉起)直接冲突;PRD §3.3 的胶囊降级为**唤回路径 = 桌面/开始菜单快捷方式 + 通知点击(guigui:// 协议)**。方案 B(独立微进程胶囊)记录不做。原型里的 `#pill` 是演示道具(前端已列入删除清单)。
 - **Deep link**:启动参数 `guigui://main|creds|settings` → 壳在页面 loaded 后 `evaluate_js("window.__guigui_launch='creds'")`;前端消费该全局变量跳视图。形状已收编入契约 §4(1.0.2)。
@@ -355,7 +355,7 @@ tests 绿 → `build_guigui.bat`(venv + spec)→ Inno → 安装到本机 → §
 
 5. **wake_login 默认值分歧**:PRD §5 表 = 关,契约 §2.6 示例 = `true`。后端按 PRD 实现 `false`;若前端 mock 按示例设 true,联调首屏开关态会不一致——需前端改 mock 或契约示例改注释,二选一。
 6. **deep link 注入形状**(已结):`window.__guigui_launch` 已收编入契约 §4(1.0.2),联调实测生效。
-7. **窗口透明/圆角(已结)**:真透明 WebView2 确认做不到,曾落 SetWindowRgn 裁剪配方;2026-08-31 用户拍板改 Win11 原生窗口,本悬案关闭(存档见打包测试报告)。
+7. **窗口透明/圆角(已结)**:真透明 WebView2 确认做不到,落 SetWindowRgn 裁剪配方(半径 8px,对齐 Win11 系统圆角;原生窗口方案 2026-08-31 当日试用后回退)。
 
 **增强 backlog(不阻塞首版)**:
 
