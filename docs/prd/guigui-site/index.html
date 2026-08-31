@@ -543,6 +543,49 @@ section.sc > canvas.scene{
   transition:background 180ms ease-out,transform 180ms ease-out;
 }
 .fb-mail:hover{background:rgba(109,77,232,0.14);transform:translateY(-1px)}
+/* 反馈渠道 chips(虚线=待建/待公开) + 模板面板 */
+.fb-chips{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fb-chip{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:13px 18px;border-radius:11px;
+  border:1.5px dashed rgba(36,31,51,0.30);color:var(--ink-3);
+  font-family:var(--mono);font-size:12px;letter-spacing:.04em;
+}
+.fb-chip svg{width:14px;height:14px;flex-shrink:0}
+.fb-toggle{
+  display:inline-flex;align-items:center;gap:7px;padding:13px 18px;border-radius:11px;cursor:pointer;
+  border:1px solid var(--line-2);background:transparent;color:var(--ink-2);
+  font-family:var(--mono);font-size:12px;letter-spacing:.04em;
+  transition:border-color 180ms ease-out,color 180ms ease-out;
+}
+.fb-toggle:hover{border-color:var(--ink-2);color:var(--ink)}
+.fb-toggle .arr{font-size:10px;transition:transform 250ms cubic-bezier(0.32,0.72,0,1)}
+.fb-toggle.on .arr{transform:rotate(180deg)}
+.fb-panel{
+  display:none;margin-top:12px;padding:24px 30px;
+  border:1px solid var(--line-2);border-radius:16px;background:rgba(255,255,255,0.6);
+}
+.fb-panel.open{display:grid;grid-template-columns:220px 1fr;gap:18px 22px;animation:fb-in .3s ease-out}
+@keyframes fb-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.fb-f label{display:block;font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+.fb-f input,.fb-f select,.fb-f textarea{
+  width:100%;padding:10px 14px;border-radius:10px;
+  border:1px solid var(--line-2);background:rgba(255,255,255,0.75);
+  font-family:var(--sans);font-size:13.5px;color:var(--ink);
+}
+.fb-f textarea{resize:vertical;min-height:76px;line-height:1.65}
+.fb-f input::placeholder,.fb-f textarea::placeholder{color:var(--ink-3)}
+.fb-f input:focus,.fb-f select:focus,.fb-f textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.fb-wide{grid-column:1/-1}
+.fb-act{grid-column:1/-1;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.fb-gen{
+  padding:12px 26px;border:none;border-radius:10px;cursor:pointer;
+  background:oklch(23% 0.015 295);color:oklch(97% 0.005 295);
+  font-family:var(--sans);font-size:13.5px;font-weight:600;
+  transition:transform 150ms ease-out;
+}
+.fb-gen:hover{transform:translateY(-1px)}
+.fb-note{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);line-height:1.7}
 .fb-mail svg{width:15px;height:15px;flex-shrink:0}
 .nav .links a.fb-link{color:var(--accent)}
 .ft-row .d code{
@@ -622,6 +665,7 @@ section.sc > canvas.scene{
   .nav .links{display:none}
   .sec-head,.dl-head{grid-template-columns:1fr;gap:18px;margin-bottom:32px}
   .ft-rows,.faq-wrap{padding:24px 20px}
+  .fb-panel.open{grid-template-columns:1fr}
   .ft-row{grid-template-columns:70px 1fr;gap:14px}
   .ft-row .d{grid-column:2}
   .faq summary{grid-template-columns:70px 1fr 16px;gap:14px;font-size:16.5px}
@@ -988,10 +1032,48 @@ section.sc > canvas.scene{
         <div class="fb-t">对不上号?直接说给桂桂听。</div>
         <div class="fb-d">说明哪天早上、当时什么情况,顺手带上日志(桂桂主页 → 历史日志,复制最后几行)。看到就回。</div>
       </div>
-      <a class="fb-mail" href="mailto:kdy233@qq.com?subject=%E6%A1%82%E6%A1%82%E5%8F%8D%E9%A6%88">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 7.5l8 6 8-6"/></svg>
-        kdy233@qq.com
-      </a>
+      <div class="fb-chips">
+        <a class="fb-mail" href="mailto:kdy233@qq.com?subject=%E6%A1%82%E6%A1%82%E5%8F%8D%E9%A6%88">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 7.5l8 6 8-6"/></svg>
+          kdy233@qq.com
+        </a>
+        <!-- TODO(user): QQ 群建好后换成 <a class="fb-mail" href="https://qm.qq.com/…">QQ 群 群号</a>(实线启用样式) -->
+        <span class="fb-chip" title="QQ 群建设中,建好启用">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/><circle cx="16.5" cy="9" r="2.6"/><path d="M15 14.7c2.3.2 4.3 1.6 4.9 4.3"/></svg>
+          QQ 群 · 待建
+        </span>
+        <!-- TODO(user): 仓库公开后换成 <a class="fb-mail" href="仓库地址/issues">Issue 反馈</a>,并修页脚「查看源码」链接 -->
+        <span class="fb-chip" title="仓库待公开,公开后启用">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5"/><circle cx="12" cy="16.3" r="0.6" fill="currentColor" stroke="none"/></svg>
+          Issue · 待公开
+        </span>
+        <button class="fb-toggle" id="fb-toggle" type="button" aria-expanded="false" aria-controls="fb-panel">写反馈 <span class="arr" aria-hidden="true">↓</span></button>
+      </div>
+    </div>
+
+    <div class="fb-panel" id="fb-panel" aria-label="反馈模板">
+      <div class="fb-f">
+        <label for="fb-when">哪天早上</label>
+        <input id="fb-when" type="text" placeholder="例:9 月 1 日" autocomplete="off">
+      </div>
+      <div class="fb-f">
+        <label for="fb-what">什么现象</label>
+        <select id="fb-what">
+          <option>早上没登上网</option>
+          <option>提示登录被拒</option>
+          <option>认证服务器不可达</option>
+          <option>被杀毒拦截</option>
+          <option selected>其他</option>
+        </select>
+      </div>
+      <div class="fb-f fb-wide">
+        <label for="fb-log">日志末尾(可选)</label>
+        <textarea id="fb-log" rows="3" placeholder="桂桂主页 → 历史日志,复制最后几行贴这里"></textarea>
+      </div>
+      <div class="fb-f fb-act">
+        <button class="fb-gen" id="fb-gen" type="button">生成邮件 →</button>
+        <span class="fb-note">不会上传任何东西——只是帮你把这封邮件写好。</span>
+      </div>
     </div>
   </div>
 </section>
@@ -1494,6 +1576,27 @@ if(typeof XiaojiangMotion === 'function'){
     sio.observe(stage);
   } else { seen = true; stage.classList.add('live'); }
   show(0); arm();
+})();
+
+/* ═══ 反馈模板面板:三栏预填 → 生成邮件(纯前端 mailto,无上传) ═══ */
+(function(){
+  var tg = document.getElementById('fb-toggle'), pn = document.getElementById('fb-panel');
+  if(!tg || !pn) return;
+  tg.addEventListener('click', function(){
+    var open = pn.classList.toggle('open');
+    tg.classList.toggle('on', open);
+    tg.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if(open){ var f = pn.querySelector('input'); if(f) f.focus(); }
+  });
+  window.__fbBuild = function(){
+    var when = (document.getElementById('fb-when').value || '').trim();
+    var what = document.getElementById('fb-what').value;
+    var log  = (document.getElementById('fb-log').value || '').trim();
+    var body = '哪天早上:' + (when || '(没填)') + '\n什么现象:' + what + '\n\n日志末尾:\n' + (log || '(没带)');
+    return 'mailto:kdy233@qq.com?subject=' + encodeURIComponent('桂桂反馈·' + what) + '&body=' + encodeURIComponent(body);
+  };
+  var gen = document.getElementById('fb-gen');
+  if(gen) gen.addEventListener('click', function(){ window.location.href = window.__fbBuild(); });
 })();
 
 /* ═══ 入场动效 ═══ */
