@@ -1040,11 +1040,10 @@ section.sc > canvas.scene{
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 7.5l8 6 8-6"/></svg>
           kdy233@qq.com
         </a>
-        <!-- TODO(user): 仓库公开后换成 <a class="fb-mail" href="仓库地址/issues">Issue 反馈</a>,并修页脚「查看源码」链接 -->
-        <span class="fb-chip" title="仓库待公开,公开后启用">
+        <a class="fb-mail" href="https://github.com/ornman/guigui-site/issues" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5"/><circle cx="12" cy="16.3" r="0.6" fill="currentColor" stroke="none"/></svg>
-          Issue · 待公开
-        </span>
+          Issue 反馈
+        </a>
         <button class="fb-toggle" id="fb-toggle" type="button" aria-expanded="false" aria-controls="fb-panel">写反馈 <span class="arr" aria-hidden="true">↓</span></button>
       </div>
     </div>
@@ -1140,7 +1139,7 @@ section.sc > canvas.scene{
       </div>
     </div>
     <div class="spacer"></div>
-    <div class="repo"><a href="#">查看源码</a></div>
+    <div class="repo"><a href="https://github.com/ornman/guigui-site" target="_blank" rel="noopener">查看源码</a></div>
   </div>
 </footer>
 
@@ -1582,7 +1581,7 @@ if(typeof XiaojiangMotion === 'function'){
 })();
 
 /* ═══ 反馈面板:在线提交优先(Worker+D1),失败或未部署转邮件 ═══ */
-var FB_ENDPOINT = window.FB_ENDPOINT || ''; /* 部署 feedback-worker 后填,如 https://guigui-feedback.xxx.workers.dev/fb */
+var FB_ENDPOINT = window.FB_ENDPOINT || 'https://guigui-feedback.kdy233.workers.dev/fb';
 (function(){
   var tg = document.getElementById('fb-toggle'), pn = document.getElementById('fb-panel');
   var gen = document.getElementById('fb-gen'), ok = document.getElementById('fb-ok');
