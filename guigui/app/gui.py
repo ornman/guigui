@@ -139,6 +139,26 @@ def _missing_static_dialog() -> None:
         pass
 
 
+def _reconcile_on_start() -> None:
+    """启动后台对齐:上次会话任务若缺失/失配(如曾被安全软件拦),打开即补。
+
+    挂后台延迟跑,不挡首屏;失败时与保存路径同款 toast 指引。
+    --ensure 定时路径不做对齐(它本身靠已存在的任务触发,补建有鸡生蛋问题)。"""
+    import time
+
+    from guigui.core import selfheal
+
+    time.sleep(1.5)
+    try:
+        cfg = config_mod.load()
+        _, misaligned = selfheal.reconcile(cfg)
+    except Exception:
+        log.exception("gui: 启动对齐失败")
+        return
+    if misaligned and cfg.get("master", True):
+        notify_mod.task_blocked()
+
+
 def run(view: str | None = None) -> int:
     """启动 GUI;返回进程退出码。重复启动直接退出(单实例)。"""
     import webview
@@ -179,6 +199,7 @@ def run(view: str | None = None) -> int:
 
     watcher = FileWatcher(api)
     watcher.start()
+    threading.Thread(target=_reconcile_on_start, daemon=True).start()
     try:
         webview.start()
     finally:

@@ -67,6 +67,19 @@ def send(title: str, message: str, launch: str = LAUNCH_MAIN) -> None:
 # ── 去重决策(纯函数,AC-04)──────────────────────────────
 
 
+def task_blocked() -> None:
+    """建任务被安全软件拦时的指引通知(点开直达设置页)。
+
+    仅在用户主动动作(保存设置/切总开关/GUI 启动对齐)后调用,
+    --ensure 定时路径不建任务,不会每天刷屏。"""
+    send(
+        "桂桂",
+        "安全软件拦住了定时任务的创建,自动登录还没生效。"
+        "把桂桂加入它的信任区,再回来保存一次设置就好。",
+        launch=LAUNCH_SETTINGS,
+    )
+
+
 def decide_notify(prev_state: str | None, *, connected: bool,
                   login_attempted: bool, login_succeeded: bool,
                   consecutive_fail: int, fail_notify_sent: bool,

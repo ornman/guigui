@@ -16,7 +16,7 @@ import logging
 import threading
 import time
 
-from guigui.core import config, detect, diagnostics, drcom, ensure, logstore, selfheal, vault, wifictl
+from guigui.core import config, detect, diagnostics, drcom, ensure, logstore, notify, selfheal, vault, wifictl
 from guigui.core.config import ConfigError
 from guigui.core.vault import VaultError
 from guigui.core.wifictl import WifiConnectError, WifiScanError
@@ -40,19 +40,6 @@ def _ok(data: dict) -> dict:
 
 def _err(code: str, message: str) -> dict:
     return {"ok": False, "code": code, "message": message}
-
-
-def _toast_task_blocked() -> None:
-    """建任务被拦(典型:安全软件)时的兜底通知 —— 用户刚做过保存/开关动作,
-    当场说清怎么办;点通知直达设置页。仅 GUI 动作路径调用(--ensure 不调
-    reconcile,不会每天刷屏)。"""
-    from guigui.core import notify
-    notify.send(
-        "桂桂",
-        "安全软件拦住了定时任务的创建,自动登录还没生效。"
-        "把桂桂加入它的信任区,再回来保存一次设置就好。",
-        launch=notify.LAUNCH_SETTINGS,
-    )
 
 
 class GuiGuiApi:
@@ -241,7 +228,7 @@ class GuiGuiApi:
                 log.exception("api.saveConfig: selfheal 对齐失败")
                 misaligned = bool(saved.get("master", True))
             if misaligned and saved.get("master", True):
-                _toast_task_blocked()
+                notify.task_blocked()
             self._emit("schedule:changed",
                        {"master": saved["master"], "trigger_time": saved["trigger_time"]})
 
@@ -258,7 +245,7 @@ class GuiGuiApi:
             # 语义重(建/删任务):同步做完再回话
             _, misaligned = selfheal.reconcile(saved)
             if misaligned and value:
-                _toast_task_blocked()
+                notify.task_blocked()
             self._emit("schedule:changed",
                        {"master": saved["master"], "trigger_time": saved["trigger_time"]})
             return _ok({"master": saved["master"]})
