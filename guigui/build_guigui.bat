@@ -1,16 +1,17 @@
 @echo off
+chcp 65001 >nul
 rem 桂桂 v2 构建脚本:venv + 依赖 + 测试 + PyInstaller(+ 可选 Inno 安装器)
-rem 在仓库根生成 dist\guigui\guigui.exe
+rem 在仓库根生成 dist\guigui\guigui.exe(必须 CRLF 行尾,cmd 不认 LF-only 批处理)
 setlocal
 cd /d %~dp0..
 
 if not exist .venv-guigui python -m venv .venv-guigui
-call .venv-guigui\Scripts\activate.bat
+call .venv-guigui\Scriptsctivate.bat
 
-python -m pip install -q -r guigui\requirements.txt pyinstaller pytest
+python -m pip install -q -r guiguiequirements.txt pyinstaller pytest
 if errorlevel 1 goto :err
 
-python -m pytest guigui\tests -q
+python -m pytest guigui	ests -q
 if errorlevel 1 goto :err_test
 
 pyinstaller guigui\guigui.spec --noconfirm --distpath dist --workpath build
