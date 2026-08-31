@@ -1581,7 +1581,7 @@ if(typeof XiaojiangMotion === 'function'){
 })();
 
 /* ═══ 反馈面板:在线提交优先(Worker+D1),失败或未部署转邮件 ═══ */
-var FB_ENDPOINT = window.FB_ENDPOINT || 'https://guigui-feedback.kdy233.workers.dev/fb';
+var FB_ENDPOINT = window.FB_ENDPOINT || '/fb'; /* 同域 Pages Function;本地 file:// 打不开时自动转邮件 */
 (function(){
   var tg = document.getElementById('fb-toggle'), pn = document.getElementById('fb-panel');
   var gen = document.getElementById('fb-gen'), ok = document.getElementById('fb-ok');
