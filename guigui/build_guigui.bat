@@ -20,8 +20,12 @@ if errorlevel 1 goto :err
 echo.
 echo === BUILD OK: dist\guigui\guigui.exe ===
 
-if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" (
-    "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" guigui\setup.iss
+rem ISCC 两处可能:系统级或按用户安装(本机为 per-user,只认系统级会静默跳过
+rem 并残留旧安装器 —— 2026-08-31 实测踩坑)
+set "ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
+if not exist "%ISCC%" set "ISCC=%LocalAppData%\Programs\Inno Setup 6\ISCC.exe"
+if exist "%ISCC%" (
+    "%ISCC%" guigui\setup.iss
     echo installer: guigui\Output\guigui-setup-*.exe
 ) else (
     echo [hint] Inno Setup 6 not found, skip installer; run dist\guigui\guigui.exe directly
