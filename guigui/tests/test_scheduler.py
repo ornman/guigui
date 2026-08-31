@@ -45,11 +45,15 @@ def _cfg(**over):
 def test_main_task_xml_triggers_and_rev():
     xml = scheduler.build_main_task_xml(_cfg(), rev=7)
     assert "GuiGui v2 automation rev=7" in xml
+    assert "<RegistrationInfo><Description>GuiGui v2 automation rev=7</Description>" in xml
+    assert "<Triggers><CalendarTrigger>" in xml        # schema 顺序:触发器必须包壳(联调实测教训)
     assert "<ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>" in xml
     assert "T06:30:00" in xml
     assert "<Interval>PT5M</Interval>" in xml and "<Duration>PT25M</Duration>" in xml
     assert "<LogonTrigger>" in xml                      # boot_login 默认开
     assert "<EventTrigger>" not in xml                  # wake_login 默认关
+    # 声明与 create_task 落盘编码必须同为 UTF-16(schtasks 规范;不一致报「无法切换编码」)
+    assert xml.startswith('<?xml version="1.0" encoding="UTF-16"?>')
 
 
 def test_main_task_xml_switch_reflects_config():
@@ -74,7 +78,7 @@ def test_patrol_task_xml():
     now = dt.datetime(2026, 8, 31, 12, 0, 0)
     xml = scheduler.build_patrol_task_xml(
         {"patrol_minutes": 30, **_cfg()}, rev=3, now=now)
-    assert "<TimeTrigger>" in xml and "<CalendarTrigger>" not in xml
+    assert "<Triggers><TimeTrigger>" in xml and "<CalendarTrigger>" not in xml
     assert "<Interval>PT30M</Interval>" in xml
     assert "<Duration>P3650D</Duration>" in xml
     assert "rev=3" in xml
@@ -116,7 +120,7 @@ def test_create_task_passes_xml_file(fake):
 
     def spy(args, timeout=30):
         if args[0] == "/create":
-            sent["xml"] = Path(args[4]).read_text(encoding="utf-8")
+            sent["xml"] = Path(args[4]).read_text(encoding="utf-16")
         return orig(args, timeout)
     scheduler._run = spy
     try:

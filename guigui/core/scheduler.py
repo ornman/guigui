@@ -109,7 +109,11 @@ def _exec_xml() -> str:
 
 
 def build_main_task_xml(cfg: dict, rev: int, now=None) -> str:
-    """主任务 GuiGui:L1 Daily+Repetition + L2 AtLogon + L5 唤醒(按开关注入)。"""
+    """主任务 GuiGui:L1 Daily+Repetition + L2 AtLogon + L5 唤醒(按开关注入)。
+
+    结构必须严格按 Task Scheduler schema 顺序:
+    RegistrationInfo(含 Description/rev 标记)→ Triggers → Principals → Settings → Actions。
+    """
     import datetime as dt
 
     now = now or dt.datetime.now()
@@ -137,8 +141,10 @@ def build_main_task_xml(cfg: dict, rev: int, now=None) -> str:
     return (
         '<?xml version="1.0" encoding="UTF-16"?>'
         '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">'
+        "<RegistrationInfo>"
         f"<Description>GuiGui v2 automation rev={rev}</Description>"
-        f"{trig}"
+        "</RegistrationInfo>"
+        f"<Triggers>{trig}</Triggers>"
         f"{_principal_xml()}"
         f"{_settings_xml()}"
         f"{_exec_xml()}"
@@ -164,8 +170,10 @@ def build_patrol_task_xml(cfg: dict, rev: int, now=None) -> str:
     return (
         '<?xml version="1.0" encoding="UTF-16"?>'
         '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">'
+        "<RegistrationInfo>"
         f"<Description>GuiGui v2 automation rev={rev}</Description>"
-        f"{trig}"
+        "</RegistrationInfo>"
+        f"<Triggers>{trig}</Triggers>"
         f"{_principal_xml()}"
         f"{_settings_xml()}"
         f"{_exec_xml()}"
@@ -187,8 +195,10 @@ def create_task(task_name: str, xml: str) -> bool:
     """用 XML 注册/覆盖任务(/f 幂等)。"""
     tmp: str | None = None
     try:
+        # Task Scheduler 规范格式是 UTF-16(带 BOM);声明与文件编码必须一致,
+        # 否则 schtasks 报「无法切换编码」(联调实测)
         with tempfile.NamedTemporaryFile(
-                "w", suffix=".xml", delete=False, encoding="utf-8") as f:
+                "w", suffix=".xml", delete=False, encoding="utf-16") as f:
             f.write(xml)
             tmp = f.name
         r = _run(["/create", "/tn", task_name, "/xml", tmp, "/f"])
