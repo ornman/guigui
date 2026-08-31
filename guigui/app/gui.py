@@ -29,7 +29,9 @@ WATCH_INTERVAL = 2.0
 # SetWindowRgn 裁圆角,半径 8 CSS px × DPI —— 对齐 Win11 系统圆角观感(原 22px 已弃)。
 # WinForms+WebView2 做不到真透明(transparent=True 四角露白),配方详见契约「集成待办」。
 CORNER_CSS_PX = 8                  # Win11 系统窗口圆角规格(非 CSS 卡片 token)
-SHELL_BG = "#2b2740"               # ≈ 前端 --ink,兜圆角弧线与 CSS 间的亚像素缝隙
+# 取卡片浅底(≈ .window 渐变的浅紫),兜首帧闪色与弧线亚像素缝隙;
+# 深色会在浅色卡片的角落露楔形(2026-08-31 实机踩坑)
+SHELL_BG = "#e9e7f2"
 
 _STATE2NET = {"up": "logged_in", "down": "unreachable", "failed": "not_logged_in"}
 

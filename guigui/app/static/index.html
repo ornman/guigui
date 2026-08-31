@@ -404,6 +404,10 @@ body.backdrop-black .taskbar{display:none}
 html.in-app,html.in-app body{background:transparent}
 html.in-app body::before{display:none}
 html.in-app body{padding:0}
+/* 圆角对齐系统窗口裁剪(gui.py SetWindowRgn = 8px):卡片若仍 22px,
+   角落会露出 WebView2 底色楔形(黑色块);两层弧线必须一致 */
+html.in-app .window{border-radius:8px}
+html.in-app #fx{border-radius:8px}
 </style>
 
 </head>
