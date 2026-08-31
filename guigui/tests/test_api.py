@@ -323,3 +323,26 @@ def test_master_toggle_unconfigured_skips_create(monkeypatch):
     out = c.api.masterToggle(True)
     assert out["ok"] is True and out["data"]["master"] is True
     assert c.reconciled == []
+
+
+# ── login:凭据单次读出 + 空值防线 ─────────────────────────
+
+
+def test_login_reads_vault_once_across_retries(ctx, monkeypatch):
+    ctx.probe_state = {"state": "not_logged_in", "ssid": "x", "detail": ""}
+    seq = [("rejected", "x"), ("rejected", "x"), ("success", "")]
+    # Ctx 的 login 桩只回第一个元素不前进;这里覆写成逐次弹出,驱动真实重试
+    monkeypatch.setattr(api_mod.drcom, "login", lambda *a, **k: seq.pop(0))
+    calls = []
+    monkeypatch.setattr(api_mod.vault, "get_password",
+                        lambda uid: (calls.append(uid) or "pw"))
+    out = ctx.api.login({})
+    assert out["ok"] is True and out["data"]["attempts"] == 3
+    assert len(calls) == 1                    # 旧实现每轮重读(3 次)
+
+
+def test_login_vault_read_failure_maps_not_configured(ctx, monkeypatch):
+    ctx.probe_state = {"state": "not_logged_in", "ssid": "x", "detail": ""}
+    monkeypatch.setattr(api_mod.vault, "get_password", lambda uid: None)
+    out = ctx.api.login({})
+    assert out["code"] == "NOT_CONFIGURED"    # 旧实现 INTERNAL(quote(None) 炸)

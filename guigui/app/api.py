@@ -153,6 +153,12 @@ class GuiGuiApi:
                 if not uid or not vault.has_password(uid):
                     return _err(NOT_CONFIGURED, "还没存过密码,先填一次")
 
+            # 凭据单次读出(重试不碰 keyring);读出为空 → 明确报未配置,
+            # 不让 None 流进 drcom.build_login_url(quote(None) 炸成 INTERNAL)。
+            stored = vault.get_password(uid)
+            if not stored:
+                return _err(NOT_CONFIGURED, "还没存过密码,先填一次")
+
             self._emit("login:progress", {"phase": "probe"})
             net = detect.probe(cfg)
             if net["state"] == detect.LOGGED_IN:
@@ -168,7 +174,7 @@ class GuiGuiApi:
                 attempts = i + 1
                 self._emit("login:progress",
                            {"phase": "requesting", "attempt": attempts, "attempts": retries})
-                result, msg = drcom.login(cfg["url"], uid, vault.get_password(uid))
+                result, msg = drcom.login(cfg["url"], uid, stored)
                 if result == drcom.SUCCESS:
                     break
                 if i < retries - 1:
