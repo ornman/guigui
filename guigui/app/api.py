@@ -74,16 +74,19 @@ class GuiGuiApi:
 
     # ── 事件(契约 §3)──────────────────────────────
 
-    def _emit(self, type_: str, payload: dict) -> None:
+    def _eval(self, js: str) -> None:
         w = self._window
         if w is None:
             return
         try:
-            w.evaluate_js(
-                f"window.guiguiEmit && window.guiguiEmit("
-                f"{json.dumps(type_)}, {json.dumps(payload, ensure_ascii=False)})")
+            w.evaluate_js(js)
         except Exception as e:
-            log.warning("api: 事件推送失败(%s): %s", type_, e)
+            log.warning("api: JS 执行失败(%s)", e)
+
+    def _emit(self, type_: str, payload: dict) -> None:
+        self._eval(
+            f"window.guiguiEmit && window.guiguiEmit("
+            f"{json.dumps(type_)}, {json.dumps(payload, ensure_ascii=False)})")
 
     # ── 2.1 probe ─────────────────────────────────
 
