@@ -505,7 +505,7 @@ html.in-app body{padding:0}
         <span class="sw on" id="sw-auto" onclick="toggleAuto()"></span></div>
       <div class="row"><div><div class="t">网络</div>
         <div class="d" id="main-net">已连上 Campus-WiFi ✓</div></div></div>
-      <div class="row"><div><div class="t">昨晚</div>
+      <div class="row"><div><div class="t" id="main-last-t">昨晚</div>
         <div class="d" id="main-last">…</div></div></div>
 
       <button class="btn quiet" id="main-btn" onclick="quickLogin()">立即重新登录</button>
@@ -580,7 +580,18 @@ html.in-app body{padding:0}
       <div class="row"><div><div class="t">重试间隔</div><div class="d">每次失败后歇一歇再试</div></div>
         <div class="dd" data-cfg-key="retry_seconds"><button class="dd-btn"><span class="dd-label">5 秒</span><span class="car">▼</span></button>
           <div class="dd-menu"><button class="on" data-v="5">5 秒 <span class="ck">✓</span></button><button data-v="10">10 秒 <span class="ck">✓</span></button><button data-v="30">30 秒 <span class="ck">✓</span></button></div></div></div>
+      <div class="row"><div><div class="t">遇见问题?</div><div class="d">一键复制打码诊断信息,发给谁都不泄密</div></div>
+        <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openDetail('v-feedback')">反馈</button></div>
       <div style="height:8px"></div>
+    </div>
+
+    <!-- 问题反馈:打码诊断展示 + 一键复制(契约 §2.12,1.1.0) -->
+    <div class="v" id="v-feedback">
+      <button class="back" onclick="backFrom('v-feedback')">‹ 返回</button>
+      <h1 style="font-size:22px">诊断信息。</h1>
+      <p class="lede">已自动打码:学号只留头尾,密码永远不会出现。复制发给开发者即可:</p>
+      <div class="log" id="feedback-text" style="max-height:300px;white-space:pre-wrap">正在生成…</div>
+      <button class="btn" id="feedback-copy" onclick="copyFeedback(this)">复制诊断信息</button>
     </div>
 
   </div>
@@ -597,7 +608,7 @@ html.in-app body{padding:0}
 <script>
 const win=document.getElementById('win');
 const $=id=>document.getElementById(id);
-const views=['v-boot','v-ok','v-login','v-success','v-guide','v-main','v-settings','v-log'];
+const views=['v-boot','v-ok','v-login','v-success','v-guide','v-main','v-settings','v-log','v-feedback'];
 let mainState='ok',configured=false,hasPwd=false;
 const origin={};   /* 详情视图来路:返回必回原处 */
 /* 触发时间:从 v-settings 时间输入/药丸同步,主页 desc 与庆祝页 lede 都读这个值(报告 1.4) */
@@ -659,7 +670,7 @@ function show(id){
   }else{next.classList.add('on')}
 }
 /* 来路栈:首次进入时记录,返回后清除(报告 5.5);不再每次覆盖 */
-function openDetail(id){if(!(id in origin))origin[id]=currentView();show(id);if(id==='v-settings')loadSettings();if(id==='v-log')loadLogs();if(id==='v-guide')renderGuide();if(id==='v-login')fillLoginLanding()}
+function openDetail(id){if(!(id in origin))origin[id]=currentView();show(id);if(id==='v-settings')loadSettings();if(id==='v-log')loadLogs();if(id==='v-guide')renderGuide();if(id==='v-login')fillLoginLanding();if(id==='v-feedback')loadFeedback()}
 function backFrom(id){const dest=origin[id]||'v-main';delete origin[id];if(dest==='v-main'){renderMain();renderMainData()}show(dest);greet();document.body.classList.remove('setup')}
 function greetText(){const h=new Date().getHours();return h<11?'早上好':(h<18?'下午好':'晚上好')}
 function greet(){const g=greetText()+'。';
@@ -947,6 +958,7 @@ function lastText(r){
   if(!r||r.outcome==='none')return '还没有记录';
   if(r.outcome==='silent')return '假期静默,没打扰你';
   if(r.outcome==='fail')return (r.time||'')+' 没能登上,白天巡逻会补';
+  if(r.tries===0)return (r.time||'')+' 已经在线 ✓';   /* 首装时本来就在线(联调实测) */
   return (r.time||'')+(r.tries===1?' 第一次就登好了 ✓':' 第 '+r.tries+' 次登好 ✓');
 }
 function logLineHTML(e){
@@ -1013,7 +1025,7 @@ async function renderMainData(){
     $('sw-gui').classList.toggle('on',curCfg.show_gui!==false);
   }
   if(lastNet)$('main-net').textContent=netText(lastNet);
-  if(l.ok)$('main-last').textContent=lastText(l.data);
+  if(l.ok){$('main-last-t').textContent=l.data.when||'昨晚';$('main-last').textContent=lastText(l.data)}
   if(g.ok&&g.data.days[0])$('main-log-entries').innerHTML=g.data.days[0].entries.map(logLineHTML).join('');
 }
 async function loadLogs(){
@@ -1046,6 +1058,22 @@ async function loadSettings(){
   }
 }
 function toggleCfg(el){el.classList.toggle('on');GG.api.saveConfig({[el.dataset.cfg]:el.classList.contains('on')})}
+/* 问题反馈(契约 §2.12):拉取打码诊断文本,展示 + 一键复制(复制动作在前端) */
+async function loadFeedback(){
+  const box=$('feedback-text'),btn=$('feedback-copy');
+  box.textContent='正在生成…';box.dataset.raw='';btn.disabled=true;
+  const r=await GG.api.feedback();
+  btn.disabled=false;
+  if(!r.ok){box.textContent='生成失败:'+r.message;return}
+  box.textContent=r.data.text;box.dataset.raw=r.data.text;
+}
+async function copyFeedback(btn){
+  const t=$('feedback-text').dataset.raw||'';
+  if(!t)return;
+  try{await navigator.clipboard.writeText(t)}
+  catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}
+  btn.textContent='已复制 ✓';setTimeout(()=>{btn.textContent='复制诊断信息'},1800);
+}
 /* 日志追加事件:主页内嵌 + 历史页今天组同步追加 */
 GG.on('log:appended',e=>{
   if(!e||!e.entry)return;

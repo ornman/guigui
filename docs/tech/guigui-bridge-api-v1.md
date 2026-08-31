@@ -190,5 +190,6 @@
 ## 6. 集成待办(联调问题记这里)
 
 - **学号打码示例说明(后端记,已随 1.0.1 登记)**:打码规则=前4…后4,对真实学号 2025000000001 得 `2025…0001`;PRD/契约示例里的 `2025…7209` 是手打示意串、非规则推得。前端如做正则校验请以规则为准。
-- **`recentResult` tries=0 文案(后端记,2026-08-31 联调实测)**:首装时"本来就在线"路径 `tries=0`,主页第三行渲染成「07:58 第 0 次登好 ✓」——"第 0 次"不可读。建议前端对 `tries===0` 单独映射(如「07:58 已经在线 ✓」);后端不改(0 是事实值)。
-- **`recentResult` when 与行标题(后端记,2026-08-31 联调实测)**:今早的记录(`when="今早"`)渲染在静态标题「昨晚」行下,语义打架。建议行标题直接用 `when` 或做映射。
+- **`recentResult` tries=0 文案** → 前端已修复(2026-08-31):`tries===0` 映射「(时间) 已经在线 ✓」。
+- **`recentResult` when 与行标题** → 前端已修复(2026-08-31):行标题改用 `when`(id=main-last-t),缺省「昨晚」。
+- **窗口圆角配方(前端实测,后端 gui.py 需采纳——现 gui.py:142 仍 transparent=True,生产同样白角)**:WinForms+WebView2 做不到真透明,`transparent=True` 只把 WebView2 设透明,窗体 BackColor 仍默认浅灰(240,240,240),四角露白(用户实机确认);设窗体 BackColor=Transparent 亦无效。**配方**:①`shadow=False`(pywebview 的 DWM 阴影 hack 会在圆角外铺白边);②`background_color='#2b2740'`(≈ --ink,兜弧线亚像素缝隙);③`before_show` 里 `SetWindowRgn` 圆角,半径 = `round(22 × GetDpiForWindow/96)`,rgn 尺寸 = `form.ClientSize+1`;④`restored` 事件重挂。参考实现 `devshell.py::_apply_rounded_region`(已像素级实测:四角露壁纸、零白边)。代价:卡片 CSS 外投影被裁掉(用户已拍板:22px 精确圆角优先)。

@@ -35,7 +35,7 @@ const S={
     patrol_enabled:false,patrol_minutes:30,wake_login:false,
     vacation_silence:true,notifications:true,show_gui:true,master:true,
     login_retries:3,retry_seconds:5},
-  last:{when:'今早',time:'07:00',tries:1,outcome:'ok'},
+  last:{when:'今早',time:'07:00',tries:1,outcome:'ok'},   /* tries:0=本来就在线,见 lastText */
   logs:[
     {label:'今天',entries:[
       {ts:'07:00:01',level:'ok',text:'网络可达'},
@@ -118,6 +118,21 @@ window.GGMock={
     return OK({days:S.logs.slice(0,n)});
   },
   async recentResult(){await delay(50);return OK({...S.last})},
+  async feedback(){
+    await delay(400);
+    const lines=[
+      '桂桂 v2.0.0 诊断信息',
+      '时间:2026-08-31 07:00',
+      '系统:Windows 11 · WebView2',
+      '网络:Campus-WiFi · 已登录 · 2025…0001',
+      '配置:07:00 触发 · 巡逻 30 分钟 · 通知开',
+      '凭据:已存(密码不出后端)',
+      '任务:GuiGui(每日)与 GuiGui-Patrol(巡逻)已注册',
+      '—— 最近 3 天 ——',
+      '07:00 [OK] 已登录 · 2025…0001'
+    ];
+    return OK({text:lines.join('\n')});
+  },
   async winMinimize(){},
   async winClose(){}
 };
