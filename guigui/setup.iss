@@ -22,7 +22,8 @@ ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=lowest
 WizardStyle=modern
 DisableProgramGroupPage=yes
-; TODO 图标资产定稿后:SetupIconFile=guigui.ico / UninstallDisplayIcon={app}\{#MyAppExeName}
+SetupIconFile=guigui.ico
+UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Files]
 Source: "..\dist\guigui\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion

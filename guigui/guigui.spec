@@ -51,6 +51,6 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,     # windowed;--ensure 同一无窗入口
-    icon=None,         # TODO 图标资产定稿后补
+    icon=str(GUIGUI_DIR / "guigui.ico"),  # 小匠 bot:深蓝方脸眯眯眼+绿芽
 )
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="guigui")
