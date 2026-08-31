@@ -95,3 +95,10 @@ def test_apply_patch_accepts_valid_operator():
 def test_to_bridge_includes_operator():
     bridge = config.to_bridge(config.load())
     assert "operator" in bridge and bridge["operator"] == "校园用户"
+
+
+def test_operator_campus_other_valid_roundtrip():
+    out = config.validate({**config.DEFAULTS, "operator": "校园其他"})
+    assert out["operator"] == "校园其他"
+    ok = config.apply_patch(config.load(), {"operator": "校园其他"})
+    assert ok["operator"] == "校园其他"

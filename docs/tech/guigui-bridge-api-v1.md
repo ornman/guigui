@@ -57,7 +57,7 @@
 
 ### 2.3 login({sid?, password?, operator?}) — 登录(首装开启/立即登录/重新登录共用)
 
-- 省略 `password` → 用已存凭据;省略 `sid` → 用已存学号;省略 `operator` → 用当前配置(枚举同 §2.6 `operator`:校园用户/校园电信/校园联通,决定登录用户名后缀)。重试节奏按配置,期间推 `login:progress` 事件。
+- 省略 `password` → 用已存凭据;省略 `sid` → 用已存学号;省略 `operator` → 用当前配置(枚举同 §2.6 `operator`:校园用户/校园电信/校园联通/校园其他,决定登录用户名后缀)。重试节奏按配置,期间推 `login:progress` 事件。
 - 时延承诺:最坏 ≈ 次数×(10s 超时+间隔),前端以事件驱动 UI,不设本地超时。
 
 ```jsonc
@@ -104,7 +104,7 @@
   "master": true,                 // 后台自动化总开关(与主页开关同步)
   "login_retries": 3,             // ∈ 1|3|5
   "retry_seconds": 5,             // ∈ 5|10|30
-  "operator": "校园用户"           // ∈ 校园用户|校园电信|校园联通(登录用户名后缀:空|@dx|@lt)
+  "operator": "校园用户"           // ∈ 校园用户|校园电信|校园联通|校园其他(后缀:空|@dx|@lt|空)
 }
 ```
 
@@ -188,7 +188,7 @@
 | 1.0.1 | 2026-08-31 | mock 移入 `static/dev/`,仅 `?dev=1` 加载;生产无绑定返回 `BRIDGE_MISSING` 诚实报错(错误码 +1);打包必须排除 `static/dev/` | 前端已实现;后端已适配(guigui.spec 递归排除 dev/,commit 2026-08-31)— **生效** |
 | 1.0.2 | 2026-08-31 | `wake_login` 默认值对齐 PRD §5(→ false,清待办#1);§4 收编深链注入 `window.__guigui_launch`(清待办#2,后端已按此注入) | 前端已实现;后端联调实测生效(wake_login=false 落盘验证,commit 17c0eb1)— **生效** |
 | 1.1.0 | 2026-08-31 | 新增 `feedback()`(§2.12):返回打码诊断文本(用户拍板:反馈动作=复制诊断信息);方法 11→12 | 后端已实现(diagnostics+api.feedback,120 测);前端已接(反馈视图+设置入口,commit 1bb4083)— **生效** |
-| 1.1.1 | 2026-08-31 | §2.6 getConfig/saveConfig 新增 `operator` 枚举(校园用户/校园电信/校园联通);§2.3 login payload 新增可选 `operator`;login 响应新增 `verified` | 后端已落地(提交密码先验证后入库 + verified 随信封下行);前端适配待接 |
+| 1.1.1 | 2026-08-31 | §2.6 getConfig/saveConfig 新增 `operator` 枚举(校园用户/校园电信/校园联通/校园其他,注销页 carrier 实测抓全);§2.3 login payload 新增可选 `operator`;login 响应新增 `verified` | 后端已落地(提交密码先验证后入库 + verified 随信封下行);前端适配待接 |
 
 ## 6. 集成待办(联调问题记这里)
 

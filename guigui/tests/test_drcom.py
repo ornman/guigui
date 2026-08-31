@@ -152,3 +152,31 @@ def test_logout_none_when_portal_unconfigured(monkeypatch):
     monkeypatch.setattr(drcom, "urlopen", fake)
     assert drcom.logout("<html>没有配置</html>", "http://10.1.2.3") is None
     assert called == []                        # 没配置就不发请求
+
+
+# ── 运营商:校园其他 + 门户 carrier 解析(2026-08-31 注销页实测)─────
+
+_CARRIER_HTML = (
+    "charset='gb2312';//页面编码 exparam=0; "
+    "carrier='{\"yys\":{\"title\": \"服务类型\",\"mode\":\"radiobutton\",\"type\":\"0\","
+    "\"data\":[{\"id\":\"1\",\"name\":\"校园用户\",\"suffix\":\"\"},"
+    "{\"id\":\"2\",\"name\":\"校园电信\",\"suffix\":\"@dx\"},"
+    "{\"id\":\"3\",\"name\":\"校园联通\",\"suffix\":\"@lt\"},"
+    "{\"id\":\"4\",\"name\":\"校园其他\",\"suffix\":\"\"}],\"defaultID\":\"1\"}}';//运营商选择"
+)
+
+
+def test_operator_table_matches_real_portal():
+    assert drcom.parse_operators(_CARRIER_HTML) == drcom.OPERATOR_TABLE
+
+
+def test_parse_operators_garbage_returns_empty():
+    assert drcom.parse_operators("") == {}
+    assert drcom.parse_operators("carrier='not json';") == {}
+    assert drcom.parse_operators("<html>无配置</html>") == {}
+
+
+def test_campus_other_is_bare_uid():
+    assert drcom.operator_suffix("校园其他") == ""
+    url = drcom.build_login_url("http://x", "u", "p", operator="校园其他")
+    assert "DDDDD=u&" in url                       # 裸学号,无后缀

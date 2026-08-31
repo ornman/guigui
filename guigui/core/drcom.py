@@ -30,14 +30,31 @@ REJECTED = "rejected"      # 服务器应答 result!=1(密码被拒等)
 UNEXPECTED = "unexpected"  # 响应不是 JSONP(维护页/劫持页)
 UNREACHABLE = "unreachable"
 
-# PRD §4.1.1 实测记录的门户后缀表(默认校园用户=裸学号,v1 生产验证)。
-# 运行时从门户拉取列为增强(技术方案 §14.8),先按实测值落地。
+# 门户后缀表(2026-08-31 从注销页 carrier 配置实测抓全,共 4 项;
+# 默认校园用户=裸学号)。运行时从门户拉取列为增强(技术方案 §14.8)。
 OPERATOR_TABLE: dict[str, str] = {
     "校园用户": "",
     "校园电信": "@dx",
     "校园联通": "@lt",
+    "校园其他": "",
 }
 DEFAULT_OPERATOR = "校园用户"
+
+
+def parse_operators(portal_html: str) -> dict[str, str]:
+    """从门户页 carrier 配置解析运营商表(name → suffix)。
+
+    实测载体(注销页 JS,哆点参数):carrier='{"yys":{…,"data":[
+    {"id":"1","name":"校园用户","suffix":""},…]}}';解析不到/损坏返回
+    空 dict(调用方沿用内置表)。TE 用它断言内置表与门户一致。"""
+    m = re.search(r"carrier\s*=\s*'(.*?)'\s*;", portal_html or "", re.DOTALL)
+    if not m:
+        return {}
+    try:
+        items = json.loads(m.group(1))["yys"]["data"]
+        return {str(i["name"]): str(i.get("suffix", "")) for i in items if i.get("name")}
+    except (ValueError, KeyError, TypeError):
+        return {}
 
 
 def operator_suffix(operator: str | None) -> str:
