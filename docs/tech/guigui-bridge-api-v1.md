@@ -192,4 +192,5 @@
 - **学号打码示例说明(后端记,已随 1.0.1 登记)**:打码规则=前4…后4,对真实学号 2025000000001 得 `2025…0001`;PRD/契约示例里的 `2025…7209` 是手打示意串、非规则推得。前端如做正则校验请以规则为准。
 - **`recentResult` tries=0 文案** → 前端已修复(2026-08-31):`tries===0` 映射「(时间) 已经在线 ✓」。
 - **`recentResult` when 与行标题** → 前端已修复(2026-08-31):行标题改用 `when`(id=main-last-t),缺省「昨晚」。
-- **窗口圆角配方(前端实测)→ 后端已采纳(2026-08-31,gui.py:SetWindowRgn+shadow=False+#2b2740,before_show/restored 双挂)**——原票:WinForms+WebView2 做不到真透明,`transparent=True` 只把 WebView2 设透明,窗体 BackColor 仍默认浅灰(240,240,240),四角露白(用户实机确认);设窗体 BackColor=Transparent 亦无效。**配方**:①`shadow=False`(pywebview 的 DWM 阴影 hack 会在圆角外铺白边);②`background_color='#2b2740'`(≈ --ink,兜弧线亚像素缝隙);③`before_show` 里 `SetWindowRgn` 圆角,半径 = `round(22 × GetDpiForWindow/96)`,rgn 尺寸 = `form.ClientSize+1`;④`restored` 事件重挂。参考实现 `devshell.py::_apply_rounded_region`(已像素级实测:四角露壁纸、零白边)。代价:卡片 CSS 外投影被裁掉(用户已拍板:22px 精确圆角优先)。
+- **【已废弃 2026-08-31 下午】窗口圆角配方票关闭**:用户拍板改用 **Win11 原生窗口**(系统标题栏 + DWM 圆角/阴影/贴边),gui.py 已删 `SetWindowRgn` 全套 hack(`frameless`/`shadow=False`/双事件挂载一并移除)。原配方记录存档于打包测试报告与 git(3ffb764)。**连带前端待办见下条。**
+- **【前端票】拆自绘标题行(后端记,2026-08-31)**:原生窗口下标题栏由系统绘制,前端的自绘标题行(`桂桂 / GUIGUI` 名称 + `×`/`–` 按钮 + `.pywebview-drag-region` 拖拽区)整行移除即可;§2.11 `winMinimize`/`winClose` 后端保留不删(兼容,前端按钮拆除后自然无人调用)。标题栏名字 = 回主页的交互(`onclick=goDaily()`)随标题行一起消失,如需保留"回主页"请另行安置。`background_color='#2b2740'` 后端仍在传,新用途是兜 WebView2 首帧闪白。
