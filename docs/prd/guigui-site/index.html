@@ -524,6 +524,30 @@ section.sc > canvas.scene{
   background:rgba(36,31,51,0.06);border:1px solid var(--line);color:var(--ink);
 }
 
+/* ═══ Fig.04 下半:排障清单 + 反馈入口 ═══ */
+.support-head{margin-top:72px}
+/* 反馈入口行:虚线框=通道建设中,渠道确认后换实线 */
+.fb-row{
+  display:flex;align-items:center;justify-content:space-between;gap:28px;flex-wrap:wrap;
+  margin-top:18px;padding:22px 30px;border-radius:16px;
+  border:1px dashed rgba(109,77,232,0.45);background:rgba(109,77,232,0.03);
+  scroll-margin-top:96px;
+}
+.fb-row .fb-t{font-family:var(--serif);font-size:17.5px;font-weight:500;letter-spacing:-.01em}
+.fb-row .fb-d{font-size:13px;color:var(--ink-2);margin-top:5px;line-height:1.7;max-width:52ch}
+.fb-mail{
+  display:inline-flex;align-items:center;gap:9px;flex-shrink:0;
+  padding:13px 22px;border-radius:11px;
+  border:1.5px dashed var(--accent);background:rgba(109,77,232,0.06);color:var(--accent);
+  font-family:var(--mono);font-size:12px;letter-spacing:.04em;
+}
+.fb-mail svg{width:15px;height:15px;flex-shrink:0}
+.nav .links a.fb-link{color:var(--accent)}
+.ft-row .d code{
+  font-family:var(--mono);font-size:12px;padding:1px 6px;
+  background:rgba(36,31,51,0.06);border:1px solid var(--line);color:var(--ink);
+}
+
 /* ═══ Fig.05 下载 ═══ */
 .dl-eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:22px}
 .dl-eyebrow .pulse{width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,#6D4DE8,#D946EF);box-shadow:0 0 0 4px var(--accent-soft),0 0 22px rgba(217,70,239,0.7);animation:st-pulse 2.2s ease-in-out infinite}
@@ -632,6 +656,7 @@ section.sc > canvas.scene{
     <a href="#fig-03">03 信号</a>
     <a href="#fig-04">04 问答</a>
     <a href="#fig-05">05 下载</a>
+    <a href="#feedback" class="fb-link">反馈</a>
   </div>
   <div class="spacer"></div>
   <span class="ver">v0.1 · 32 MB · Win 10/11</span>
@@ -936,6 +961,36 @@ section.sc > canvas.scene{
           <div class="answer">升级:重新下载安装包覆盖,配置与日志保留。卸载:走 Windows 设置的应用卸载,用户目录留一份配置备份,30 天后自动清理。</div>
         </details>
       </div>
+    </div>
+
+    <!-- 下半:出了问题怎么办(排障自查 + 反馈入口) -->
+    <div class="sec-head support-head">
+      <div class="fig-label"><b>Fix</b><br>Troubleshoot<br>· 5 症状</div>
+      <div>
+        <h2 class="rv">出了问题?先看这里。</h2>
+        <p class="lede rv">五类常见症状,对号入座,多数自己就能解决。</p>
+      </div>
+    </div>
+    <div class="panel rv">
+      <div class="ft-rows">
+        <div class="ft-row"><div class="fig-label"><b>T1</b> Trouble</div><span class="t">早上七点没登上网</span><span class="d">九成是连的不是校园网:热点和手机流量里桂桂无法工作。切回 Campus-WiFi,连上就自动补登。</span></div>
+        <div class="ft-row"><div class="fig-label"><b>T2</b> Trouble</div><span class="t">日志提示「登录被拒」</span><span class="d">密码改过了(改初始密码、教务改密都会)。打开桂桂把新密码填一次,之后的每天照旧。</span></div>
+        <div class="ft-row"><div class="fig-label"><b>T3</b> Trouble</div><span class="t">「认证服务器不可达」</span><span class="d">学校认证服务器每天 <code>06:50</code> 才开门,开门前不可达不是故障。开门后桂桂自动补,无需处理。</span></div>
+        <div class="ft-row"><div class="fig-label"><b>T4</b> Trouble</div><span class="t">七点电脑没开机</span><span class="d">开机补登兜底:进系统 30 秒内自动补一次,周末也启用,不会因为睡过头漏掉。</span></div>
+        <div class="ft-row"><div class="fig-label"><b>T5</b> Trouble</div><span class="t">安装或运行被杀毒拦</span><span class="d">桂桂只装在用户目录,不碰系统目录。加一次信任即可;日志里能看到卡在了哪一步。</span></div>
+      </div>
+    </div>
+
+    <!-- TODO(user): 反馈邮箱确认后,把下面 .fb-mail 换成 <a class="fb-mail" href="mailto:真实地址">真实地址</a>,并把 .fb-row 虚线边框换实线 -->
+    <div class="fb-row rv" id="feedback">
+      <div>
+        <div class="fb-t">对不上号?直接说给桂桂听。</div>
+        <div class="fb-d">说明哪天早上、当时什么情况,顺手带上日志(桂桂主页 → 历史日志,复制最后几行)。看到就回。</div>
+      </div>
+      <span class="fb-mail" aria-label="反馈邮箱待填,渠道确认后启用">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 7.5l8 6 8-6"/></svg>
+        邮箱地址待填
+      </span>
     </div>
   </div>
 </section>
