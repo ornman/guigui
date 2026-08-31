@@ -34,6 +34,7 @@ CORNER_CSS_PX = 8                  # Win11 系统窗口圆角规格(非 CSS 卡�
 # 取卡片浅底(≈ .window 渐变的浅紫),兜首帧闪色与弧线亚像素缝隙;
 # 深色会在浅色卡片的角落露楔形(2026-08-31 实机踩坑)
 SHELL_BG = "#e9e7f2"
+WINDOW_TITLE = "桂桂 / GuiGui"
 
 _STATE2NET = {"up": "logged_in", "down": "unreachable", "failed": "not_logged_in"}
 
@@ -120,7 +121,7 @@ class FileWatcher(threading.Thread):
             item = json.loads(raw)
             view = item.get("view")
             fresh = _time.time() - float(item.get("ts") or 0) <= PENDING_VIEW_TTL
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, AttributeError):
             return
         if fresh and view in ("main", "creds", "settings"):
             # 与冷启动同一条路:壳注入 __guigui_launch → applyLaunch 消费
@@ -142,11 +143,12 @@ def _activate_existing_window() -> None:
         import ctypes
 
         user32 = ctypes.windll.user32
-        hwnd = user32.FindWindowW(None, "桂桂 / GuiGui")
+        hwnd = user32.FindWindowW(None, WINDOW_TITLE)
         if hwnd:
             if user32.IsIconic(hwnd):
                 user32.ShowWindow(hwnd, 9)          # SW_RESTORE
-            user32.SetForegroundWindow(hwnd)
+            if not user32.SetForegroundWindow(hwnd):
+                log.info("gui: 前台切换被系统拒绝(仅任务栏闪烁),视图仍会经深链生效")
     except Exception as e:
         log.warning("gui: 激活已有窗口失败: %s", e)
 
@@ -287,14 +289,14 @@ def run(view: str | None = None) -> int:
     api = GuiGuiApi()
     try:
         window = webview.create_window(
-            "桂桂 / GuiGui", str(index), js_api=api,
+            WINDOW_TITLE, str(index), js_api=api,
             width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], min_size=WINDOW_SIZE,
             frameless=True, resizable=False,
             shadow=False,               # DWM 阴影 hack 在圆角外铺白边,禁用(契约集成票)
             background_color=SHELL_BG)
     except TypeError:  # 旧版 pywebview 参数差异兜底
         window = webview.create_window(
-            "桂桂 / GuiGui", str(index), js_api=api,
+            WINDOW_TITLE, str(index), js_api=api,
             width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], resizable=False)
     api.attach_window(window)
 

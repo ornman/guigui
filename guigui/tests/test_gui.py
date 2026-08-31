@@ -64,3 +64,15 @@ def test_watcher_drops_invalid_view():
     _write_pending("evil")                    # 白名单外
     w._check_pending_view()
     assert api.js == []
+    assert not (paths.data_dir() / PENDING_VIEW_NAME).exists()
+
+
+def test_watcher_drops_nondict_json():
+    api = StubApi()
+    w = FileWatcher(api)
+    p = paths.data_dir() / PENDING_VIEW_NAME
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("42", encoding="utf-8")     # 合法 JSON 但不是对象
+    w._check_pending_view()
+    assert api.js == []
+    assert not p.exists()

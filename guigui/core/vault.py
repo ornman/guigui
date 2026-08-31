@@ -87,11 +87,13 @@ _CRED_TYPE_GENERIC = 1
 
 def _enum_targets_default() -> list[str]:
     """枚举当前用户全部凭据目标名(keyring 无枚举 API,直接走 advapi32)。"""
-    advapi32 = ctypes.windll.advapi32
+    advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
     count = wintypes.DWORD()
     pcreds = ctypes.POINTER(ctypes.POINTER(_CREDENTIALW))()
     if not advapi32.CredEnumerateW(None, 0, ctypes.byref(count),
                                    ctypes.byref(pcreds)):
+        if ctypes.get_last_error() == 1168:   # ERROR_NOT_FOUND:本用户无任何凭据
+            return []
         raise OSError(ctypes.get_last_error())
     try:
         return [pcreds[i].contents.TargetName for i in range(count.value)]

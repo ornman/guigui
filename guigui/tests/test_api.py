@@ -9,6 +9,8 @@ from guigui.app import api as api_mod
 from guigui.app.api import GuiGuiApi
 from guigui.core import config, ensure
 
+_REAL_SLEEP = time.sleep   # 模块导入时绑定;Ctx 会全局打桩 time.sleep,_wait_for 需要真睡眠
+
 
 class FakeWindow:
     def __init__(self):
@@ -296,7 +298,7 @@ def _wait_for(predicate, timeout=2.0):
     while time.time() < deadline:
         if predicate():
             return True
-        time.sleep(0.01)
+        _REAL_SLEEP(0.01)
     return predicate()
 
 
@@ -308,6 +310,16 @@ def test_save_config_unconfigured_skips_task_creation(monkeypatch):
     assert _wait_for(
         lambda: any(t == "schedule:changed" for t, _ in parse_emitted(c.window)))
     assert c.reconciled == []
+
+
+def test_save_config_uid_without_password_skips_task_creation(ctx, monkeypatch):
+    # 守卫另一半:uid 有、密码没存 → 同样不建任务
+    monkeypatch.setattr(api_mod.vault, "has_password", lambda uid: False)
+    out = ctx.api.saveConfig({"trigger_time": "06:45"})
+    assert out["ok"] is True
+    assert _wait_for(
+        lambda: any(t == "schedule:changed" for t, _ in parse_emitted(ctx.window)))
+    assert ctx.reconciled == []
 
 
 def test_login_with_password_triggers_alignment(ctx):

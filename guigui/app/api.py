@@ -34,6 +34,11 @@ SAVE_FAILED = "SAVE_FAILED"
 INTERNAL = "INTERNAL"
 
 
+def _configured(cfg: dict) -> bool:
+    """首装完成判定:学号已存且凭据管理器里有密码(契约 §4 单行道终点)。"""
+    return bool(cfg.get("uid")) and vault.has_password(cfg["uid"])
+
+
 def _ok(data: dict) -> dict:
     return {"ok": True, "data": data}
 
@@ -59,8 +64,7 @@ class GuiGuiApi:
         master 关 → 删任务不受守卫影响。"""
         misaligned = False
         try:
-            if saved.get("master", True) and not (
-                    saved.get("uid") and vault.has_password(saved["uid"])):
+            if saved.get("master", True) and not _configured(saved):
                 log.info("api: 首装未完成,暂不建任务(等 login 存凭据后再对齐)")
             else:
                 _, misaligned = selfheal.reconcile(saved)
@@ -94,7 +98,7 @@ class GuiGuiApi:
         try:
             cfg = config.load()
             net = detect.probe(cfg)
-            configured = bool(cfg.get("uid")) and vault.has_password(cfg["uid"])
+            configured = _configured(cfg)
             return _ok({
                 "configured": configured,
                 "net": {"state": net["state"], "ssid": net.get("ssid"),
@@ -267,7 +271,7 @@ class GuiGuiApi:
             cfg = config.load()
             saved = config.save(config.apply_patch(cfg, {"master": value}))
             # 语义重(建/删任务):同步做完再回话
-            if value and not (saved.get("uid") and vault.has_password(saved["uid"])):
+            if value and not _configured(saved):
                 misaligned = False   # 首装未完成不建任务(与 _align_saved 同口径)
             else:
                 _, misaligned = selfheal.reconcile(saved)
