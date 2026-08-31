@@ -94,11 +94,12 @@ body{
 .v.on{display:block}
 .v.leaving{animation:fadeout .25s ease-in forwards}
 @keyframes fadeout{from{opacity:1}to{opacity:0}}
-/* 日常页:日志钉底,中部留白是呼吸感不是空缺 */
-#v-main.on{display:flex;flex-direction:column;min-height:100%}
-#v-main .log{margin-top:auto}
-/* 兜底:日志条目区永不无限长(裁剪由 JS 主导,这里是保险丝) */
-#v-main .log #main-log-entries{max-height:10em;overflow-y:auto}
+/* 日常页:一屏装下不靠滚动 — 日志框是唯一弹性区,问题状态(顶部多横幅)时
+   它自己收缩(条目区内滚),「历史日志 →」和按钮永远在屏内 */
+#v-main.on{display:flex;flex-direction:column;height:100%}
+#v-main.on>*{flex-shrink:0}
+#v-main .log{margin-top:auto;flex-shrink:1;display:flex;flex-direction:column;min-height:88px}
+#v-main .log #main-log-entries{flex:1 1 auto;min-height:0;overflow-y:auto}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* ═══ Bot:bumbum55/noteai-bot 接管几何+动画(见 vendor/noteai-bot/LICENSE) ═══ */
@@ -200,7 +201,7 @@ h1{font-size:27px;font-weight:600;letter-spacing:-.01em;line-height:1.3}
 .status.ok .dot{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .status.warn .dot{background:var(--warm)}
 /* 问题状态行:掉线=品牌紫(自己能修),不可达=琥珀(外部问题) */
-.status.warn{background:oklch(58% 0.15 295 / 0.06);border-radius:10px;padding:10px 12px;margin:12px 0 4px}
+.status.warn{background:oklch(58% 0.15 295 / 0.06);border-radius:10px;padding:9px 12px;margin:10px 0 2px}
 .status.danger{background:oklch(72% 0.12 70 / 0.1);border-radius:10px;padding:10px 12px;margin:12px 0 4px}
 .status.danger .dot{background:var(--warm);animation:pulse 1.4s ease-in-out infinite}
 /* 状态即标题时,修复按钮与状态同色 */
