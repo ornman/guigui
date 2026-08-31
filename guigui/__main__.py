@@ -27,15 +27,19 @@ def main(argv: list[str] | None = None) -> int:
         return ensure.run()
 
     if "--clear-creds" in argv:
-        # 卸载器「彻底清理」用:删当前配置学号的凭据;无配置/无凭据静默成功
+        # 卸载器「彻底清理」用:枚举凭据管理器中 <学号>@GuiGui 全部条目;
+        # 枚举失败(罕见)回退删当前配置学号;无配置/无凭据静默成功
         from guigui.core import config, vault
 
         uid = config.load().get("uid") or ""
-        if uid:
-            try:
-                vault.delete_password(uid)
-            except Exception:
-                pass
+        try:
+            vault.delete_all_service_entries()
+        except Exception:
+            if uid:
+                try:
+                    vault.delete_password(uid)
+                except Exception:
+                    pass
         return 0
 
     deep = next((a for a in argv if a.startswith("guigui://")), None)

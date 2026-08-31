@@ -6,7 +6,9 @@
 
 from __future__ import annotations
 
+import ctypes
 import logging
+from ctypes import wintypes
 
 import keyring
 
@@ -62,3 +64,65 @@ def rekey(old_uid: str | None, new_uid: str, password: str) -> None:
     set_password(new_uid, password)
     if old_uid and old_uid != new_uid:
         delete_password(old_uid)
+
+
+# ── 卸载全删(枚举式)────────────────────────────────────
+
+
+class _CREDENTIALW(ctypes.Structure):
+    _fields_ = [
+        ("Flags", wintypes.DWORD), ("Type", wintypes.DWORD),
+        ("TargetName", wintypes.LPWSTR), ("Comment", wintypes.LPWSTR),
+        ("LastWritten", wintypes.FILETIME),
+        ("CredentialBlobSize", wintypes.DWORD),
+        ("CredentialBlob", ctypes.POINTER(ctypes.c_byte)),
+        ("Persist", wintypes.DWORD), ("AttributeCount", wintypes.DWORD),
+        ("Attributes", ctypes.c_void_p), ("TargetAlias", wintypes.LPWSTR),
+        ("UserName", wintypes.LPWSTR),
+    ]
+
+
+_CRED_TYPE_GENERIC = 1
+
+
+def _enum_targets_default() -> list[str]:
+    """枚举当前用户全部凭据目标名(keyring 无枚举 API,直接走 advapi32)。"""
+    advapi32 = ctypes.windll.advapi32
+    count = wintypes.DWORD()
+    pcreds = ctypes.POINTER(ctypes.POINTER(_CREDENTIALW))()
+    if not advapi32.CredEnumerateW(None, 0, ctypes.byref(count),
+                                   ctypes.byref(pcreds)):
+        raise OSError(ctypes.get_last_error())
+    try:
+        return [pcreds[i].contents.TargetName for i in range(count.value)]
+    finally:
+        advapi32.CredFree(pcreds)
+
+
+def _delete_target_default(target: str) -> bool:
+    return bool(ctypes.windll.advapi32.CredDeleteW(
+        target, _CRED_TYPE_GENERIC, 0))
+
+
+def delete_all_service_entries(enum_targets=None, delete_target=None) -> int:
+    """删除凭据管理器中本服务全部条目(目标名 <学号>@GuiGui)。
+
+    卸载「彻底清理」用:不依赖 config 当前学号,历史遗留条目一并清。
+    返回删除条数;枚举失败抛 VaultError(调用方回退逐条删);
+    单条删除失败不挡其余。enum/delete 可注入,便于单测。"""
+    enum_targets = enum_targets or _enum_targets_default
+    delete_target = delete_target or _delete_target_default
+    suffix = "@" + _SERVICE
+    try:
+        targets = list(enum_targets())
+    except Exception as e:
+        raise VaultError(f"凭据枚举失败: {e}") from e
+    deleted = 0
+    for target in targets:
+        if target and target.endswith(suffix):
+            try:
+                if delete_target(target):
+                    deleted += 1
+            except Exception:
+                continue
+    return deleted
