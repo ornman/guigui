@@ -25,8 +25,11 @@ log = logging.getLogger(__name__)
 
 WINDOW_SIZE = (560, 640)
 WATCH_INTERVAL = 2.0
-# 窗口配置与前端验证过的 devshell 完全一致(work-split:F4 无边框透明窗口验证通过);
-# 拖拽靠 titlebar 的 .pywebview-drag-region 类(pywebview 6 默认选择器,原生支持)
+# 窗口圆角配方(契约集成票,前端 devshell 像素级实测):WinForms+WebView2 做不到
+# 真透明,transparent=True 四角露白;改为 SetWindowRgn 裁剪 + 深色底兜弧线缝隙。
+# 代价:卡片 CSS 外投影被裁掉(用户拍板:22px 精确圆角优先)。
+CORNER_CSS_PX = 22                 # 设计 token:卡片圆角(PRD 原型 .window border-radius)
+SHELL_BG = "#2b2740"               # ≈ 前端 --ink,兜圆角弧线与 CSS 卡片间的亚像素缝隙
 
 _STATE2NET = {"up": "logged_in", "down": "unreachable", "failed": "not_logged_in"}
 
@@ -104,6 +107,27 @@ def _inject_launch(window, view: str) -> None:
         log.warning("deep link 注入失败: %s", e)
 
 
+def _apply_rounded_region(window):
+    """窗口裁成圆角:半径 = 22 CSS px × DPI 缩放(devshell._apply_rounded_region 同款)。
+
+    shadow 必须为 False —— pywebview 的 DWM 阴影 hack 会在圆角外铺白边(前端实测);
+    任一步失败只记日志,窗口退化为直角(不影响功能)。
+    """
+    try:
+        import ctypes
+
+        form = window.native
+        hwnd = form.Handle.ToInt64()
+        user32 = ctypes.windll.user32
+        scale = (user32.GetDpiForWindow(hwnd) or 96) / 96.0
+        r = int(round(CORNER_CSS_PX * scale))
+        hrgn = ctypes.windll.gdi32.CreateRoundRectRgn(
+            0, 0, form.ClientSize.Width + 1, form.ClientSize.Height + 1, r * 2, r * 2)
+        user32.SetWindowRgn(hwnd, hrgn, True)
+    except Exception as e:
+        log.warning("gui: 圆角裁剪失败(退化为直角): %s", e)
+
+
 def _missing_static_dialog() -> None:
     """前端资源缺失时的原生提示(正常发布不该走到这里)。"""
     try:
@@ -139,12 +163,16 @@ def run(view: str | None = None) -> int:
         window = webview.create_window(
             "桂桂 / GuiGui", str(index), js_api=api,
             width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], min_size=WINDOW_SIZE,
-            frameless=True, transparent=True, resizable=False)
+            frameless=True, resizable=False,
+            shadow=False,               # DWM 阴影 hack 在圆角外铺白边,禁用(契约集成票)
+            background_color=SHELL_BG)
     except TypeError:  # 旧版 pywebview 参数差异兜底
         window = webview.create_window(
             "桂桂 / GuiGui", str(index), js_api=api,
             width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], resizable=False)
     api.attach_window(window)
+    window.events.before_show += lambda: _apply_rounded_region(window)
+    window.events.restored += lambda: _apply_rounded_region(window)  # 最小化还原后重挂,保险
 
     if view:
         window.events.loaded += lambda: _inject_launch(window, view)

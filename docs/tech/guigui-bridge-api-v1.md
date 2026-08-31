@@ -185,11 +185,11 @@
 | 1.0.0 | 2026-08-31 | 初版:11 方法 + 4 事件 + 8 错误码 | 已被 1.0.1 取代 |
 | 1.0.1 | 2026-08-31 | mock 移入 `static/dev/`,仅 `?dev=1` 加载;生产无绑定返回 `BRIDGE_MISSING` 诚实报错(错误码 +1);打包必须排除 `static/dev/` | 前端已实现;后端已适配(guigui.spec 递归排除 dev/,commit 2026-08-31)— **生效** |
 | 1.0.2 | 2026-08-31 | `wake_login` 默认值对齐 PRD §5(→ false,清待办#1);§4 收编深链注入 `window.__guigui_launch`(清待办#2,后端已按此注入) | 前端已实现;后端联调实测生效(wake_login=false 落盘验证,commit 17c0eb1)— **生效** |
-| 1.1.0 | 2026-08-31 | 新增 `feedback()`(§2.12):返回打码诊断文本(用户拍板:反馈动作=复制诊断信息);方法 11→12 | **后端已实现**(diagnostics 模块 + api.feedback,120 测);待前端接设置页入口行「遇见问题?点击反馈」与反馈视图(展示 text + 一键复制) |
+| 1.1.0 | 2026-08-31 | 新增 `feedback()`(§2.12):返回打码诊断文本(用户拍板:反馈动作=复制诊断信息);方法 11→12 | 后端已实现(diagnostics+api.feedback,120 测);前端已接(反馈视图+设置入口,commit 1bb4083)— **生效** |
 
 ## 6. 集成待办(联调问题记这里)
 
 - **学号打码示例说明(后端记,已随 1.0.1 登记)**:打码规则=前4…后4,对真实学号 2025000000001 得 `2025…0001`;PRD/契约示例里的 `2025…7209` 是手打示意串、非规则推得。前端如做正则校验请以规则为准。
 - **`recentResult` tries=0 文案** → 前端已修复(2026-08-31):`tries===0` 映射「(时间) 已经在线 ✓」。
 - **`recentResult` when 与行标题** → 前端已修复(2026-08-31):行标题改用 `when`(id=main-last-t),缺省「昨晚」。
-- **窗口圆角配方(前端实测,后端 gui.py 需采纳——现 gui.py:142 仍 transparent=True,生产同样白角)**:WinForms+WebView2 做不到真透明,`transparent=True` 只把 WebView2 设透明,窗体 BackColor 仍默认浅灰(240,240,240),四角露白(用户实机确认);设窗体 BackColor=Transparent 亦无效。**配方**:①`shadow=False`(pywebview 的 DWM 阴影 hack 会在圆角外铺白边);②`background_color='#2b2740'`(≈ --ink,兜弧线亚像素缝隙);③`before_show` 里 `SetWindowRgn` 圆角,半径 = `round(22 × GetDpiForWindow/96)`,rgn 尺寸 = `form.ClientSize+1`;④`restored` 事件重挂。参考实现 `devshell.py::_apply_rounded_region`(已像素级实测:四角露壁纸、零白边)。代价:卡片 CSS 外投影被裁掉(用户已拍板:22px 精确圆角优先)。
+- **窗口圆角配方(前端实测)→ 后端已采纳(2026-08-31,gui.py:SetWindowRgn+shadow=False+#2b2740,before_show/restored 双挂)**——原票:WinForms+WebView2 做不到真透明,`transparent=True` 只把 WebView2 设透明,窗体 BackColor 仍默认浅灰(240,240,240),四角露白(用户实机确认);设窗体 BackColor=Transparent 亦无效。**配方**:①`shadow=False`(pywebview 的 DWM 阴影 hack 会在圆角外铺白边);②`background_color='#2b2740'`(≈ --ink,兜弧线亚像素缝隙);③`before_show` 里 `SetWindowRgn` 圆角,半径 = `round(22 × GetDpiForWindow/96)`,rgn 尺寸 = `form.ClientSize+1`;④`restored` 事件重挂。参考实现 `devshell.py::_apply_rounded_region`(已像素级实测:四角露壁纸、零白边)。代价:卡片 CSS 外投影被裁掉(用户已拍板:22px 精确圆角优先)。
