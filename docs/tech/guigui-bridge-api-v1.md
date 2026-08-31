@@ -64,8 +64,7 @@
 { "result": "success", "uid": "2025…7209", "attempts": 1, "verified": true }
 // result: success | already | rejected | unreachable
 // already = 探测发现已登录(等效成功,不算失败)
-// verified = 凭证是否经服务器真登录验证(真登录成功 true;already=在线存入未验证 false)
-//            —— 1.1.1 登记,后端实现中,详见后续提交
+// verified = 凭证是否已经服务器真验证;真登录成功 true;already+false = 在线存入未验证(门户无注销配置/注销无效降级)
 ```
 
 失败:`AUTH_REJECTED` / `NET_UNREACHABLE`(信封),`result` 不出现在失败信封里。
@@ -189,7 +188,7 @@
 | 1.0.1 | 2026-08-31 | mock 移入 `static/dev/`,仅 `?dev=1` 加载;生产无绑定返回 `BRIDGE_MISSING` 诚实报错(错误码 +1);打包必须排除 `static/dev/` | 前端已实现;后端已适配(guigui.spec 递归排除 dev/,commit 2026-08-31)— **生效** |
 | 1.0.2 | 2026-08-31 | `wake_login` 默认值对齐 PRD §5(→ false,清待办#1);§4 收编深链注入 `window.__guigui_launch`(清待办#2,后端已按此注入) | 前端已实现;后端联调实测生效(wake_login=false 落盘验证,commit 17c0eb1)— **生效** |
 | 1.1.0 | 2026-08-31 | 新增 `feedback()`(§2.12):返回打码诊断文本(用户拍板:反馈动作=复制诊断信息);方法 11→12 | 后端已实现(diagnostics+api.feedback,120 测);前端已接(反馈视图+设置入口,commit 1bb4083)— **生效** |
-| 1.1.1 | 2026-08-31 | §2.6 getConfig/saveConfig 新增 `operator` 枚举(校园用户/校园电信/校园联通);§2.3 login payload 新增可选 `operator`;login 响应将新增 `verified`(1.1.1 后端实现中,详见后续提交) | 后端配置字段已落地(config.operator + 注销端点解析地基,TA);`verified` 响应与前端适配待后续提交 |
+| 1.1.1 | 2026-08-31 | §2.6 getConfig/saveConfig 新增 `operator` 枚举(校园用户/校园电信/校园联通);§2.3 login payload 新增可选 `operator`;login 响应新增 `verified` | 后端已落地(提交密码先验证后入库 + verified 随信封下行);前端适配待接 |
 
 ## 6. 集成待办(联调问题记这里)
 

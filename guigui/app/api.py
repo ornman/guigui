@@ -134,70 +134,194 @@ class GuiGuiApi:
             cfg = config.load()
             sid = str(payload.get("sid") or "").strip()
             password = payload.get("password") or None
-
             if password:
-                uid = sid or cfg.get("uid") or ""
-                if not uid:
-                    return _err(NOT_CONFIGURED, "先填学号,再开启")
-                try:
-                    if sid and cfg.get("uid") and sid != cfg["uid"]:
-                        vault.rekey(cfg["uid"], sid, password)   # 换学号:清旧凭据
-                    else:
-                        vault.set_password(uid, password)
-                except VaultError as e:
-                    log.warning("api.login: 凭据存储失败: %s", e)
-                    return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
-                cfg = config.save({**cfg, "uid": uid})
-                # 首次存好凭据 = 「开启每日自动登录」落地,任务此刻才属于
-                # 用户(首装单行道终点);reconcile 幂等,已配置时零成本。
-                threading.Thread(target=lambda: self._align_saved(cfg),
-                                 daemon=True, name="guigui-align").start()
-            else:
-                uid = cfg.get("uid") or ""
-                if not uid or not vault.has_password(uid):
-                    return _err(NOT_CONFIGURED, "还没存过密码,先填一次")
-
-            # 凭据单次读出(重试不碰 keyring);读出为空 → 明确报未配置,
-            # 不让 None 流进 drcom.build_login_url(quote(None) 炸成 INTERNAL)。
-            stored = vault.get_password(uid)
-            if not stored:
-                return _err(NOT_CONFIGURED, "还没存过密码,先填一次")
-
-            self._emit("login:progress", {"phase": "probe"})
-            net = detect.probe(cfg)
-            if net["state"] == detect.LOGGED_IN:
-                ensure.settle_from_gui(cfg, uid, 0)
-                return _ok({"result": "already", "uid": drcom.mask_uid(uid), "attempts": 0})
-            if net["state"] in (detect.UNREACHABLE, detect.WAITING):
-                return _err(NET_UNREACHABLE, "现在够不着校园网")
-
-            retries = max(1, int(cfg.get("login_retries", 3)))
-            interval = int(cfg.get("retry_seconds", 5))
-            result, msg, attempts = drcom.UNREACHABLE, "", 0
-            for i in range(retries):
-                attempts = i + 1
-                self._emit("login:progress",
-                           {"phase": "requesting", "attempt": attempts, "attempts": retries})
-                result, msg = drcom.login(cfg["url"], uid, stored)
-                if result == drcom.SUCCESS:
-                    break
-                if i < retries - 1:
-                    self._emit("login:progress",
-                               {"phase": "retrying", "attempt": attempts, "attempts": retries})
-                    time.sleep(interval)
-
-            if result == drcom.SUCCESS:
-                ensure.settle_from_gui(cfg, uid, attempts)
-                return _ok({"result": "success", "uid": drcom.mask_uid(uid),
-                            "attempts": attempts})
-            if result == drcom.REJECTED:
-                return _err(AUTH_REJECTED, "密码可能改过了,改下面的密码再点一次")
-            if result == drcom.UNREACHABLE:
-                return _err(NET_UNREACHABLE, "现在够不着校园网")
-            return _err(INTERNAL, msg or "认证服务器返回了不认识的格式")
+                return self._login_submitted_credential(cfg, sid, password, payload)
+            return self._login_stored_credential(cfg)
         except Exception:
             log.exception("api.login")
             return _err(INTERNAL, "登录过程出了点问题,再试一次")
+
+    def _login_stored_credential(self, cfg: dict) -> dict:
+        """已存凭据路径(立即登录/每日任务同款):探测→重试登录。"""
+        uid = cfg.get("uid") or ""
+        if not uid or not vault.has_password(uid):
+            return _err(NOT_CONFIGURED, "还没存过密码,先填一次")
+        # 凭据单次读出(重试不碰 keyring);读出为空 → 明确报未配置,
+        # 不让 None 流进 drcom.build_login_url(quote(None) 炸成 INTERNAL)。
+        stored = vault.get_password(uid)
+        if not stored:
+            return _err(NOT_CONFIGURED, "还没存过密码,先填一次")
+
+        self._emit("login:progress", {"phase": "probe"})
+        net = detect.probe(cfg)
+        if net["state"] == detect.LOGGED_IN:
+            ensure.settle_from_gui(cfg, uid, 0)
+            return _ok({"result": "already", "uid": drcom.mask_uid(uid), "attempts": 0,
+                        "verified": bool(ensure.load_state().get("cred_verified"))})
+        if net["state"] in (detect.UNREACHABLE, detect.WAITING):
+            return _err(NET_UNREACHABLE, "现在够不着校园网")
+
+        result, msg, attempts = self._attempt_login(
+            cfg, uid, stored, cfg.get("operator", drcom.DEFAULT_OPERATOR))
+        if result == drcom.SUCCESS:
+            ensure.settle_from_gui(cfg, uid, attempts)
+            return _ok({"result": "success", "uid": drcom.mask_uid(uid),
+                        "attempts": attempts, "verified": True})
+        if result == drcom.REJECTED:
+            return _err(AUTH_REJECTED, "密码可能改过了,改下面的密码再点一次")
+        if result == drcom.UNREACHABLE:
+            return _err(NET_UNREACHABLE, "现在够不着校园网")
+        return _err(INTERNAL, msg or "认证服务器返回了不认识的格式")
+
+    def _login_submitted_credential(self, cfg: dict, sid: str,
+                                    password: str, payload: dict) -> dict:
+        """提交新密码路径 — 先验证后入库(凭证神圣:垃圾密码绝不能「成功」入库)。
+
+        探测先行:离线(not_logged_in)= 服务器可达,真刀真枪验证,拒绝永不入库;
+        在线(logged_in)= 走验证阶梯「注销→等状态翻转→真登一次」,
+        门户不给注销配置或注销无效则降级存入(verified=false);
+        失败时用旧凭据把网接回来(注销是破坏性动作,得给用户留条退路)。"""
+        operator = payload.get("operator")
+        if not (isinstance(operator, str) and operator in drcom.OPERATOR_TABLE):
+            operator = cfg.get("operator") or drcom.DEFAULT_OPERATOR
+        uid = sid or cfg.get("uid") or ""
+        if not uid:
+            return _err(NOT_CONFIGURED, "先填学号,再开启")
+        old_uid = cfg.get("uid") or ""
+        old_pw = vault.get_password(old_uid) if old_uid else None   # 旧凭证,失败时恢复网络用
+
+        self._emit("login:progress", {"phase": "probe"})
+        net = detect.probe(cfg)
+
+        if net["state"] == detect.NOT_LOGGED_IN:
+            result, msg, attempts = self._attempt_login(cfg, uid, password, operator)
+            if result == drcom.SUCCESS:
+                saved = self._store_credential(cfg, uid, operator, password, verified=True)
+                if saved is None:
+                    return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+                ensure.settle_from_gui(saved, uid, attempts)
+                return _ok({"result": "success", "uid": drcom.mask_uid(uid),
+                            "attempts": attempts, "verified": True})
+            if result == drcom.REJECTED:
+                return _err(AUTH_REJECTED, "密码可能改过了,改下面的密码再点一次")
+            if result == drcom.UNREACHABLE:
+                # 循环中途断网:密码没被否认,存了给明早一次机会
+                saved = self._store_credential(cfg, uid, operator, password, verified=False)
+                if saved is None:
+                    return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+                return _err(NET_UNREACHABLE, "现在够不着校园网")
+            return _err(INTERNAL, msg or "认证服务器返回了不认识的格式")
+
+        if net["state"] == detect.LOGGED_IN:
+            used = drcom.logout(detect.portal_html(cfg), cfg["url"])
+            flipped = False
+            if used is not None:
+                for _ in range(6):   # 注销生效要一拍:最多 6×0.5s 等状态翻转
+                    time.sleep(0.5)
+                    if detect.http_probe(cfg=cfg)["state"] != detect.LOGGED_IN:
+                        flipped = True
+                        break
+            if used is not None and flipped:
+                result, msg, tries = self._verify_login_once(cfg, uid, password, operator)
+                if result == drcom.SUCCESS:
+                    saved = self._store_credential(cfg, uid, operator, password,
+                                                   verified=True)
+                    if saved is None:
+                        return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+                    ensure.settle_from_gui(saved, uid, tries)
+                    return _ok({"result": "success", "uid": drcom.mask_uid(uid),
+                                "attempts": tries, "verified": True})
+                if result == drcom.REJECTED:
+                    restored = self._restore_network(cfg, old_uid, uid, old_pw)
+                    return _err(AUTH_REJECTED, "密码被服务器拒绝了" +
+                                (";已用旧密码把网接回来了,改对再点一次" if restored
+                                 else ";旧密码也没能接回网络,改对密码再点一次"))
+                if result == drcom.UNREACHABLE:
+                    self._restore_network(cfg, old_uid, uid, old_pw)  # 尽力恢复,不看成败
+                    saved = self._store_credential(cfg, uid, operator, password,
+                                                   verified=False)
+                    if saved is None:
+                        return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+                    return _err(NET_UNREACHABLE,
+                                "验证做到一半网络够不着了,密码先存着,明早首试见真章")
+                self._restore_network(cfg, old_uid, uid, old_pw)
+                return _err(INTERNAL, msg or "认证服务器返回了不认识的格式")
+            # 门户无注销配置 / 注销未见翻转:降级存入,verified=false
+            saved = self._store_credential(cfg, uid, operator, password, verified=False)
+            if saved is None:
+                return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+            return _ok({"result": "already", "uid": drcom.mask_uid(uid),
+                        "attempts": 0, "verified": False})
+
+        # unreachable / waiting:密码没被否认,存了给明早一次机会
+        saved = self._store_credential(cfg, uid, operator, password, verified=False)
+        if saved is None:
+            return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+        return _err(NET_UNREACHABLE, "现在够不着校园网")
+
+    def _attempt_login(self, cfg: dict, uid: str, password: str,
+                       operator: str) -> tuple[str, str, int]:
+        """重试节奏按配置(retries × interval),期间推进度事件。"""
+        retries = max(1, int(cfg.get("login_retries", 3)))
+        interval = int(cfg.get("retry_seconds", 5))
+        result, msg, attempts = drcom.UNREACHABLE, "", 0
+        for i in range(retries):
+            attempts = i + 1
+            self._emit("login:progress",
+                       {"phase": "requesting", "attempt": attempts, "attempts": retries})
+            result, msg = drcom.login(cfg["url"], uid, password, operator)
+            if result == drcom.SUCCESS:
+                break
+            if i < retries - 1:
+                self._emit("login:progress",
+                           {"phase": "retrying", "attempt": attempts, "attempts": retries})
+                time.sleep(interval)
+        return result, msg, attempts
+
+    def _verify_login_once(self, cfg: dict, uid: str, password: str,
+                           operator: str) -> tuple[str, str, int]:
+        """阶梯验证单发:刚注销立即重登会被 waitsec 节流 → 等 4s 重试一次。"""
+        result, msg = drcom.login(cfg["url"], uid, password, operator)
+        tries = 1
+        if result in (drcom.REJECTED, drcom.UNREACHABLE) and "waitsec" in (msg or ""):
+            time.sleep(4)
+            result, msg = drcom.login(cfg["url"], uid, password, operator)
+            tries = 2
+        return result, msg, tries
+
+    def _restore_network(self, cfg: dict, old_uid: str, uid: str,
+                         old_pw: str | None) -> bool:
+        """验证失败后用旧凭据把网接回来(注销是破坏性动作)。返回是否恢复成功。"""
+        if not old_pw:
+            return False
+        restore_operator = cfg.get("operator", drcom.DEFAULT_OPERATOR)
+        result, msg = drcom.login(cfg["url"], old_uid or uid, old_pw, restore_operator)
+        if result in (drcom.REJECTED, drcom.UNREACHABLE) and "waitsec" in (msg or ""):
+            time.sleep(4)
+            result, msg = drcom.login(cfg["url"], old_uid or uid, old_pw,
+                                      restore_operator)
+        return result == drcom.SUCCESS
+
+    def _store_credential(self, cfg: dict, uid: str, operator: str,
+                          password: str, *, verified: bool) -> dict | None:
+        """入库:vault(换学号清旧条目)→ config(uid/operator)→ cred_verified。
+        成功后后台对齐任务计划;VaultError 返回 None(调用方回 INTERNAL 信封)。"""
+        try:
+            if cfg.get("uid") and cfg["uid"] != uid:
+                vault.rekey(cfg["uid"], uid, password)   # 换学号:清旧凭据
+            else:
+                vault.set_password(uid, password)
+        except VaultError as e:
+            log.warning("api.login: 凭据存储失败: %s", e)
+            return None
+        saved = config.save({**cfg, "uid": uid, "operator": operator})
+        state = ensure.load_state()
+        state["cred_verified"] = verified
+        ensure.save_state(state)
+        # 存好凭据 = 「开启每日自动登录」落地;对齐放后台(与 saveConfig 同款)
+        threading.Thread(target=lambda: self._align_saved(saved),
+                         daemon=True, name="guigui-align").start()
+        return saved
 
     # ── 2.4 scanWifi ──────────────────────────────
 

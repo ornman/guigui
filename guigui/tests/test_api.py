@@ -37,36 +37,54 @@ class Ctx:
         self.api = GuiGuiApi()
         self.api.attach_window(self.window)
         self.probe_state = {"state": "logged_in", "ssid": "Campus-WiFi", "detail": ""}
+        self.probe_seq = None      # 设为 [ {...}, ... ] 时逐次弹出(探测序列)
         self.http_state = {"state": "logged_in", "detail": ""}
+        self.http_seq = None       # 同上,http_probe 序列(注销翻转轮询用)
+        self.portal_html_text = "<html>no logout config</html>"
+        self.logout_url = None     # None = drcom.logout 桩回报「门户无注销配置」
         self.login_seq = [("success", "")]
+        self.login_calls = []      # drcom.login 位置参数记录
+        self.set_calls = []        # vault.set_password 记录
+        self.rekey_calls = []      # vault.rekey 记录
         self.chk_uid = None
         self.scan = [{"ssid": "Campus-WiFi", "signal": "strong"}]
         self.connect_ok = True
         self.reconciled = []
 
-        monkeypatch.setattr(api_mod.detect, "probe", lambda cfg=None: dict(self.probe_state))
+        monkeypatch.setattr(api_mod.detect, "probe",
+                            lambda cfg=None: dict(self.probe_seq.pop(0)) if self.probe_seq
+                            else dict(self.probe_state))
         monkeypatch.setattr(api_mod.detect, "http_probe",
-                            lambda base=None, timeout=5, cfg=None: dict(self.http_state))
-        monkeypatch.setattr(api_mod.drcom, "login",
-                            lambda *a, **k: self.login_seq[0])
+                            lambda base=None, timeout=5, cfg=None:
+                            dict(self.http_seq.pop(0)) if self.http_seq
+                            else dict(self.http_state))
+        monkeypatch.setattr(api_mod.detect, "portal_html",
+                            lambda cfg=None, timeout=5: self.portal_html_text)
+        monkeypatch.setattr(api_mod.drcom, "login", self._login_stub)
+        monkeypatch.setattr(api_mod.drcom, "logout",
+                            lambda html, base, timeout=5: self.logout_url)
         monkeypatch.setattr(api_mod.drcom, "chkstatus_uid",
                             lambda base, timeout=5: self.chk_uid)
         monkeypatch.setattr(api_mod.wifictl, "scan_networks", lambda: self.scan)
         monkeypatch.setattr(api_mod.wifictl, "connect",
                             lambda ssid, timeout=90, progress=None: self.connect_ok)
         monkeypatch.setattr(api_mod.vault, "has_password", lambda uid: True)
-        monkeypatch.setattr(api_mod.vault, "get_password", lambda uid: "pw")
+        monkeypatch.setattr(api_mod.vault, "get_password", lambda uid: "old")
         monkeypatch.setattr(api_mod.vault, "set_password",
-                            lambda uid, pw: self._raise_nothing())
+                            lambda uid, pw: (self.set_calls.append((uid, pw)) or None))
         monkeypatch.setattr(api_mod.vault, "rekey",
-                            lambda old, new, pw: self._raise_nothing())
+                            lambda old, new, pw:
+                            (self.rekey_calls.append((old, new, pw)) or None))
         monkeypatch.setattr(api_mod.selfheal, "reconcile",
                             lambda cfg: (self.reconciled.append(cfg["master"]), False))
         monkeypatch.setattr(api_mod.time, "sleep", lambda s: None)
 
-    def _raise_nothing(self):
-        """凭据写入桩:什么都不抛 = 存储成功。"""
-        return None
+    def _login_stub(self, *a, **k):
+        """drcom.login 桩:记录位置参数;seq 多于一条时逐次前进,末条重复。"""
+        self.login_calls.append(a)
+        if len(self.login_seq) > 1:
+            return self.login_seq.pop(0)
+        return self.login_seq[0]
 
 
 def parse_emitted(window) -> list[tuple[str, dict]]:
@@ -113,13 +131,15 @@ def test_login_success_masked_uid_no_password_leak(ctx):
     ctx.probe_state = {"state": "not_logged_in", "ssid": "Campus-WiFi", "detail": ""}
     out = ctx.api.login({})
     assert out["ok"] is True
-    assert out["data"] == {"result": "success", "uid": "2025…0001", "attempts": 1}
+    assert out["data"] == {"result": "success", "uid": "2025…0001", "attempts": 1,
+                           "verified": True}
     assert "password" not in json.dumps(out)          # 契约总则:密码永不下行
 
 
 def test_login_already(ctx):
     out = ctx.api.login({})
     assert out["data"]["result"] == "already" and out["data"]["attempts"] == 0
+    assert out["data"]["verified"] is False           # 已存凭据未经今次真验证
 
 
 def test_login_rejected_maps_auth_rejected(ctx):
@@ -358,3 +378,104 @@ def test_login_vault_read_failure_maps_not_configured(ctx, monkeypatch):
     monkeypatch.setattr(api_mod.vault, "get_password", lambda uid: None)
     out = ctx.api.login({})
     assert out["code"] == "NOT_CONFIGURED"    # 旧实现 INTERNAL(quote(None) 炸)
+
+
+# ── login:提交密码先验证后入库(在线走注销→真登阶梯)────────
+
+
+def _online_flip(ctx):
+    """在线 + 门户有注销配置 + 状态在第 6 次轮询翻转(5×logged_in→not_logged_in)。"""
+    ctx.logout_url = "http://10.1.2.3:801/eportal/logout"
+    ctx.http_seq = ([{"state": "logged_in", "detail": ""}] * 5
+                    + [{"state": "not_logged_in", "detail": ""}])
+
+
+def test_submit_password_online_garbage_rejected_never_stored(ctx):
+    # 在线 + 错密码:注销→真登被拒 → 绝不入库,并用旧密码把网接回来
+    _online_flip(ctx)
+    ctx.login_seq = [("rejected", "密码错误"), ("success", "")]
+    out = ctx.api.login({"sid": "2025000000001", "password": "garbage"})
+    assert out["ok"] is False and out["code"] == "AUTH_REJECTED"
+    assert "旧密码" in out["message"]
+    assert ctx.set_calls == [] and ctx.rekey_calls == []   # 拒绝永不入库
+    assert ensure.load_state()["cred_verified"] is False
+    # 恢复尝试:旧学号 + 旧密码 + 配置里的运营商
+    assert ctx.login_calls[1] == ("http://10.1.2.3", "2025000000001", "old", "校园用户")
+
+
+def test_submit_password_online_correct_verifies_then_stores(ctx):
+    _online_flip(ctx)
+    ctx.login_seq = [("success", "")]
+    out = ctx.api.login({"sid": "2025000000001", "password": "newpw"})
+    assert out["data"] == {"result": "success", "uid": "2025…0001", "attempts": 1,
+                           "verified": True}
+    assert ctx.set_calls == [("2025000000001", "newpw")]
+    assert ensure.load_state()["cred_verified"] is True
+    assert _wait_for(lambda: ctx.reconciled == [True])     # 存完即对齐任务
+
+
+def test_submit_password_online_no_logout_config_fallback(ctx):
+    # 默认桩:门户页无注销配置 → 降级存入,already + 未验证
+    out = ctx.api.login({"sid": "2025000000001", "password": "pw"})
+    assert out["data"] == {"result": "already", "uid": "2025…0001", "attempts": 0,
+                           "verified": False}
+    assert ctx.set_calls == [("2025000000001", "pw")]
+    assert ensure.load_state()["cred_verified"] is False
+    assert _wait_for(lambda: ctx.reconciled == [True])
+
+
+def test_submit_password_online_throttle_retries_once(ctx):
+    # 实测:刚注销立即重登会被 waitsec 节流 → 等 4s 再试一次
+    _online_flip(ctx)
+    ctx.login_seq = [("rejected", "error5 waitsec <3"), ("success", "")]
+    out = ctx.api.login({"sid": "2025000000001", "password": "pw"})
+    assert out["data"]["result"] == "success"
+    assert out["data"]["attempts"] == 2 and out["data"]["verified"] is True
+
+
+def test_submit_password_offline_wrong_never_stored(ctx):
+    ctx.probe_state = {"state": "not_logged_in", "ssid": "x", "detail": ""}
+    ctx.login_seq = [("rejected", "密码错误")] * 3
+    out = ctx.api.login({"sid": "2025000000001", "password": "bad"})
+    assert out == {"ok": False, "code": "AUTH_REJECTED",
+                   "message": "密码可能改过了,改下面的密码再点一次"}
+    assert ctx.set_calls == [] and ctx.rekey_calls == []
+
+
+def test_submit_password_offline_correct_stores_verified(ctx):
+    ctx.probe_state = {"state": "not_logged_in", "ssid": "x", "detail": ""}
+    ctx.login_seq = [("success", "")]
+    out = ctx.api.login({"sid": "2025000000001", "password": "pw"})
+    assert out["data"]["verified"] is True
+    assert ctx.set_calls == [("2025000000001", "pw")]
+    assert ensure.load_state()["cred_verified"] is True
+
+
+def test_submit_password_operator_passthrough_and_invalid_fallback(ctx):
+    ctx.probe_state = {"state": "not_logged_in", "ssid": "x", "detail": ""}
+    ctx.api.login({"sid": "2025000000001", "password": "pw", "operator": "校园电信"})
+    assert ctx.login_calls[0][3] == "校园电信"          # 第 4 位参数透传
+    ctx.login_calls.clear()
+    config.save(dict(config.DEFAULTS, uid="2025000000001"))   # 抹掉上轮存入的运营商
+    ctx.api.login({"sid": "2025000000001", "password": "pw", "operator": "bogus"})
+    assert ctx.login_calls[0][3] == "校园用户"          # 枚举外回退配置值
+
+
+def test_submit_password_restore_fail_message(ctx):
+    _online_flip(ctx)
+    ctx.login_seq = [("rejected", "密码错误"), ("rejected", "再拒")]
+    out = ctx.api.login({"sid": "2025000000001", "password": "garbage"})
+    assert out["code"] == "AUTH_REJECTED"
+    assert "旧密码也没能接回" in out["message"]
+    assert ctx.set_calls == []
+
+
+def test_submit_password_logout_ineffective_falls_back(ctx):
+    # 注销发起但 6 次轮询始终 logged_in → 判定注销无效,降级存入
+    ctx.logout_url = "http://10.1.2.3:801/eportal/logout"
+    ctx.http_seq = [{"state": "logged_in", "detail": ""}] * 6
+    out = ctx.api.login({"sid": "2025000000001", "password": "pw"})
+    assert out["data"] == {"result": "already", "uid": "2025…0001", "attempts": 0,
+                           "verified": False}
+    assert ctx.set_calls == [("2025000000001", "pw")]
+    assert ctx.login_calls == []                       # 没走到真登验证
