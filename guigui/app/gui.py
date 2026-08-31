@@ -181,14 +181,18 @@ def _reconcile_on_start() -> None:
     """启动后台对齐:上次会话任务若缺失/失配(如曾被安全软件拦),打开即补。
 
     挂后台延迟跑,不挡首屏;失败时与保存路径同款 toast 指引。
-    --ensure 定时路径不做对齐(它本身靠已存在的任务触发,补建有鸡生蛋问题)。"""
+    --ensure 定时路径不做对齐(它本身靠已存在的任务触发,补建有鸡生蛋问题)。
+    未完成首装(无学号或密码)时不建 —— 任务属于「开启每日自动登录」
+    那一步(契约 §4 单行道),启动对齐只服务已配置用户。"""
     import time
 
-    from guigui.core import selfheal
+    from guigui.core import selfheal, vault
 
     time.sleep(1.5)
     try:
         cfg = config_mod.load()
+        if not cfg.get("uid") or not vault.has_password(cfg["uid"]):
+            return
         _, misaligned = selfheal.reconcile(cfg)
     except Exception:
         log.exception("gui: 启动对齐失败")

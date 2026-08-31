@@ -42,7 +42,15 @@ Root: HKCU; Subkey: "Software\Classes\guigui\shell\open\command"; ValueType: str
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "启动桂桂"; Flags: nowait postinstall skipifsilent
 
+[UninstallRun]
+; 计划任务无意义残留(exe 已删,任务只会报错),卸载必删;被安全软件拦则留着也无害
+Filename: "{sys}\schtasks.exe"; Parameters: "/delete /tn GuiGui /f"; Flags: runhidden; RunOnceId: "DelTaskMain"
+Filename: "{sys}\schtasks.exe"; Parameters: "/delete /tn GuiGui-Patrol /f"; Flags: runhidden; RunOnceId: "DelTaskPatrol"
+
 [Code]
+var
+  DelUserData: Boolean;
+
 function WebView2Installed(): Boolean;
 var
   v: String;
@@ -60,4 +68,28 @@ begin
       '如启动异常,请到这里安装后重试:' + #13#10 +
       'https://developer.microsoft.com/microsoft-edge/webview2/',
       mbInformation, MB_OK);
+end;
+
+procedure CurUninstallStepChanged(CurStep: TUninstallStep);
+var
+  dataDir: String;
+  rc: Integer;
+begin
+  if CurStep = usUninstall then
+  begin
+    dataDir := ExpandConstant('{localappdata}') + '\GuiGui';
+    DelUserData :=
+      DirExists(dataDir) and
+      (SuppressibleMsgBox(
+        '是否同时删除配置、日志和已保存的密码?' + #13#10 + #13#10 +
+        '选「否」则保留(重装桂桂时不用重新配置);' + #13#10 +
+        '选「是」则彻底清干净,包括凭据管理器里的密码。',
+        mbConfirmation, MB_YESNO, IDNO) = IDYES);
+    if DelUserData then
+    begin
+      DelTree(dataDir, True, True, True);
+      Exec(ExpandConstant('{cmd}'), '/C cmdkey /delete:GuiGui', '',
+           SW_HIDE, ewWaitUntilTerminated, rc);
+    end;
+  end;
 end;
