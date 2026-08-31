@@ -83,3 +83,22 @@
 - 安装器与 dist 同一次构建(15:59:09→15:59:22),无陈旧安装包;.gitignore
   覆盖 dist/build/Output/.venv,无大二进制入库;安装说明无 v1 autostart 残留。
 - 125 测试全过;生产 index.html 无 mock 引用,BRIDGE_MISSING 铁律未破。
+
+## 修复落地(2026-08-31,计划见 guigui-package-fix-plan-2026-08-31.md)
+
+- P1 AppMutex ✅ 04ca331(setup.iss,已编入 17:15 新安装器)
+- P2 deep link 转发 ✅ 2935299(pending 文件 + applyLaunch,前端零改动;
+  附带 polish f6001c9:非 dict JSON 防御/WINDOW_TITLE 常量化/前台拒绝日志)
+- P2 saveConfig 守卫 ✅ 8e487e6(三处统一 + login 存凭据后台首建;
+  polish f6001c9 收敛 `_configured` 谓词 + has_password=False 半边测试)
+- P2 凭据枚举全删 ✅ ba8c800(CredEnumerate 扫 *@GuiGui;polish f6001c9:
+  use_last_error + 空库 1168 特判)
+- P3 login 循环外读凭据 ✅ 80a8098;P3 GDI 泄漏 ✅ 3ba93af
+- 附加:build_guigui.bat ISCC per-user 路径兜底 ✅ c097816(T7 实测踩坑,
+  原脚本会静默跳过安装器步骤残留旧包)
+- P3 其余(日志轮转竞态/GBK 边缘/WebView2 注册表检测/toast 冷启)维持记录在案
+- 测试 125→139 全绿;全链路重建通过(139 测 → PyInstaller → ISCC),
+  `--ensure` 无头冒烟 exit=0
+- **实机 6 项清单待人工验证**(AppMutex 提示/深链热跳/首装任务时机/
+  凭据全删/巡逻任务不变/装新包冒烟):清单见修复计划 Task 7 Step 2,
+  验证后在此回填结果
