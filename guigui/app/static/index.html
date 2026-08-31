@@ -97,6 +97,8 @@ body{
 /* 日常页:日志钉底,中部留白是呼吸感不是空缺 */
 #v-main.on{display:flex;flex-direction:column;min-height:100%}
 #v-main .log{margin-top:auto}
+/* 兜底:日志条目区永不无限长(裁剪由 JS 主导,这里是保险丝) */
+#v-main .log #main-log-entries{max-height:10em;overflow-y:auto}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* ═══ Bot:bumbum55/noteai-bot 接管几何+动画(见 vendor/noteai-bot/LICENSE) ═══ */
@@ -613,6 +615,8 @@ html.in-app #fx{border-radius:8px}
 const win=document.getElementById('win');
 const $=id=>document.getElementById(id);
 const views=['v-boot','v-ok','v-login','v-success','v-guide','v-main','v-settings','v-log','v-feedback'];
+/* 主页日志钉底保留条数:全天历史走 v-log;过多会顶飞「历史日志 →」 */
+const MAIN_LOG_KEEP=5;
 let mainState='ok',configured=false,hasPwd=false;
 const origin={};   /* 详情视图来路:返回必回原处 */
 /* 触发时间:从 v-settings 时间输入/药丸同步,主页 desc 与庆祝页 lede 都读这个值(报告 1.4) */
@@ -1030,7 +1034,9 @@ async function renderMainData(){
   }
   if(lastNet)$('main-net').textContent=netText(lastNet);
   if(l.ok){$('main-last-t').textContent=l.data.when||'昨晚';$('main-last').textContent=lastText(l.data)}
-  if(g.ok&&g.data.days[0])$('main-log-entries').innerHTML=g.data.days[0].entries.map(logLineHTML).join('');
+  /* 主页日志是「钉底最近几条」,全天完整历史在 v-log;不裁剪会把
+     「历史日志 →」顶出可视区(2026-08-31 实测) */
+  if(g.ok&&g.data.days[0])$('main-log-entries').innerHTML=g.data.days[0].entries.slice(-MAIN_LOG_KEEP).map(logLineHTML).join('');
 }
 async function loadLogs(){
   const g=await GG.api.logs({days:14});
@@ -1078,10 +1084,12 @@ async function copyFeedback(btn){
   catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}
   btn.textContent='已复制 ✓';setTimeout(()=>{btn.textContent='复制诊断信息'},1800);
 }
-/* 日志追加事件:主页内嵌 + 历史页今天组同步追加 */
+/* 日志追加事件:主页内嵌(只保最近几条,防止把「历史日志 →」顶飞) + 历史页今天组同步追加 */
 GG.on('log:appended',e=>{
   if(!e||!e.entry)return;
-  const m=$('main-log-entries');if(m)m.insertAdjacentHTML('beforeend',logLineHTML(e.entry));
+  const m=$('main-log-entries');
+  if(m){m.insertAdjacentHTML('beforeend',logLineHTML(e.entry));
+    while(m.children.length>MAIN_LOG_KEEP)m.firstElementChild.remove()}
   const d=document.querySelector('#log-days .day:first-child .log');
   if(d)d.insertAdjacentHTML('beforeend',logLineHTML(e.entry));
 });
