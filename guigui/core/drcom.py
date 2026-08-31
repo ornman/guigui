@@ -115,6 +115,41 @@ def chkstatus_uid(base: str, timeout: int = CHKSTATUS_TIMEOUT) -> str | None:
     return uid or None
 
 
+def parse_logout_endpoint(portal_html: str, base: str) -> str | None:
+    """从门户页的 JS 配置解析注销端点(实测:authlogoutport=801;authlogoutpath='/eportal/…')。
+
+    authlogoutIP 为空表示与认证服务器同主机;解析不到返回 None(调用方降级,
+    不做验证)。"""
+    import re as _re
+    from urllib.parse import urlsplit
+
+    m_port = _re.search(r"authlogoutport\s*=\s*(\d+)", portal_html or "")
+    m_path = _re.search(r"authlogoutpath\s*=\s*'([^']*)'", portal_html or "")
+    if not (m_port and m_path):
+        return None
+    host = (urlsplit(base).hostname or "").strip()
+    if not host:
+        return None
+    return f"http://{host}:{m_port.group(1)}{m_path.group(1)}"
+
+
+def logout(portal_html: str, base: str, timeout: int = 5) -> str | None:
+    """发起注销:按门户页配置 GET 注销端点。返回所用 URL(None=门户页没给配置)。
+
+    不解析注销响应(格式不稳定),是否真登出由调用方探测状态翻转判定;
+    任何网络异常按已发起处理(交给探测收线),永不抛出。"""
+    url = parse_logout_endpoint(portal_html, base)
+    if url is None:
+        return None
+    try:
+        req = Request(url, headers={"User-Agent": UA, "Referer": f"{base}/"})
+        with urlopen(req, timeout=timeout) as resp:
+            resp.read(256)
+    except Exception as e:
+        log.info("drcom: 注销请求异常(%s,交由探测判定)", type(e).__name__)
+    return url
+
+
 def mask_uid(uid: str | None) -> str:
     """学号打码:长度>8 → 前4…后4(契约 §2.3/§2.9 示例格式)。"""
     uid = str(uid or "").strip()

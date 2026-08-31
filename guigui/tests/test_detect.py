@@ -106,3 +106,20 @@ def test_wait_for_gate_never_raises(monkeypatch):
     monkeypatch.setattr(detect, "server_reachable", lambda *a, **kw: False)
     monkeypatch.setattr(detect.time, "sleep", lambda s: None)
     assert detect.wait_for_gate(timeout=0) is False
+
+
+def test_portal_html_returns_page_text(monkeypatch):
+    seen = []
+
+    def fake(req, timeout=None):
+        seen.append(req.full_url)
+        return FakeResp("authlogoutport=801;//注销端口 authlogoutpath='/eportal/?c=Logout';")
+    monkeypatch.setattr(detect, "urlopen", fake)
+    html = detect.portal_html({"url": "http://10.1.2.3"})
+    assert "authlogoutport=801" in html
+    assert seen == ["http://10.1.2.3/"]
+
+
+def test_portal_html_failure_returns_none(monkeypatch):
+    monkeypatch.setattr(detect, "urlopen", lambda req, timeout=None: (_ for _ in ()).throw(urllib.error.URLError("refused")))
+    assert detect.portal_html({"url": "http://10.1.2.3"}) is None

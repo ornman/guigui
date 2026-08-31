@@ -64,3 +64,34 @@ def test_apply_patch_validates_enum():
     # 未知键忽略、未提到的键保持
     same = config.apply_patch(ok, {"__proto__": 1})
     assert same["trigger_time"] == "08:00"
+
+
+def test_operator_default_value():
+    assert config.DEFAULTS["operator"] == "校园用户"
+    assert config.load()["operator"] == "校园用户"
+
+
+def test_validate_invalid_operator_falls_back():
+    out = config.validate({**config.DEFAULTS, "operator": "中国移动"})
+    assert out["operator"] == "校园用户"
+    out = config.validate({**config.DEFAULTS, "operator": 123})      # 类型错也回退
+    assert out["operator"] == "校园用户"
+    out = config.validate({**config.DEFAULTS, "operator": "校园电信"})
+    assert out["operator"] == "校园电信"
+
+
+def test_apply_patch_rejects_unknown_operator():
+    cfg = dict(config.DEFAULTS)
+    with pytest.raises(config.ConfigError, match="运营商"):
+        config.apply_patch(cfg, {"operator": "中国移动"})
+
+
+def test_apply_patch_accepts_valid_operator():
+    cfg = dict(config.DEFAULTS)
+    ok = config.apply_patch(cfg, {"operator": "校园联通"})
+    assert ok["operator"] == "校园联通"
+
+
+def test_to_bridge_includes_operator():
+    bridge = config.to_bridge(config.load())
+    assert "operator" in bridge and bridge["operator"] == "校园用户"

@@ -7,8 +7,8 @@ class FakeResp:
     def __init__(self, body: str):
         self._b = body.encode("gbk", errors="replace")
 
-    def read(self):
-        return self._b
+    def read(self, size=None):
+        return self._b[:size]
 
     def __enter__(self):
         return self
@@ -92,3 +92,63 @@ def test_mask_uid():
     assert drcom.mask_uid("2025000000001") == "2025…0001"
     assert drcom.mask_uid("12345678") == "12345678"     # ≤8 不打码
     assert drcom.mask_uid(None) == ""
+
+
+# ── 注销端点解析 + logout(实测门户 JS 配置,全桩)──────────────
+
+# 实测门户页 JS 配置行(PRD §4.1.1 采集;authlogoutIP 空 = 与认证服务器同主机)
+REAL_PORTAL_JS = (
+    "authlogouttype=1;//注销协议 "
+    "authlogoutIP='';//注销IP "
+    "authlogoutport=801;//注销端口 "
+    "authlogoutpath='/eportal/?c=ACSetting&a=Logout&ver=1.0';"
+)
+
+
+def test_parse_logout_endpoint_real_portal_config():
+    url = drcom.parse_logout_endpoint(REAL_PORTAL_JS, "http://10.1.2.3")
+    assert url == "http://10.1.2.3:801/eportal/?c=ACSetting&a=Logout&ver=1.0"
+
+
+def test_parse_logout_endpoint_garbage_returns_none():
+    assert drcom.parse_logout_endpoint("", "http://10.1.2.3") is None
+    assert drcom.parse_logout_endpoint("<html>维护中</html>", "http://10.1.2.3") is None
+    # 只有 port 没有 path / 只有 path 没有 port → 同样 None
+    assert drcom.parse_logout_endpoint("authlogoutport=801;//x", "http://10.1.2.3") is None
+    assert drcom.parse_logout_endpoint("authlogoutpath='/eportal/?c=Logout';", "http://10.1.2.3") is None
+
+
+def test_parse_logout_endpoint_no_host_returns_none():
+    assert drcom.parse_logout_endpoint(REAL_PORTAL_JS, "notaurl") is None
+    assert drcom.parse_logout_endpoint(REAL_PORTAL_JS, "") is None
+
+
+def test_logout_calls_endpoint_and_returns_url(monkeypatch):
+    seen = []
+
+    def fake(req, timeout=None):
+        seen.append(req.full_url)
+        return FakeResp("logout ok")
+    monkeypatch.setattr(drcom, "urlopen", fake)
+    url = drcom.logout(REAL_PORTAL_JS, "http://10.1.2.3")
+    assert url == "http://10.1.2.3:801/eportal/?c=ACSetting&a=Logout&ver=1.0"
+    assert seen == [url]                       # 恰好一次、URL 正确
+
+
+def test_logout_swallows_network_error(monkeypatch):
+    def fake(req, timeout=None):
+        raise TimeoutError("boom")
+    monkeypatch.setattr(drcom, "urlopen", fake)
+    url = drcom.logout(REAL_PORTAL_JS, "http://10.1.2.3")
+    assert url == "http://10.1.2.3:801/eportal/?c=ACSetting&a=Logout&ver=1.0"
+
+
+def test_logout_none_when_portal_unconfigured(monkeypatch):
+    called = []
+
+    def fake(req, timeout=None):
+        called.append(req.full_url)
+        return FakeResp("x")
+    monkeypatch.setattr(drcom, "urlopen", fake)
+    assert drcom.logout("<html>没有配置</html>", "http://10.1.2.3") is None
+    assert called == []                        # 没配置就不发请求

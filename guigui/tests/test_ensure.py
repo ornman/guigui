@@ -181,3 +181,37 @@ def test_l4_disabled_by_default(monkeypatch):
     h = Harness(monkeypatch, probe_seq=[{"state": "unreachable"}])
     h.run()
     assert h.connect_calls == []
+
+
+def test_operator_forwarded_to_login(monkeypatch):
+    h = Harness(monkeypatch, cfg_over={"operator": "校园电信"},
+                probe_seq=[{"state": "not_logged_in"}], login_seq=[("success", "")])
+    calls = []
+    monkeypatch.setattr(ensure.drcom, "login",
+                        lambda *a, **k: calls.append(a) or ("success", ""))
+    h.run()
+    assert calls, "drcom.login 应被调用"
+    args = calls[0]
+    assert args[0] == "http://10.1.2.3" and args[1] == "2025000000001" and args[2] == "pw123"
+    assert args[3] == "校园电信"                 # 第 4 参 = 配置里的运营商
+
+
+def test_cred_verified_true_after_real_login(monkeypatch):
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("success", "")])     # 真登录成功 → tries>0
+    h.run()
+    assert ensure.load_state()["cred_verified"] is True
+
+
+def test_cred_verified_false_on_rejected(monkeypatch):
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("rejected", "密码错误")])
+    h.run()
+    assert ensure.load_state()["cred_verified"] is False
+
+
+def test_cred_verified_default_false_when_already_online(monkeypatch):
+    assert ensure.load_state()["cred_verified"] is False   # 全新状态 = 未验证
+    h = Harness(monkeypatch)                               # 默认 probe=logged_in → tries=0
+    h.run()
+    assert ensure.load_state()["cred_verified"] is False   # 在线存入未验证,不翻 True

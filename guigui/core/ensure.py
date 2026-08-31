@@ -34,6 +34,7 @@ def _default_state() -> dict:
         "silent": False,
         "last_settle_date": None,
         "last_result": None,             # {date, time, tries, outcome}
+        "cred_verified": False,          # 凭证是否经服务器真验证(在线存入未验证 / 真登录成功翻 True)
     }
 
 
@@ -80,7 +81,8 @@ def _attempt_login(cfg: dict, uid: str, password: str) -> tuple[str, int, str]:
     tries = 0
     for i in range(max(1, cfg["login_retries"])):
         tries += 1
-        result, msg = drcom.login(cfg["url"], uid, password)
+        result, msg = drcom.login(cfg["url"], uid, password,
+                                  cfg.get("operator", "校园用户"))
         if result == drcom.SUCCESS:
             break
         if i < cfg["login_retries"] - 1:
@@ -205,11 +207,14 @@ def run() -> int:
         if state.get("last_settle_date") == today:
             return 0  # 登上就停:后续拍零日志零通知
         _apply_settle(cfg, state, today, uid, tries)
+        if tries > 0:
+            state["cred_verified"] = True  # 真登录成功 = 凭证经服务器验证
         save_state(state)
         return 0
 
     if outcome in ("rejected", "unexpected"):
         state["consecutive_fail"] = state.get("consecutive_fail", 0) + 1
+        state["cred_verified"] = False
         text = "登录被拒:密码可能改过了" if outcome == "rejected" else "认证服务器返回了不认识的格式"
         logstore.append("fail", text, when=_now())
         state["last_result"] = {"date": today, "time": _now().strftime("%H:%M"),

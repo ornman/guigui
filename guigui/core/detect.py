@@ -106,3 +106,15 @@ def wait_for_gate(base: str | None = None, timeout: int = GATE_TIMEOUT,
         if time.time() >= deadline:
             return False
         time.sleep(interval)
+
+
+def portal_html(cfg: dict | None = None, timeout: int = PROBE_TIMEOUT) -> str | None:
+    """取认证服务器门户页原文(验证流程解析注销端点用);失败返回 None。"""
+    base = _base_url(cfg)
+    try:
+        req = Request(base + "/", headers={"User-Agent": UA})
+        with urlopen(req, timeout=timeout) as resp:
+            return resp.read().decode("gb2312", errors="replace")
+    except Exception as e:
+        log.info("detect: 门户页取回失败(%s)", type(e).__name__)
+        return None
