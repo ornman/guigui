@@ -130,6 +130,42 @@ def _apply_rounded_region(window):
         log.warning("gui: 圆角裁剪失败(退化为直角): %s", e)
 
 
+def _hook_region_trackers(window) -> None:
+    """把圆角重贴挂到 WinForms 窗体的 Resize / LocationChanged 上。
+
+    跨屏拖动变 DPI 时系统会重算 ClientSize(125%↔150%),只在 before_show
+    贴一次的圆角区会和客户区脱节 —— 底部露一条壳底色带,页面卡片像被
+    裁掉一截(2026-08-31 像素采样实测:WebView2 比窗口短 50px)。
+    """
+    try:
+        form = window.native
+        handler = lambda sender, args: _apply_rounded_region(window)
+        form.Resize += handler
+        form.LocationChanged += handler
+    except Exception as e:
+        log.warning("gui: 圆角跟踪事件挂载失败: %s", e)
+
+
+def _start_region_keeper(window) -> None:
+    """圆角区定时重贴(1.5s):窗体 DPI 定型的时序在 WinForms/WebView2 里
+    不可靠(实测 before_show 时 ClientSize 还是中间值 682x752,定型到
+    700x800 后 Resize 并不触发),事件挂钩只是加速,这道定时是收敛保证,
+    兼容用户日后跨屏拖动变 DPI。"""
+    stop = threading.Event()
+
+    def keeper():
+        import time
+
+        while not stop.wait(1.5):
+            try:
+                _apply_rounded_region(window)
+            except Exception:
+                break  # 窗口销毁后退出
+
+    threading.Thread(target=keeper, daemon=True, name="guigui-region-keeper").start()
+    window.events.closed += stop.set
+
+
 def _missing_static_dialog() -> None:
     """前端资源缺失时的原生提示(正常发布不该走到这里)。"""
     try:
@@ -193,7 +229,15 @@ def run(view: str | None = None) -> int:
             "桂桂 / GuiGui", str(index), js_api=api,
             width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], resizable=False)
     api.attach_window(window)
-    window.events.before_show += lambda: _apply_rounded_region(window)
+
+    def _on_before_show():
+        _apply_rounded_region(window)
+        # native 在 webview.start() 后才存在,事件挂钩必须等窗体诞生(挂早了
+        # window.native=None,Resize 永远追不上 DPI 定型后的最终尺寸)
+        _hook_region_trackers(window)
+        _start_region_keeper(window)
+
+    window.events.before_show += _on_before_show
     window.events.restored += lambda: _apply_rounded_region(window)  # 最小化还原后重挂,保险
 
     if view:
