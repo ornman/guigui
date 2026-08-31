@@ -1,6 +1,7 @@
 """pywebview 壳 — 窗口 / js_api / deep link / 文件监视器 / 单实例。
 
-- 560×640 无边框;拖拽交给前端 ``pywebview-drag`` 类(easy_drag=False)。
+- 560×640 无边框;拖拽只认前端 ``pywebview-drag-region`` 类(标题行,create_window
+  传 easy_drag=False;pywebview 默认 True = 整窗任意位置可拖,2026-08-31 实测踩坑)。
 - FileWatcher:2s mtime 轮询数据目录三个文件,把外部 --ensure 进程的落盘
   翻译成契约事件(net:state / log:appended / schedule:changed),诚实边界
   为 ≤2s 延迟(技术方案 §6)。
@@ -293,11 +294,13 @@ def run(view: str | None = None) -> int:
             width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], min_size=WINDOW_SIZE,
             frameless=True, resizable=False,
             shadow=False,               # DWM 阴影 hack 在圆角外铺白边,禁用(契约集成票)
-            background_color=SHELL_BG)
+            background_color=SHELL_BG,
+            easy_drag=False)            # 只许标题行拖窗(.pywebview-drag-region);默认 True 是全局拖
     except TypeError:  # 旧版 pywebview 参数差异兜底
         window = webview.create_window(
             WINDOW_TITLE, str(index), js_api=api,
-            width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], resizable=False)
+            width=WINDOW_SIZE[0], height=WINDOW_SIZE[1], resizable=False,
+            easy_drag=False)
     api.attach_window(window)
 
     def _on_before_show():

@@ -79,6 +79,7 @@ def main():
         resizable=False,
         shadow=False,                # DWM 阴影 hack 会铺白边,禁用(见 _apply_rounded_region 注释)
         background_color="#2b2740",  # ≈ --ink,兜圆角弧线亚像素缝隙
+        easy_drag=False,             # 与正式壳同款:只许标题行拖窗(.pywebview-drag-region)
     )
     win.events.before_show += _apply_rounded_region
     win.events.restored += _apply_rounded_region  # 最小化还原后重挂,保险
