@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "桂桂 · 凭证可信度状态机",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "docs/prd/flows/guigui-cred.lifecycle.html",
+    "views": [
+      {
+        "id": "to-verified",
+        "label": "置真之路",
+        "focus": [
+          "submitted",
+          "unverified",
+          "verified"
+        ],
+        "note": "从密码提交到真登验证成功的唯一通路。"
+      },
+      {
+        "id": "reject-loop",
+        "label": "被拒与恢复",
+        "focus": [
+          "verified",
+          "rejected",
+          "unverified"
+        ],
+        "note": "明确被拒置假;改密重验后回到主轨。"
+      },
+      {
+        "id": "keep-calm",
+        "label": "保持不动",
+        "focus": [
+          "unverified",
+          "verified"
+        ],
+        "note": "锚前/断网/bind/维护页都不冤枉密码。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "主轨"
+    },
+    {
+      "id": "exc",
+      "label": "被拒与恢复"
+    }
+  ],
+  "states": [
+    {
+      "id": "submitted",
+      "type": "start",
+      "label": "密码提交",
+      "sublabel": "首装/改密·等待态按钮",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "tag": "入口"
+    },
+    {
+      "id": "unverified",
+      "type": "active",
+      "label": "未验证",
+      "sublabel": "单一真源·驱动横幅与通知",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "可信=假"
+    },
+    {
+      "id": "verified",
+      "type": "success",
+      "label": "已验证",
+      "sublabel": "真登成功",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "可信=真"
+    },
+    {
+      "id": "rejected",
+      "type": "failure",
+      "label": "明确被拒",
+      "sublabel": "error2·密码不对",
+      "lane": "exc",
+      "col": 0,
+      "tag": "可恢复"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "t-store",
+      "from": "submitted",
+      "to": "unverified",
+      "label": "入库·降级则明早首试",
+      "variant": "default",
+      "labelAt": [
+        171,
+        208
+      ]
+    },
+    {
+      "id": "t-verify",
+      "from": "unverified",
+      "to": "verified",
+      "label": "真登成功",
+      "variant": "emphasis",
+      "labelAt": [
+        296,
+        208
+      ]
+    },
+    {
+      "id": "t-lose",
+      "from": "verified",
+      "to": "rejected",
+      "label": "服务器明确拒绝",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelDy": 40
+    },
+    {
+      "id": "t-recover",
+      "from": "rejected",
+      "to": "unverified",
+      "label": "改密重验·回主轨",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "top",
+      "via": [
+        [
+          490,
+          307
+        ],
+        [
+          490,
+          110
+        ],
+        [
+          248,
+          110
+        ]
+      ],
+      "labelAt": [
+        543,
+        208
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "置真来源(三种)",
+      "items": [
+        "首装/改密验证阶梯真登成功",
+        "日常每拍真登成功(tries>0)",
+        "主页「立即登录」用已存密码成功"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "置假仅一条路",
+      "items": [
+        "06:50 后服务器明确拒绝(error2)",
+        "被拒 → 横幅 + 当拍通知 + 改密页直达",
+        "改对重验成功后可信度即刻恢复"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "明早首试(不是状态,是约定)",
+      "items": [
+        "降级/断网/锚前存入的密码由次日首拍见真章",
+        "首试成功即置真;首试被拒即置假+弹通知"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "保持不变(不冤枉密码)",
+      "items": [
+        "06:50 开门前被拒/不可达",
+        "登录途中网络中断",
+        "bind 绑定被拦(密码其实是对的)",
+        "门户维护页(格式不认识)"
+      ]
+    }
+  ]
+}

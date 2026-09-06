@@ -1,0 +1,309 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "桂桂 · 首装验证阶梯",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "docs/prd/flows/guigui-first-run.workflow.html",
+    "views": [
+      {
+        "id": "main-path",
+        "label": "提交到庆祝页",
+        "focus": [
+          "form",
+          "busy",
+          "probe",
+          "logout",
+          "flip",
+          "login",
+          "vaultbox",
+          "success"
+        ],
+        "note": "主路:提交→等待态→探测→注销→翻转→真登→入库→庆祝页。"
+      },
+      {
+        "id": "reject-recover",
+        "label": "拒绝与恢复",
+        "focus": [
+          "login",
+          "reject",
+          "restore",
+          "busy"
+        ],
+        "note": "被拒不入库,先恢复网络,改对再走一遍等待态。"
+      },
+      {
+        "id": "degrade",
+        "label": "降级与未验证",
+        "focus": [
+          "flip",
+          "unverified",
+          "success"
+        ],
+        "note": "门户不给注销翻转/网络中断时存未验证,明早首试真验证。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "ui",
+      "label": "用户界面"
+    },
+    {
+      "id": "ladder",
+      "label": "验证阶梯"
+    },
+    {
+      "id": "vault",
+      "label": "凭证与状态"
+    },
+    {
+      "id": "exc",
+      "label": "拒绝与恢复",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "ph-submit",
+      "label": "提交",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "ph-verify",
+      "label": "验证阶梯",
+      "fromCol": 2,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "ph-settle",
+      "label": "入库与收尾",
+      "fromCol": 4,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "form",
+    "busy",
+    "probe",
+    "logout",
+    "flip",
+    "login",
+    "vaultbox",
+    "success"
+  ],
+  "nodes": [
+    {
+      "id": "form",
+      "lane": "ui",
+      "col": 0,
+      "type": "frontend",
+      "label": "交钥匙表单",
+      "sublabel": "学号+密码+运营商四选",
+      "width": 150
+    },
+    {
+      "id": "busy",
+      "lane": "ui",
+      "col": 1,
+      "type": "frontend",
+      "label": "等待态按钮",
+      "sublabel": "置灰·旋转·防重复",
+      "tag": "5~15秒",
+      "width": 150
+    },
+    {
+      "id": "success",
+      "lane": "ui",
+      "col": 5,
+      "type": "backend",
+      "label": "庆祝页",
+      "sublabel": "仅真实成功",
+      "width": 150
+    },
+    {
+      "id": "probe",
+      "lane": "ladder",
+      "col": 1,
+      "type": "backend",
+      "label": "探测门户",
+      "sublabel": "四态判定",
+      "width": 150
+    },
+    {
+      "id": "logout",
+      "lane": "ladder",
+      "col": 2,
+      "type": "security",
+      "label": "注销当前会话",
+      "sublabel": "断几秒·如实告知",
+      "width": 150
+    },
+    {
+      "id": "flip",
+      "lane": "ladder",
+      "col": 3,
+      "type": "backend",
+      "label": "等状态翻转",
+      "sublabel": "最多6×0.5秒",
+      "width": 150
+    },
+    {
+      "id": "login",
+      "lane": "ladder",
+      "col": 4,
+      "type": "backend",
+      "label": "真登一次",
+      "sublabel": "waitsec→等4秒重试",
+      "width": 150
+    },
+    {
+      "id": "vaultbox",
+      "lane": "vault",
+      "col": 5,
+      "type": "database",
+      "label": "凭据管理器",
+      "sublabel": "拒绝永不入库",
+      "width": 150
+    },
+    {
+      "id": "unverified",
+      "lane": "vault",
+      "col": 4,
+      "type": "database",
+      "label": "未验证入库",
+      "sublabel": "降级/断网存入·明早首试",
+      "width": 150
+    },
+    {
+      "id": "reject",
+      "lane": "exc",
+      "col": 5,
+      "type": "security",
+      "label": "服务器拒绝",
+      "sublabel": "三态文案·就地内联",
+      "width": 150
+    },
+    {
+      "id": "restore",
+      "lane": "exc",
+      "col": 4,
+      "type": "security",
+      "label": "旧密码接回网络",
+      "sublabel": "首装无旧密码·如实说",
+      "width": 150
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-form-busy",
+      "from": "form",
+      "to": "busy",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-busy-probe",
+      "from": "busy",
+      "to": "probe",
+      "label": "探测",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-probe-logout",
+      "from": "probe",
+      "to": "logout",
+      "label": "已登录",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-probe-login",
+      "from": "probe",
+      "to": "login",
+      "label": "未登录·直接真登",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "e-logout-flip",
+      "from": "logout",
+      "to": "flip",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-flip-login",
+      "from": "flip",
+      "to": "login",
+      "label": "翻转",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-flip-unverified",
+      "from": "flip",
+      "to": "unverified",
+      "label": "降级/断网·存未验证",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "e-login-vault",
+      "from": "login",
+      "to": "vaultbox",
+      "label": "result=1",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-vault-success",
+      "from": "vaultbox",
+      "to": "success",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-login-reject",
+      "from": "login",
+      "to": "reject",
+      "label": "被拒",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "e-reject-restore",
+      "from": "reject",
+      "to": "restore",
+      "label": "先恢复网络",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "等待态铁律",
+      "items": [
+        "提交后按钮置灰+旋转,等待中不可重复点击",
+        "双击等于并发跑两次注销→登录,属正确性问题",
+        "仅验证成功才进庆祝页,失败就地内联报错"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "拒绝三态(2026-09-06 实测)",
+      "items": [
+        "userid error1 = 学号或运营商选错,核对一下",
+        "userid error2 = 密码不对,改了再试",
+        "bind userid error = 密码其实是对的,账号绑定被拦→指引自助服务平台"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "开门锚点 06:50",
+      "items": [
+        "开门前被拒不判密码错误,提示明早自动验证",
+        "密码存未验证,不清可信度、不发通知",
+        "校园实测 06:50 开门;锚点行为待真机窗口期复核"
+      ]
+    }
+  ]
+}

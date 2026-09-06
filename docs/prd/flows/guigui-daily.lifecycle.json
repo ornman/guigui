@@ -1,0 +1,291 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "桂桂 · 日常每拍状态机",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "docs/prd/flows/guigui-daily.lifecycle.html",
+    "views": [
+      {
+        "id": "happy-rail",
+        "label": "主轨五步",
+        "focus": [
+          "beat",
+          "gate",
+          "probe",
+          "login",
+          "settled"
+        ],
+        "note": "每拍从入口检查到收工的主路,登上即停。"
+      },
+      {
+        "id": "anchor",
+        "label": "开门锚点",
+        "focus": [
+          "gate",
+          "probe",
+          "unreachable"
+        ],
+        "note": "06:50 前的失败只算还没开门,不计数不通知。"
+      },
+      {
+        "id": "outcomes",
+        "label": "异常与当日结果",
+        "focus": [
+          "rejected",
+          "unreachable",
+          "silent",
+          "settled"
+        ],
+        "note": "被拒可恢复,不可达连两天进假期静默。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "每拍主轨"
+    },
+    {
+      "id": "exc",
+      "label": "异常·静默·重试"
+    }
+  ],
+  "states": [
+    {
+      "id": "beat",
+      "type": "start",
+      "label": "拍开始",
+      "sublabel": "总开关·凭据检查",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "tag": "入口"
+    },
+    {
+      "id": "gate",
+      "type": "waiting",
+      "label": "等门",
+      "sublabel": "网络栈未起·30s一看",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "等待",
+      "yOffset": 56
+    },
+    {
+      "id": "probe",
+      "type": "decision",
+      "label": "探测",
+      "sublabel": "四态判定",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "分岔"
+    },
+    {
+      "id": "login",
+      "type": "active",
+      "label": "真登·重试",
+      "sublabel": "3次×5s·登上即停",
+      "lane": "main",
+      "col": 3,
+      "step": "04",
+      "tag": "动作"
+    },
+    {
+      "id": "settled",
+      "type": "success",
+      "label": "收工",
+      "sublabel": "last_result=ok·幂等",
+      "lane": "main",
+      "col": 4,
+      "step": "05",
+      "tag": "终好"
+    },
+    {
+      "id": "unreachable",
+      "type": "waiting",
+      "label": "不可达",
+      "sublabel": "兜底WiFi开启时切网重试一轮",
+      "lane": "exc",
+      "col": 0,
+      "tag": "环境"
+    },
+    {
+      "id": "rejected",
+      "type": "failure",
+      "label": "被拒",
+      "sublabel": "06:50后·当拍通知",
+      "lane": "exc",
+      "col": 1,
+      "tag": "可恢复"
+    },
+    {
+      "id": "silent",
+      "type": "neutral",
+      "label": "假期静默",
+      "sublabel": "连2天·每天1次·不通知",
+      "lane": "exc",
+      "col": 2,
+      "tag": "静默"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "d-beat-gate",
+      "from": "beat",
+      "to": "gate",
+      "label": "栈未起",
+      "variant": "default",
+      "labelAt": [
+        160,
+        260
+      ]
+    },
+    {
+      "id": "d-beat-probe",
+      "from": "beat",
+      "to": "probe",
+      "label": "直探",
+      "variant": "default"
+    },
+    {
+      "id": "d-gate-probe",
+      "from": "gate",
+      "to": "probe",
+      "label": "开门即续",
+      "variant": "default",
+      "labelAt": [
+        355,
+        260
+      ]
+    },
+    {
+      "id": "d-probe-login",
+      "from": "probe",
+      "to": "login",
+      "label": "未登录",
+      "variant": "emphasis",
+      "labelAt": [
+        479,
+        230
+      ]
+    },
+    {
+      "id": "d-probe-settled",
+      "from": "probe",
+      "to": "settled",
+      "label": "已在线·tries=0",
+      "variant": "emphasis",
+      "route": "top-channel"
+    },
+    {
+      "id": "d-probe-unreach",
+      "from": "probe",
+      "to": "unreachable",
+      "label": "不可达",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelAt": [
+        435,
+        228
+      ]
+    },
+    {
+      "id": "d-login-settled",
+      "from": "login",
+      "to": "settled",
+      "variant": "emphasis"
+    },
+    {
+      "id": "d-login-reject",
+      "from": "login",
+      "to": "rejected",
+      "label": "error2",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelAt": [
+        590,
+        228
+      ]
+    },
+    {
+      "id": "d-reject-retry",
+      "from": "rejected",
+      "to": "login",
+      "label": "下一拍重试·通知每日一次",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "bottom",
+      "via": [
+        [
+          636,
+          307
+        ],
+        [
+          636,
+          210
+        ],
+        [
+          556,
+          210
+        ]
+      ]
+    },
+    {
+      "id": "d-unreach-silent",
+      "from": "unreachable",
+      "to": "silent",
+      "label": "连续≥2天",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [
+        [
+          402,
+          384
+        ],
+        [
+          710,
+          384
+        ]
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "开门锚点 06:50",
+      "items": [
+        "锚前被拒/不可达只记「还没开门」",
+        "不计数·不通知·不清可信度",
+        "默认 07:00 的窗口 6 拍 = 06:30~06:55,后两拍落在开门后"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "通知决策",
+      "items": [
+        "06:50 后首拍明确被拒 → 当拍弹,每日≤1 次",
+        "不可达永不通知(假期静默同理)",
+        "门户维护类连续 ≥3 拍才弹"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "当日结果(last_result)",
+      "items": [
+        "ok = 收工;fail = 被拒/连不上(主页横幅)",
+        "silent = 假期静默;none = 还没记录",
+        "同日已收工的后续拍零日志零通知(幂等)",
+        "假期静默在回校后自动恢复:次日拍照常探测"
+      ]
+    }
+  ]
+}

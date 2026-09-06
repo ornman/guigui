@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>桂桂 · 全态业务流程图(2026-09-06)</title>
+<style>
+  :root{
+    --bg:oklch(97.5% .008 295); --card:oklch(99.2% .005 295);
+    --ink:oklch(23% .015 295); --mut:oklch(45% .02 295); --faint:oklch(60% .015 295);
+    --line:oklch(88% .015 295); --acc:oklch(58% .15 295); --accbg:oklch(94% .03 295);
+    --amb:oklch(70% .12 70); --ambbg:oklch(95% .03 85);
+    --bad:oklch(55% .17 20); --badbg:oklch(95% .025 20);
+    --sil:oklch(70% .012 295); --silbg:oklch(95.5% .008 295);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);
+    font:15px/1.7 "Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+    padding:40px 20px 80px}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-family:Georgia,"Noto Serif SC","Source Han Serif SC",serif;
+    font-size:30px;font-weight:600;letter-spacing:.02em}
+  h1 small{display:block;font-size:13px;color:var(--mut);font-weight:400;
+    margin-top:6px;letter-spacing:.08em}
+  .fig{background:var(--card);border:1px solid var(--line);border-radius:20px;
+    padding:28px 30px 30px;margin-top:26px}
+  h2{font-family:Georgia,"Noto Serif SC",serif;font-size:20px;font-weight:600;
+    margin-bottom:4px}
+  .fig>p.sub{color:var(--mut);font-size:13.5px;margin-bottom:18px}
+  /* 节点 */
+  .nd{border:1.5px solid var(--line);border-radius:12px;background:var(--card);
+    padding:10px 14px;font-size:13.5px;line-height:1.55}
+  .nd b{font-weight:600}
+  .nd small{color:var(--mut);font-size:12px;display:block;margin-top:2px}
+  .ok{border-color:var(--acc);background:var(--accbg)}
+  .warn{border-color:var(--amb);background:var(--ambbg)}
+  .fail{border-color:var(--bad);background:var(--badbg)}
+  .mute{border-color:var(--sil);background:var(--silbg);color:var(--mut)}
+  .gate{border:2px dashed var(--amb);border-radius:16px;padding:14px 16px;
+    background:oklch(97% .01 85);margin:10px 0}
+  .gate h4{font-size:13px;color:oklch(45% .1 70);margin-bottom:6px}
+  /* 箭头 */
+  .ar{text-align:center;color:var(--faint);font-size:15px;line-height:1.2;
+    padding:5px 0;user-select:none}
+  .ar span{display:inline-block;background:var(--card);border:1px solid var(--line);
+    border-radius:99px;padding:0 10px;font-size:11.5px;color:var(--mut);margin-bottom:2px}
+  .ar.r{display:inline-block;padding:0 6px;vertical-align:middle}
+  /* 布局 */
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch}
+  .row>div{flex:1 1 150px}
+  .col{display:flex;flex-direction:column}
+  .stack{display:flex;flex-direction:column}
+  /* 表格 */
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:10px}
+  th{font-size:12px;letter-spacing:.08em;color:var(--mut);text-align:left;
+    font-weight:600;padding:8px 10px;border-bottom:1.5px solid var(--line)}
+  td{padding:8px 10px;border-bottom:1px solid oklch(93% .01 295);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .tag{display:inline-block;border-radius:99px;padding:1px 9px;font-size:11.5px;
+    border:1px solid var(--line);margin-right:4px;white-space:nowrap}
+  .t-ok{border-color:var(--acc);color:var(--acc);background:var(--accbg)}
+  .t-warn{border-color:var(--amb);color:oklch(50% .12 70);background:var(--ambbg)}
+  .t-fail{border-color:var(--bad);color:var(--bad);background:var(--badbg)}
+  .t-mute{border-color:var(--sil);color:var(--mut);background:var(--silbg)}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 0}
+  code{font:12.5px/1.5 Consolas,monospace;background:var(--silbg);
+    border:1px solid var(--line);border-radius:6px;padding:0 5px}
+  .foot{color:var(--faint);font-size:12.5px;margin-top:26px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>桂桂 · 全态业务流程图
+<small>2026-09-06 业务逻辑重梳理定稿 · 配套 docs/prd/guigui-prd-v2.md(§4.1.2 / §7 / §8.5)</small></h1>
+
+<div class="legend">
+  <span class="tag t-ok">紫 = 成功 / 已验证 / 弹通知</span>
+  <span class="tag t-warn">琥珀 = 不可达 / 等门 / 开门前</span>
+  <span class="tag t-fail">玫红 = 被拒 / 失败 / 横幅</span>
+  <span class="tag t-mute">灰 = 静默 / 不打扰 / 终止</span>
+</div>
+
+<!-- ══════════════ 图1 总览泳道 ══════════════ -->
+<section class="fig">
+<h2>图 1 · 用户旅程总览</h2>
+<p class="sub">首装一次性 → 成功 → 日常循环 → 异常 → 修复回归日常(闭环)</p>
+<div class="row">
+  <div class="stack">
+    <div class="nd ok"><b>① 首装(一次)</b><small>体检三分流 → 交钥匙表单 → 验证阶梯(图2)</small></div>
+    <div class="ar">↓ 仅验证成功</div>
+    <div class="nd ok"><b>② 成功页</b><small>庆祝只给真实成功;注册每日自动化</small></div>
+  </div>
+  <div class="ar r">→</div>
+  <div class="stack">
+    <div class="nd"><b>③ 日常(每天自动)</b><small>起床窗口 6 拍心跳 + 开机/巡逻/唤醒叠加(图3)</small></div>
+    <div class="ar">↓ 无异常则停留</div>
+    <div class="nd mute"><b>一切正常</b><small>永不通知 · 无横幅 · GUI 都不用打开</small></div>
+  </div>
+  <div class="ar r">→</div>
+  <div class="stack">
+    <div class="nd fail"><b>④ 异常</b><small>被拒(密码改了) / 不可达 / 线上是别人的学号</small></div>
+    <div class="ar">↓</div>
+    <div class="nd fail"><b>⑤ 修复</b><small>当拍通知(点击直达) / 主页横幅(点击直达) → 改密页重验(图2 同款阶梯)</small></div>
+  </div>
+  <div class="ar r">→</div>
+  <div class="stack">
+    <div class="nd ok"><b>⑥ 回归日常</b><small>验证通过 → 可信度恢复、横幅消失、通知停发</small></div>
+    <div class="ar">↺ 回 ③</div>
+    <div class="nd mute"><b>循环</b><small>绑定类被拦(bind)除外 → 指引自助平台</small></div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ 图2 首装验证阶梯 ══════════════ -->
+<section class="fig">
+<h2>图 2 · 首装:体检三分流 → 提交 → 验证阶梯 → 五路结果</h2>
+<p class="sub">凭证神圣:密码必须经服务器真验证;明确被拒不入库 · 全程按钮等待态(置灰+旋转+不可重复点击)</p>
+
+<div class="row">
+  <div class="stack">
+    <div class="nd"><b>开机仪式(2s) + 网络体检</b></div>
+    <div class="ar">↓</div>
+    <div class="row" style="gap:8px">
+      <div class="nd ok" style="flex:1"><b>已登录</b><small>→ 交钥匙页(学号已识别回填)</small></div>
+      <div class="nd warn" style="flex:1"><b>未登录</b><small>→ 登录表单</small></div>
+      <div class="nd warn" style="flex:1"><b>不可达</b><small>→ 引导页(诊断/选WiFi/重测)</small></div>
+      <div class="nd mute" style="flex:1"><b>网络栈未就绪</b><small>→ 等门:桂桂睡着,30s一看,开门即登</small></div>
+    </div>
+  </div>
+</div>
+
+<div class="ar">↓ 表单:学号 + 密码 + 运营商四选(校园用户''/电信@dx/联通@lt/其他'')<br><span style="color:var(--acc)">点击「开启每日自动登录」→ 按钮进入等待态 · 在线验证 5~15 秒</span></div>
+
+<div class="gate">
+  <h4>⏱ 验证阶梯时序(在线态)</h4>
+  <div class="row">
+    <div class="nd"><b>① 注销当前会话</b><small>提交上方如实一行:"会先注销当前登录,网络断几秒";线上是别的学号 → 注明"线上的是 6503…21,验证时会先注销它"</small></div>
+    <div class="ar r">→</div>
+    <div class="nd"><b>② 等状态翻转</b><small>最多 6 × 0.5s 轮询;不翻转 → 降级:密码存"未验证",明早首试</small></div>
+    <div class="ar r">→</div>
+    <div class="nd"><b>③ 真登一次</b><small>刚注销会被限流(waitsec)→ 等 4s 重试一次</small></div>
+  </div>
+</div>
+
+<div class="ar">↓ 五路结果(未登录态跳过①②,直接真登)</div>
+
+<div class="row">
+  <div class="nd ok"><b>登录成功</b><small>密码入库,标记<b>已验证</b> → 庆祝页(唯一通往庆祝页的路)</small></div>
+  <div class="nd fail"><b>密码不对</b><code>userid error2</code><small>旧密码接回网络 + 按钮恢复 + 内联"密码不对";首装无旧密码 → "网先断着,输对马上通"</small></div>
+  <div class="nd fail"><b>号/运营商错</b><code>userid error1</code><small>同上恢复 + "学号或运营商选错了,核对一下"</small></div>
+  <div class="nd fail"><b>绑定被拦</b><code>bind userid error</code><small>密码其实是对的 → 指引自助服务平台查绑定/换绑</small></div>
+  <div class="nd warn"><b>网络中途够不着</b><small>密码没被否认 → 存"未验证",明早首试真验证,失败弹通知</small></div>
+</div>
+
+<div class="gate" style="border-color:var(--amb)">
+  <h4>⏱ 06:50 开门前提交(锚点)</h4>
+  <div class="nd mute" style="background:transparent">被拒不判"密码错误" → "还没到开门时间(06:50),密码先存着,明早自动验证"(存未验证)。门户维护页(格式不认识)→ 如实展示不猜测。</div>
+</div>
+</section>
+
+<!-- ══════════════ 图3 日常状态机 ══════════════ -->
+<section class="fig">
+<h2>图 3 · 日常:每拍执行体(窗口心跳 / 开机 / 巡逻 / 唤醒共用)</h2>
+<p class="sub">登上即停:同日已收工的后续拍零日志零通知 · 开门锚点包裹全程</p>
+
+<div class="nd mute">入口检查:总开关关 / 没存过凭据 → <b>直接退出</b>(不写任何东西)</div>
+<div class="ar">↓</div>
+<div class="nd warn">网络栈未就绪(waiting)→ <b>等门</b>:30 秒一看,上限 10 分钟,开门即继续</div>
+<div class="ar">↓</div>
+
+<div class="row">
+  <div class="stack">
+    <div class="nd ok"><b>已在线</b></div>
+    <div class="ar">↓</div>
+    <div class="nd ok"><b>当日首次 → 收工</b><small>三行日志 + 计数复位 + last_result=ok;真登过(tries&gt;0)→ 可信度=已验证</small></div>
+    <div class="ar">↓ tries=0(桂桂没动手)</div>
+    <div class="nd"><b>只读查线上学号,如实记录</b>
+      <small>线上 = 自己 → 正常,零打扰(会话续期很常见)<br>
+      线上 = 别人 → 日志一行"线上的是 6503…21",不横幅不通知<br>
+      <span class="tag t-fail">且密码未验证</span> → 主页横幅"今早的网不是桂桂登的,新密码存一下?"</small></div>
+  </div>
+  <div class="ar r">│</div>
+  <div class="stack">
+    <div class="nd"><b>未登录</b></div>
+    <div class="ar">↓</div>
+    <div class="nd"><b>真登(重试 N 次×间隔,登上即停)</b></div>
+    <div class="ar">↓</div>
+    <div class="nd ok"><b>成功 → 收工</b><small>last_result=ok · 可信度=已验证</small></div>
+    <div class="ar">↓</div>
+    <div class="nd fail"><b>被拒(error2)</b><small>06:50 前 → 只记"还没开门",等下一拍(到此为止)<br>06:50 后 → 记 fail + 可信度=未验证 + <b>当拍即弹通知</b>(图4)</small></div>
+    <div class="ar">↓</div>
+    <div class="nd warn"><b>格式不认识(维护页)</b><small>记异常;连续 ≥3 拍才通知</small></div>
+  </div>
+  <div class="ar r">│</div>
+  <div class="stack">
+    <div class="nd warn"><b>不可达</b></div>
+    <div class="ar">↓</div>
+    <div class="nd warn"><b>兜底 WiFi(默认关)</b><small>开了才切,切后重试一轮(仅一轮防循环)</small></div>
+    <div class="ar">↓ 仍不可达</div>
+    <div class="nd mute"><b>假期静默状态机</b><small>连续 ≥2 天 且静默开 → last_result=silent,每天 1 次,永不通知<br>否则 last_result=fail"连不上校园网",不通知</small></div>
+  </div>
+</div>
+
+<div class="ar">↓ 当日结果汇总</div>
+<div class="row">
+  <div class="nd ok"><b>last_result = ok</b><small>收工。昨晚行"第一次就登好了 ✓"</small></div>
+  <div class="nd fail"><b>= fail</b><small>被拒或当日连不上 → 主页横幅"今早没登上,去改一下"</small></div>
+  <div class="nd mute"><b>= silent</b><small>假期静默 →"假期静默,没打扰你"</small></div>
+  <div class="nd mute"><b>= none</b><small>还没有记录(刚装好/一直没开电脑)</small></div>
+</div>
+</section>
+
+<!-- ══════════════ 图4 通知决策 ══════════════ -->
+<section class="fig">
+<h2>图 4 · 通知决策(后台唯一主动触达,全部可点击;受「弹通知」总开关管辖)</h2>
+<p class="sub">原则:有明确修复动作才弹;06:50 前永不弹失败类通知</p>
+<table>
+  <tr><th style="width:30%">发生了什么</th><th style="width:12%">弹?</th><th>通知内容 → 点击落点</th></tr>
+  <tr><td>断 → 通(网络自己回来了)</td><td><span class="tag t-ok">弹</span></td><td>"已连上 ✓ 网络回来了" → 主面板(每天最多 1 次)</td></tr>
+  <tr><td><b>06:50 后第一次明确被拒</b>(error2 密码不对)</td><td><span class="tag t-ok">当拍即弹</span></td><td>"登录失败,密码改了?" → <b>改密页</b>(每日 ≤1 次防刷屏;不再等凑满 3 次)</td></tr>
+  <tr><td>06:50 前被拒 / 不可达</td><td><span class="tag t-mute">不弹</span></td><td>只记"还没开门"等下一拍 — 防窗口期错怪用户</td></tr>
+  <tr><td>门户维护(格式不认识)连续 ≥3 拍</td><td><span class="tag t-ok">弹</span></td><td>"桂桂一直登不上,点开看看" → 主面板</td></tr>
+  <tr><td>不可达(含假期静默)</td><td><span class="tag t-mute">永不</span></td><td>—(连不上校园网多为不在校,弹了也点不了)</td></tr>
+  <tr><td>安全软件拦了定时任务(用户刚做过动作后)</td><td><span class="tag t-ok">弹</span></td><td>"定时任务被拦,点这里重建" → 设置页(<b>仅用户点击才重建</b>)</td></tr>
+  <tr><td>一切正常</td><td><span class="tag t-mute">永不</span></td><td>—</td></tr>
+</table>
+</section>
+
+<!-- ══════════════ 图5 可信度转移 ══════════════ -->
+<section class="fig">
+<h2>图 5 · 凭证可信度(贯穿全流程的单一真源)</h2>
+<p class="sub">两个值:已验证 / 未验证 · 一切横幅、失败通知、改密引导都由它和"当日失败"驱动</p>
+<div class="row">
+  <div class="stack" style="flex:1.2">
+    <div class="nd ok"><b>→ 已验证(置真)</b>
+      <small>· 验证阶梯真登成功(首装/改密)<br>· 日常每拍真登成功(tries&gt;0)<br>· 主面板「立即登录」用已存密码成功</small></div>
+    <div class="ar">↕</div>
+    <div class="nd fail"><b>→ 未验证(置假)</b>
+      <small>· 06:50 后服务器明确拒绝(密码不对 error2)<br>· 新密码在"网络够不着/降级"下入库(明早首试前)</small></div>
+  </div>
+  <div class="ar r">│</div>
+  <div class="stack" style="flex:1.2">
+    <div class="nd mute"><b>→ 保持不变(不冤枉密码)</b>
+      <small>· 06:50 开门前被拒 / 不可达(只记"还没开门")<br>· 登录途中网络断(密码没被否认)<br>· 绑定被拦(bind:密码其实是对的,问题在账号绑定)<br>· 门户维护页(格式不认识)</small></div>
+  </div>
+  <div class="ar r">│</div>
+  <div class="stack" style="flex:1.6">
+    <div class="nd"><b>谁消费这个状态</b>
+      <small>· 主页横幅①:"密码还没验证过/可能改过了 — 去改一下"<br>· 成功页文案:未验证时如实说"明早首试真验证"<br>· 失败通知只在 未验证/被拒 时出现<br>· tries=0 早晨 + 未验证 → "今早的网不是桂桂登的"横幅</small></div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ 图6 GUI 视图路由 ══════════════ -->
+<section class="fig">
+<h2>图 6 · GUI 视图路由(8 视图 + 开机覆盖层)与事件驱动</h2>
+<p class="sub">单窗口卡片,视图切换不弹二级窗 · 深链 guigui://creds|main|settings 由系统通知点击触发</p>
+<div class="row">
+  <div class="stack">
+    <div class="nd"><b>v-boot 开机仪式覆盖层</b><small>首装完整仪式(2s)/日常快速苏醒(0.6s)/等门(桂桂睡着)</small></div>
+    <div class="ar">↓ 体检三分流(首装)或直落(日常)</div>
+    <div class="row" style="gap:8px">
+      <div class="nd ok" style="flex:1"><b>v-ok 交钥匙页</b><small>已登录态首装</small></div>
+      <div class="nd" style="flex:1"><b>v-login 登录/改密页</b><small>未登录首装 · 深链 creds · 设置页入口 · 三态内联报错</small></div>
+      <div class="nd warn" style="flex:1"><b>v-guide 引导页</b><small>不可达诊断 · 选 WiFi · 重测</small></div>
+    </div>
+    <div class="ar">↓ 验证成功(唯一入口)</div>
+    <div class="nd ok"><b>v-success 庆祝页</b><small>粒子+摇晃;未验证时如实文案;→ 完成回主页 / 高级设置</small></div>
+  </div>
+  <div class="ar r">│</div>
+  <div class="stack">
+    <div class="nd"><b>v-main 日常主页</b><small>状态即标题 + 口吻行 + 横幅(仅两态,点击→v-login) + 三行服务条 + 主按钮三态(ok=立即重新登录/out=立即登录/down=去排查→v-guide) + 日志钉底5条</small></div>
+    <div class="ar">↓</div>
+    <div class="row" style="gap:8px">
+      <div class="nd" style="flex:1.4"><b>v-settings 高级设置</b><small>★ 账号与密码 →(新) · ★ 定时任务在岗/重建(新) · 时间/重试/兜底/巡逻/唤醒/通知/总开关</small></div>
+      <div class="nd" style="flex:1"><b>v-log 历史日志</b><small>按天分组 · 假期静默标注 · 线上他人学号行</small></div>
+      <div class="nd mute" style="flex:1"><b>v-feedback 诊断反馈</b></div>
+    </div>
+    <div class="ar">↓ 实时事件(后台→GUI)</div>
+    <div class="nd mute"><b>net:state</b>(四态翻转重渲) · <b>log:appended</b>(日志钉底追加) · <b>schedule:changed</b>(总开关同步) · <b>login:progress</b>(等待态进度)</div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ 附A 外力兜底矩阵 ══════════════ -->
+<section class="fig">
+<h2>附 A · 系统外力兜底矩阵</h2>
+<p class="sub">无守护/无托盘/无常驻是定稿决策 — 自动化的韧性全部由任务层与"下次打开"承担(PRD §8.5)</p>
+<table>
+  <tr><th style="width:26%">场景</th><th style="width:44%">机制</th><th>残余 / 备注</th></tr>
+  <tr><td>关机错过触发窗口</td><td>错过补跑(StartWhenAvailable)+ 开机补跑(默认开)</td><td>开机即登,窗口内幂等</td></tr>
+  <tr><td>任务没建成 / 被删</td><td>GUI 启动自动对齐(只恢复已选配置)+ 指引通知</td><td><b>永不开 GUI = 沉默死亡</b>;设置页状态行是唯一可见性</td></tr>
+  <tr><td>杀软拦任务创建</td><td>降级注册(去开机触发保每日定时)→ 放行后自动升级</td><td>设置页可一键重建(仅点击触发)</td></tr>
+  <tr><td>进程被后台杀</td><td>执行体是独立短进程;窗口内下一拍(5 分钟)自然补</td><td>GUI 被杀不影响自动化</td></tr>
+  <tr><td>exe 被杀毒清理</td><td>任务指向失效自动判坏,下次对齐重建</td><td>同"任务被删"残余</td></tr>
+  <tr><td>系统时钟错乱</td><td>—</td><td>触发时刻与 06:50 锚点跟着错,接受</td></tr>
+  <tr><td>笔记本睡眠错过窗口</td><td>唤醒触发(默认关,可开) + 唤醒补登 30s</td><td>电池供电可能不唤醒</td></tr>
+  <tr><td>假期离校</td><td>连续 2 天不可达 → 假期静默(每天 1 次,不通知)</td><td>回校自动恢复</td></tr>
+  <tr><td>同账号多设备互踢</td><td>下一拍自动补登</td><td>可能反踢手机,拉锯无解,文档明示</td></tr>
+  <tr><td>数据目录被清</td><td>回落首装单行道重来</td><td>凭据在系统凭据管理器,不受影响</td></tr>
+  <tr><td>日志无限增长</td><td>>90 天自动清理(仅桂桂自己目录)</td><td>—</td></tr>
+</table>
+</section>
+
+<!-- ══════════════ 附B 实测事实 ══════════════ -->
+<section class="fig">
+<h2>附 B · 2026-09-06 隔离测试床实测事实</h2>
+<p class="sub">墙口直连独立会话,不借道共享路由 · 测试账号登录被 bind 拦(密码已证正确),全阶梯待解绑后补测</p>
+<table>
+  <tr><th style="width:30%">项目</th><th>实测结果</th></tr>
+  <tr><td>运营商表(登录页 = 注销页)</td><td>完全一致,共 <b>4 项</b>:校园用户 <code>''</code> / 校园电信 <code>@dx</code> / 校园联通 <code>@lt</code> / 校园其他 <code>''</code>,默认第 1 项。<b>「中国移动/中国广电」不在门户选项中</b> — 套餐口径与登录后缀是两套体系</td></tr>
+  <tr><td>运营商在请求中的落点</td><td>学号 + 所选后缀(门户前端 JS 实读 + 错误码语义反证,与现实现一致)</td></tr>
+  <tr><td>拒绝文案三态(实证)</td><td><code>userid error1</code> = 账号+运营商组合不存在 · <code>userid error2</code> = 密码不对 · <code>bind userid error</code> = 密码正确但账号绑定/接入区域被拦(样本各一)</td></tr>
+  <tr><td>chkstatus 学号识别</td><td>未认证 → 空;在线 → 返回该会话学号(按源 IP)"线上是谁"功能的数据源成立</td></tr>
+  <tr><td>页面编码</td><td>登录页 UTF-8 / 注销页 GB2312;标题判别两页均正确,探测不受影响</td></tr>
+  <tr><td>注销端点</td><td>801 端 eportal 注销配置两页均内嵌,可解析</td></tr>
+</table>
+</section>
+
+<div class="foot">桂桂 GuiGui · 内部文档 · 单文件零依赖,双击即开 · 详细规则见 docs/prd/guigui-prd-v2.md</div>
+</div>
+</body>
+</html>
