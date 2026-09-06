@@ -613,7 +613,8 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div id="log-days"></div>
     </div>
 
-    <!-- 高级设置(2026-09-07 重排,同类聚齐:何时登 → 补登录时机 → 断网保险 → 失败节奏 → 提醒 → 系统 → 求助;两种重试间隔并排对照,不再各埋一处) -->
+    <!-- 高级设置(2026-09-07 二次瘦身,只留用户能评估的场景开关:账号 → 何时登 → 补登录时机 → 断网保险 → 提醒 → 系统 → 求助;
+         重试三连/巡逻间隔/后台自动化已删(工程参数默认值兜底、总开关主页唯一);定时任务行仅被拦时出现) -->
     <div class="v" id="v-settings">
       <button class="back" onclick="backFrom('v-settings')">‹ 返回</button>
       <h1 style="font-size:22px">高级设置</h1>
@@ -649,22 +650,8 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div id="fallback-pick" style="display:none;padding:6px 0 2px"></div>
       <div class="row"><div><div class="t">白天巡逻</div><div class="d">意外断网时,悄悄重连</div></div>
         <div class="sw" data-cfg="patrol_enabled" onclick="toggleCfg(this)"></div></div>
-      <div class="row"><div><div class="t">巡逻间隔</div></div>
-        <div class="dd" data-cfg-key="patrol_minutes"><button class="dd-btn"><span class="dd-label">30 分钟</span><span class="car">▼</span></button>
-          <div class="dd-menu"><button data-v="15">15 分钟 <span class="ck">✓</span></button><button class="on" data-v="30">30 分钟 <span class="ck">✓</span></button><button data-v="60">60 分钟 <span class="ck">✓</span></button></div></div></div>
       <div class="row"><div><div class="t">假期静默</div><div class="d">连续 2 天连不上(放假回家了?),自动降为每天 1 次、不打扰</div></div>
         <div class="sw on" data-cfg="vacation_silence" onclick="toggleCfg(this)"></div></div>
-
-      <div class="tiny-label">重试</div>
-      <div class="row"><div><div class="t">登录失败重试</div></div>
-        <div class="dd" data-cfg-key="login_retries"><button class="dd-btn"><span class="dd-label">3 次</span><span class="car">▼</span></button>
-          <div class="dd-menu"><button data-v="1">1 次 <span class="ck">✓</span></button><button class="on" data-v="3">3 次 <span class="ck">✓</span></button><button data-v="5">5 次 <span class="ck">✓</span></button></div></div></div>
-      <div class="row"><div><div class="t">失败后重试间隔</div><div class="d">单轮里两次尝试之间,歇几秒再试</div></div>
-        <div class="dd" data-cfg-key="retry_seconds"><button class="dd-btn"><span class="dd-label">5 秒</span><span class="car">▼</span></button>
-          <div class="dd-menu"><button class="on" data-v="5">5 秒 <span class="ck">✓</span></button><button data-v="10">10 秒 <span class="ck">✓</span></button><button data-v="30">30 秒 <span class="ck">✓</span></button></div></div></div>
-      <div class="row"><div><div class="t">窗口内重试间隔</div><div class="d">早上窗口内每隔几分钟试一轮,登上就停</div></div>
-        <div class="dd" data-cfg-key="heartbeat_minutes"><button class="dd-btn"><span class="dd-label">5 分钟</span><span class="car">▼</span></button>
-          <div class="dd-menu"><button class="on" data-v="5">5 分钟 <span class="ck">✓</span></button><button data-v="10">10 分钟 <span class="ck">✓</span></button><button data-v="15">15 分钟 <span class="ck">✓</span></button></div></div></div>
 
       <div class="tiny-label">提醒</div>
       <div class="row"><div><div class="t">弹通知</div><div class="d">只在断网恢复、登录失败时说</div></div>
@@ -673,10 +660,8 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div class="tiny-label">系统</div>
       <div class="row"><div><div class="t">显示桂桂</div></div>
         <div class="sw on" id="sw-gui" onclick="toggleGui(this)"></div></div>
-      <div class="row"><div><div class="t">定时任务</div><div class="d" id="task-status-d" style="display:none"></div></div>
-        <button class="link" id="task-rebuild" style="display:none;margin-top:0;font-size:12.5px;white-space:nowrap" onclick="rebuildTask()">点此重建</button></div>
-      <div class="row"><div><div class="t">后台自动化</div><div class="d">总开关,与主页开关同步</div></div>
-        <div class="sw on" id="sw-auto-set" onclick="toggleAuto()"></div></div>
+      <div class="row" id="task-row" style="display:none"><div><div class="t">定时任务</div><div class="d" id="task-status-d"></div></div>
+        <button class="link" id="task-rebuild" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="rebuildTask()">点此重建</button></div>
 
       <div class="row"><div><div class="t">遇见问题?</div><div class="d">一键复制打码诊断信息,发给谁都不泄密</div></div>
         <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openDetail('v-feedback')">反馈</button></div>
@@ -868,7 +853,7 @@ function renderMain(){
 function wakeProblem(kind){mainState=kind;goDaily()}
 /* 自动登录总开关:主页与设置页双向同步,关=桂桂睡觉(状态由开关自己表达,文字只讲服务) */
 function setAuto(on){
-  ['sw-auto','sw-auto-set'].forEach(id=>{const s=$(id);if(s)s.classList.toggle('on',on)});
+  {const s=$('sw-auto');if(s)s.classList.toggle('on',on)};
   const d=$('auto-desc');
   if(d)d.textContent=on?'明早 '+currentTriggerTime+' 替你登 · 提前 30 分钟开始试':'已关 · 想让我开工随时说';
   if($('v-main').classList.contains('on')){
@@ -1137,11 +1122,11 @@ GG.on('schedule:changed',e=>{
   if(e&&typeof e.master==='boolean')setAuto(e.master);
   if(e&&typeof e.task_ok==='boolean')renderTaskRow(e.task_ok);
 });
-/* 定时任务(AC-17):在岗不打扰(说明行隐藏),被拦才说话并给「点此重建」;重建仅用户点击触发 */
+/* 定时任务(AC-17):在岗整行不打扰(行隐藏),被拦才出现并给「点此重建」;重建仅用户点击触发 */
 function renderTaskRow(okk){
-  const d=$('task-status-d'),b=$('task-rebuild');if(!d)return;
-  d.textContent=okk?'':'被拦了,自动登录还没生效';
-  d.style.display=okk?'none':'block';
+  const r=$('task-row'),d=$('task-status-d'),b=$('task-rebuild');
+  if(r)r.style.display=okk?'none':'flex';
+  if(d)d.textContent=okk?'':'被拦了,自动登录还没生效';
   if(b)b.style.display=okk?'none':'inline-block';
 }
 async function rebuildTask(){
@@ -1267,7 +1252,7 @@ async function loadSettings(){
   $('ct-h').value=t[0];$('ct-m').value=t[1];currentTriggerTime=curCfg.trigger_time||'07:00';
   document.querySelectorAll('.preset').forEach(x=>x.classList.toggle('on',x.dataset.t===currentTriggerTime));
   document.querySelectorAll('#v-settings .sw[data-cfg]').forEach(sw=>sw.classList.toggle('on',!!curCfg[sw.dataset.cfg]));
-  $('sw-auto-set').classList.toggle('on',!!curCfg.master);setAuto(!!curCfg.master);
+  setAuto(!!curCfg.master);
   $('sw-gui').classList.toggle('on',curCfg.show_gui!==false);
   $('sw-fallback').classList.toggle('on',!!curCfg.wifi_fallback_enabled);
   $('fallback-pick').style.display=curCfg.wifi_fallback_enabled?'block':'none';
