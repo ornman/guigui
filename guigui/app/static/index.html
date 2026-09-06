@@ -274,8 +274,10 @@ input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--a
 /* 学号行:输入框 + 运营商自绘下拉并排(登录用户名 = 学号+后缀,下拉是后缀的可视化) */
 .sid-row{display:flex;gap:8px;align-items:stretch}
 .sid-row input{flex:1 1 auto;min-width:0}
-.sid-row .dd-btn{min-width:96px;justify-content:space-between;border-radius:12px;
+.sid-row .dd-btn{min-width:104px;justify-content:space-between;border-radius:12px;
   border-color:oklch(60% 0.01 295 / 0.35);background:oklch(100% 0 0 / 0.6);font-size:12.5px}
+/* 菜单与按钮严格同宽:左右边缘对齐按钮列,不再向左探出 */
+.sid-row .dd-menu{min-width:0;width:100%}
 /* 历史日志视图 */
 .day{margin-bottom:16px}
 .day-h{font-family:Inter,"PingFang SC",sans-serif;font-size:10.5px;font-weight:600;
