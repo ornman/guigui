@@ -16,7 +16,7 @@ import logging
 import threading
 import time
 
-from guigui.core import config, detect, diagnostics, drcom, ensure, logstore, notify, selfheal, vault, wifictl
+from guigui.core import config, detect, diagnostics, drcom, ensure, logstore, notify, scheduler, selfheal, vault, wifictl
 from guigui.core.config import ConfigError
 from guigui.core.vault import VaultError
 from guigui.core.wifictl import WifiConnectError, WifiScanError
@@ -43,8 +43,13 @@ def _ok(data: dict) -> dict:
     return {"ok": True, "data": data}
 
 
-def _err(code: str, message: str) -> dict:
-    return {"ok": False, "code": code, "message": message}
+def _err(code: str, message: str, reason: str | None = None) -> dict:
+    """reason ∈ wrong_password|wrong_account|bound|before_open(契约 1.2.0,
+    前端据此渲染拒绝三态文案;None=不分类,前端直显 message)。"""
+    out = {"ok": False, "code": code, "message": message}
+    if reason:
+        out["reason"] = reason
+    return out
 
 
 class GuiGuiApi:
@@ -73,8 +78,10 @@ class GuiGuiApi:
             misaligned = bool(saved.get("master", True))
         if misaligned and saved.get("master", True):
             notify.task_blocked()
+        # task_ok:任务在岗状态(契约 1.2.0;设置页「定时任务」行的数据源)
         self._emit("schedule:changed",
-                   {"master": saved["master"], "trigger_time": saved["trigger_time"]})
+                   {"master": saved["master"], "trigger_time": saved["trigger_time"],
+                    "task_ok": not misaligned})
 
     # ── 事件(契约 §3)──────────────────────────────
 
@@ -168,7 +175,15 @@ class GuiGuiApi:
             return _ok({"result": "success", "uid": drcom.mask_uid(uid),
                         "attempts": attempts, "verified": True})
         if result == drcom.REJECTED:
-            return _err(AUTH_REJECTED, "密码可能改过了,改下面的密码再点一次")
+            if ensure.before_anchor():
+                # 锚前被拒不判密码错误(4.1.2):明早开门后首拍真验证
+                return _err(AUTH_REJECTED,
+                            "还没到开门时间(06:50),明早开门后第一次自动登录会真验证",
+                            reason="before_open")
+            kind = drcom.classify_rejection(msg)
+            return _err(AUTH_REJECTED,
+                        drcom.rejection_text(kind, msg or "密码可能改过了,改下面的密码再点一次"),
+                        reason=kind)
         if result == drcom.UNREACHABLE:
             return _err(NET_UNREACHABLE, "现在够不着校园网")
         return _err(INTERNAL, msg or "认证服务器返回了不认识的格式")
@@ -203,7 +218,18 @@ class GuiGuiApi:
                 return _ok({"result": "success", "uid": drcom.mask_uid(uid),
                             "attempts": attempts, "verified": True})
             if result == drcom.REJECTED:
-                return _err(AUTH_REJECTED, "密码可能改过了,改下面的密码再点一次")
+                if ensure.before_anchor():
+                    # 4.1.2:开门前被拒不判「密码错误」— 密码先存着(未验证),明早首试真验证
+                    saved = self._store_credential(cfg, uid, operator, password, verified=False)
+                    if saved is None:
+                        return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+                    return _ok({"result": "stored", "uid": drcom.mask_uid(uid),
+                                "attempts": attempts, "verified": False,
+                                "reason": "before_open"})
+                kind = drcom.classify_rejection(msg)
+                return _err(AUTH_REJECTED,
+                            drcom.rejection_text(kind, msg or "密码被服务器拒绝了,核对一下再试"),
+                            reason=kind)
             if result == drcom.UNREACHABLE:
                 # 循环中途断网:密码没被否认,存了给明早一次机会
                 saved = self._store_credential(cfg, uid, operator, password, verified=False)
@@ -213,6 +239,12 @@ class GuiGuiApi:
             return _err(INTERNAL, msg or "认证服务器返回了不认识的格式")
 
         if net["state"] == detect.LOGGED_IN:
+            # 4.1.2:线上是别人的学号 → 提交等待行如实注明「验证时会先注销它」
+            online = drcom.chkstatus_uid(cfg["url"])
+            progress = {"phase": "logging_out"}
+            if online and online != uid:
+                progress["online_uid"] = drcom.mask_uid(online)
+            self._emit("login:progress", progress)
             used = drcom.logout(detect.portal_html(cfg), cfg["url"])
             flipped = False
             if used is not None:
@@ -232,10 +264,21 @@ class GuiGuiApi:
                     return _ok({"result": "success", "uid": drcom.mask_uid(uid),
                                 "attempts": tries, "verified": True})
                 if result == drcom.REJECTED:
+                    if ensure.before_anchor():
+                        # 跨过锚点的边缘:注销后已过 06:50 依旧被拒按锚前口径(存未验证)
+                        self._restore_network(cfg, old_uid, uid, old_pw)
+                        saved = self._store_credential(cfg, uid, operator, password,
+                                                       verified=False)
+                        if saved is None:
+                            return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+                        return _ok({"result": "stored", "uid": drcom.mask_uid(uid),
+                                    "attempts": tries, "verified": False,
+                                    "reason": "before_open"})
+                    kind = drcom.classify_rejection(msg)
                     restored = self._restore_network(cfg, old_uid, uid, old_pw)
-                    return _err(AUTH_REJECTED, "密码被服务器拒绝了" +
-                                (";已用旧密码把网接回来了,改对再点一次" if restored
-                                 else ";旧密码也没能接回网络,改对密码再点一次"))
+                    base = drcom.rejection_text(kind, msg or "密码被服务器拒绝了")
+                    return _err(AUTH_REJECTED, base + self._restore_suffix(restored),
+                                reason=kind)
                 if result == drcom.UNREACHABLE:
                     self._restore_network(cfg, old_uid, uid, old_pw)  # 尽力恢复,不看成败
                     saved = self._store_credential(cfg, uid, operator, password,
@@ -261,7 +304,9 @@ class GuiGuiApi:
 
     def _attempt_login(self, cfg: dict, uid: str, password: str,
                        operator: str) -> tuple[str, str, int]:
-        """重试节奏按配置(retries × interval),期间推进度事件。"""
+        """重试节奏按配置(retries × interval),期间推进度事件。
+
+        锚前(06:50 前)被拒直接收手 — 门没开,重试无意义(绝不暴力尝试)。"""
         retries = max(1, int(cfg.get("login_retries", 3)))
         interval = int(cfg.get("retry_seconds", 5))
         result, msg, attempts = drcom.UNREACHABLE, "", 0
@@ -272,11 +317,20 @@ class GuiGuiApi:
             result, msg = drcom.login(cfg["url"], uid, password, operator)
             if result == drcom.SUCCESS:
                 break
+            if result == drcom.REJECTED and ensure.before_anchor():
+                break
             if i < retries - 1:
                 self._emit("login:progress",
                            {"phase": "retrying", "attempt": attempts, "attempts": retries})
                 time.sleep(interval)
         return result, msg, attempts
+
+    @staticmethod
+    def _restore_suffix(restored: bool) -> str:
+        """拒绝后的网络恢复说明(4.1.2:首装没旧密码/恢复失败时如实说网先断着)。"""
+        if restored:
+            return ";已用旧密码把网接回来了,改对再点一次"
+        return ";网先断着,输对马上通"
 
     def _verify_login_once(self, cfg: dict, uid: str, password: str,
                            operator: str) -> tuple[str, str, int]:
@@ -402,11 +456,47 @@ class GuiGuiApi:
             if misaligned and value:
                 notify.task_blocked()
             self._emit("schedule:changed",
-                       {"master": saved["master"], "trigger_time": saved["trigger_time"]})
+                       {"master": saved["master"], "trigger_time": saved["trigger_time"],
+                        "task_ok": not misaligned})
             return _ok({"master": saved["master"]})
         except Exception:
             log.exception("api.masterToggle")
             return _err(SAVE_FAILED, "开关没切过去,再试一次")
+
+    # ── 2.13 taskStatus / rebuildTask(1.2.0 新增)──
+
+    def taskStatus(self) -> dict:
+        """定时任务在岗状态(AC-17,设置页「定时任务」行数据源)。"""
+        try:
+            cfg = config.load()
+            if not cfg.get("master", True):
+                # 总开关关着:任务本就不该存在,不是被拦
+                return _ok({"ok": True, "note": "off"})
+            ok_flag = scheduler.is_task_current(
+                scheduler.TASK_MAIN, cfg, require_logon=bool(cfg.get("boot_login")))
+            if ok_flag and cfg.get("patrol_enabled"):
+                ok_flag = scheduler.is_task_current(scheduler.TASK_PATROL, cfg)
+            return _ok({"ok": ok_flag})
+        except Exception:
+            log.exception("api.taskStatus")
+            return _err(INTERNAL, "任务状态查不出来,再试一次")
+
+    def rebuildTask(self) -> dict:
+        """一键重建定时任务 — 仅用户点击触发(8.5.2),绝不后台静默重建。"""
+        try:
+            cfg = config.load()
+            if cfg.get("master", True) and not _configured(cfg):
+                return _err(NOT_CONFIGURED, "还没完成首次开启,先去开启每日自动登录")
+            changed, misaligned = selfheal.reconcile(cfg)
+            if misaligned:
+                notify.task_blocked()
+            self._emit("schedule:changed",
+                       {"master": cfg["master"], "trigger_time": cfg["trigger_time"],
+                        "task_ok": not misaligned})
+            return _ok({"ok": not misaligned, "changed": changed})
+        except Exception:
+            log.exception("api.rebuildTask")
+            return _err(INTERNAL, "重建没成功,再试一次")
 
     # ── 2.9 logs ──────────────────────────────────
 
@@ -422,9 +512,11 @@ class GuiGuiApi:
 
     def recentResult(self) -> dict:
         try:
-            lr = ensure.load_state().get("last_result")
+            state = ensure.load_state()
+            lr = state.get("last_result")
             if not lr:
-                return _ok({"when": None, "time": None, "tries": 0, "outcome": "none"})
+                return _ok({"when": None, "time": None, "tries": 0,
+                            "outcome": "none", "verified": bool(state.get("cred_verified"))})
             import datetime as dt
 
             date = lr.get("date", "")
@@ -440,7 +532,8 @@ class GuiGuiApi:
             else:
                 when = None
             return _ok({"when": when, "time": lr.get("time"),
-                        "tries": lr.get("tries", 0), "outcome": lr.get("outcome", "none")})
+                        "tries": lr.get("tries", 0), "outcome": lr.get("outcome", "none"),
+                        "verified": bool(state.get("cred_verified"))})
         except Exception:
             log.exception("api.recentResult")
             return _err(INTERNAL, "昨晚的记录读不出来")

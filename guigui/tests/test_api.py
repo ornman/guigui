@@ -1,5 +1,6 @@
 """bridge api:契约形状(信封/错误码/事件/密码纪律)+ 关键分支。"""
 
+import datetime as dt
 import json
 import time
 
@@ -10,6 +11,9 @@ from guigui.app.api import GuiGuiApi
 from guigui.core import config, ensure
 
 _REAL_SLEEP = time.sleep   # 模块导入时绑定;Ctx 会全局打桩 time.sleep,_wait_for 需要真睡眠
+
+# 钉死在锚后(07:00 > 06:50):锚点分支否则随真实时刻漂移(清晨跑测试会变道)
+FIXED_NOW = dt.datetime(2026, 8, 31, 7, 0, 0)
 
 
 class FakeWindow:
@@ -50,6 +54,7 @@ class Ctx:
         self.scan = [{"ssid": "Campus-WiFi", "signal": "strong"}]
         self.connect_ok = True
         self.reconciled = []
+        self.task_current = True   # scheduler.is_task_current 桩返回值
 
         monkeypatch.setattr(api_mod.detect, "probe",
                             lambda cfg=None: dict(self.probe_seq.pop(0)) if self.probe_seq
@@ -77,7 +82,10 @@ class Ctx:
                             (self.rekey_calls.append((old, new, pw)) or None))
         monkeypatch.setattr(api_mod.selfheal, "reconcile",
                             lambda cfg: (self.reconciled.append(cfg["master"]), False))
+        monkeypatch.setattr(api_mod.scheduler, "is_task_current",
+                            lambda name, cfg, require_logon=False: self.task_current)
         monkeypatch.setattr(api_mod.time, "sleep", lambda s: None)
+        monkeypatch.setattr(api_mod.ensure, "_now", lambda: FIXED_NOW)
 
     def _login_stub(self, *a, **k):
         """drcom.login 桩:记录位置参数;seq 多于一条时逐次前进,末条重复。"""
@@ -146,8 +154,24 @@ def test_login_rejected_maps_auth_rejected(ctx):
     ctx.probe_state = {"state": "not_logged_in", "ssid": "x", "detail": ""}
     ctx.login_seq = [("rejected", "密码错误")]
     out = ctx.api.login({})
-    assert out == {"ok": False, "code": "AUTH_REJECTED",
-                   "message": "密码可能改过了,改下面的密码再点一次"}
+    # 不认识的拒绝:原文直显、不带 reason(前端不猜)
+    assert out == {"ok": False, "code": "AUTH_REJECTED", "message": "密码错误"}
+
+
+def test_login_rejected_three_states_carry_reason(ctx):
+    """AC-19:三态拒绝文案由后端拼好随 reason 下行,前端直显。"""
+    ctx.probe_state = {"state": "not_logged_in", "ssid": "x", "detail": ""}
+    for msg, reason, expect in (
+        ("userid error2", "wrong_password", "密码不对,改一下再试"),
+        ("userid error1", "wrong_account", "学号或运营商选错了,核对一下再试"),
+        ("bind userid error", "bound",
+         "密码是对的,但这个账号被绑在别处/受限 — 去自助服务平台看看绑定"),
+    ):
+        ctx.login_seq = [(msg and "rejected", msg)]
+        out = ctx.api.login({})
+        assert out["code"] == "AUTH_REJECTED" and out["reason"] == reason
+        assert out["message"] == expect
+        ctx.set_calls.clear()
 
 
 def test_login_unreachable_maps_net_unreachable(ctx):
@@ -437,9 +461,23 @@ def test_submit_password_offline_wrong_never_stored(ctx):
     ctx.probe_state = {"state": "not_logged_in", "ssid": "x", "detail": ""}
     ctx.login_seq = [("rejected", "密码错误")] * 3
     out = ctx.api.login({"sid": "2025000000001", "password": "bad"})
-    assert out == {"ok": False, "code": "AUTH_REJECTED",
-                   "message": "密码可能改过了,改下面的密码再点一次"}
+    assert out == {"ok": False, "code": "AUTH_REJECTED", "message": "密码错误"}
     assert ctx.set_calls == [] and ctx.rekey_calls == []
+
+
+def test_submit_password_before_open_stores_unverified(ctx, monkeypatch):
+    """4.1.2:06:50 前提交被拒 → 不判密码错误,存未验证,明早首试真验证。"""
+    ctx.probe_state = {"state": "not_logged_in", "ssid": "x", "detail": ""}
+    ctx.login_seq = [("rejected", "userid error2")]
+    monkeypatch.setattr(api_mod.ensure, "_now",
+                        lambda: dt.datetime(2026, 8, 31, 6, 30))
+    out = ctx.api.login({"sid": "2025000000001", "password": "pw"})
+    assert out["ok"] is True
+    assert out["data"] == {"result": "stored", "uid": "2025…0001", "attempts": 1,
+                           "verified": False, "reason": "before_open"}
+    assert ctx.set_calls == [("2025000000001", "pw")]     # 存了
+    assert ensure.load_state()["cred_verified"] is False  # 未验证
+    assert ctx.login_calls and len(ctx.login_calls) == 1  # 锚前单发收手,不重试
 
 
 def test_submit_password_offline_correct_stores_verified(ctx):
@@ -466,8 +504,56 @@ def test_submit_password_restore_fail_message(ctx):
     ctx.login_seq = [("rejected", "密码错误"), ("rejected", "再拒")]
     out = ctx.api.login({"sid": "2025000000001", "password": "garbage"})
     assert out["code"] == "AUTH_REJECTED"
-    assert "旧密码也没能接回" in out["message"]
+    assert "网先断着" in out["message"]          # 4.1.2:首装/恢复失败时的如实说法
     assert ctx.set_calls == []
+
+
+def test_ladder_discloses_other_online_uid(ctx):
+    """4.1.2:线上是别人的学号 → 注销前推 logging_out 事件如实注明。"""
+    _online_flip(ctx)
+    ctx.chk_uid = "2025090270999"
+    ctx.login_seq = [("success", "")]
+    ctx.api.login({"sid": "2025000000001", "password": "pw"})
+    events = [(t, p) for t, p in parse_emitted(ctx.window)
+              if t == "login:progress" and p.get("phase") == "logging_out"]
+    assert events and events[0][1]["online_uid"] == "2025…0999"
+
+
+# ── 任务在岗(AC-17,1.2.0)────────────────────────────────
+
+
+def test_task_status_ok_and_blocked(ctx):
+    assert ctx.api.taskStatus()["data"] == {"ok": True}
+    ctx.task_current = False
+    assert ctx.api.taskStatus()["data"]["ok"] is False
+
+
+def test_task_status_master_off_is_not_blocked(ctx):
+    config.save(dict(config.DEFAULTS, uid="2025000000001", master=False))
+    data = ctx.api.taskStatus()["data"]
+    assert data["ok"] is True and data.get("note") == "off"
+
+
+def test_rebuild_task_runs_reconcile_and_reports(ctx):
+    out = ctx.api.rebuildTask()
+    assert out["ok"] is True and out["data"]["ok"] is True
+    assert ctx.reconciled == [True]                     # 用户点击才重建
+    kinds = [t for t, p in parse_emitted(ctx.window)
+             if t == "schedule:changed" and "task_ok" in p]
+    assert kinds                                          # 事件带 task_ok
+
+
+def test_rebuild_task_unconfigured_refuses(ctx, monkeypatch):
+    c = Ctx(monkeypatch, cfg_over={"uid": ""})
+    monkeypatch.setattr(api_mod.vault, "has_password", lambda uid: False)
+    assert c.api.rebuildTask()["code"] == "NOT_CONFIGURED"
+
+
+def test_recent_result_carries_verified(ctx):
+    ensure.save_state({"cred_verified": True})
+    assert ctx.api.recentResult()["data"]["verified"] is True
+    ensure.save_state({"cred_verified": False})
+    assert ctx.api.recentResult()["data"]["verified"] is False
 
 
 def test_submit_password_logout_ineffective_falls_back(ctx):

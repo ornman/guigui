@@ -91,3 +91,35 @@ def query(days: int = DEFAULT_DAYS, level: str | None = None) -> list[dict]:
             label += " · 假期静默"
         out.append({"label": label, "entries": entries})
     return out
+
+
+def cleanup_old(keep_days: int = MAX_DAYS, *, today: dt.date | None = None) -> int:
+    """删除超过 keep_days 天的日志文件(AC-18)。
+
+    只匹配桂桂自己的命名(YYYY-MM-DD.jsonl)且只动 logs/ 目录;
+    删除失败不抛(日志卫生不该把主流程打挂)。返回删除数。
+    """
+    import re as _re
+
+    today = today or _now().date()
+    cutoff = today - dt.timedelta(days=keep_days)
+    try:
+        files = list(paths.logs_dir().glob("*.jsonl"))
+    except OSError:
+        return 0
+    removed = 0
+    for p in files:
+        m = _re.match(r"^(\d{4}-\d{2}-\d{2})\.jsonl$", p.name)
+        if not m:
+            continue  # 不是桂桂命名习惯的文件,一律不碰
+        try:
+            d = dt.date.fromisoformat(m.group(1))
+        except ValueError:
+            continue
+        if d < cutoff:
+            try:
+                p.unlink()
+                removed += 1
+            except OSError as e:
+                log.warning("logstore: 清理 %s 失败: %s", p.name, e)
+    return removed

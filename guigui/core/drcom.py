@@ -30,6 +30,35 @@ REJECTED = "rejected"      # 服务器应答 result!=1(密码被拒等)
 UNEXPECTED = "unexpected"  # 响应不是 JSONP(维护页/劫持页)
 UNREACHABLE = "unreachable"
 
+# 拒绝三态(PRD 4.1.2 实测表,2026-09-06 隔离测试床):
+# error1=账号+运营商组合不存在;error2=密码不对;bind=密码正确但绑定/接入区域被拦。
+REJ_WRONG_PASSWORD = "wrong_password"
+REJ_WRONG_ACCOUNT = "wrong_account"
+REJ_BOUND = "bound"
+
+
+def classify_rejection(msg: str | None) -> str | None:
+    """把服务器拒绝文案归类为三态之一;不认识返回 None(原文展示,不猜)。"""
+    msg = str(msg or "")
+    if "bind userid error" in msg:
+        return REJ_BOUND
+    if "userid error2" in msg:
+        return REJ_WRONG_PASSWORD
+    if "userid error1" in msg:
+        return REJ_WRONG_ACCOUNT
+    return None
+
+
+def rejection_text(kind: str | None, fallback: str) -> str:
+    """三态人话文案单一来源(信封 message 直显用)。None → fallback 原样。"""
+    if kind == REJ_WRONG_ACCOUNT:
+        return "学号或运营商选错了,核对一下再试"
+    if kind == REJ_WRONG_PASSWORD:
+        return "密码不对,改一下再试"
+    if kind == REJ_BOUND:
+        return "密码是对的,但这个账号被绑在别处/受限 — 去自助服务平台看看绑定"
+    return fallback
+
 # 门户后缀表(2026-08-31 从注销页 carrier 配置实测抓全,共 4 项;
 # 默认校园用户=裸学号)。运行时从门户拉取列为增强(技术方案 §14.8)。
 OPERATOR_TABLE: dict[str, str] = {

@@ -4,6 +4,8 @@
 等门(waiting→轮询 30s/上限 10min)、L4 WiFi 兜底、假期静默
 (连续 48h 不可达 → 每天只探 1 次不通知,silent 级日志)、
 收工幂等(last_settle_date,后续拍秒退)、last_result(recentResult 数据源)。
+2026-09-06 重梳理:开门锚点 06:50(锚前失败三不管)、被拒当拍即弹、
+凭证可信度仅 error2 置假、线上他人学号如实记录、日志 >90 天清理。
 """
 
 from __future__ import annotations
@@ -22,19 +24,30 @@ log = logging.getLogger(__name__)
 
 _now = dt.datetime.now  # 测试可注入
 
+# 开门锚点(PRD 4.5/4.6,校园实测:认证服务器每天 06:50 前不接受登录)。
+# 非用户配置 — 是校园侧事实;锚点行为待真机窗口期复核(PRD 8.5.3)。
+ANCHOR_TIME = (6, 50)
+
+
+def before_anchor(when: dt.datetime | None = None) -> bool:
+    """当前时刻是否在当日开门锚点(06:50)之前。"""
+    when = when or _now()
+    return (when.hour, when.minute) < ANCHOR_TIME
+
 
 def _default_state() -> dict:
     return {
         "last_net_state": None,          # up | down | failed | None(首跑)
         "last_recovered_notify_date": None,
-        "consecutive_fail": 0,
-        "fail_notify_sent": False,
+        "fail_notify_date": None,        # 当拍即弹的每日闸(AC-13)
+        "maintenance_streak": 0,         # 维护页(格式不认识)连续拍数
+        "maintenance_notify_date": None,
         "unreachable_streak": 0,
         "last_unreachable_date": None,
         "silent": False,
         "last_settle_date": None,
         "last_result": None,             # {date, time, tries, outcome}
-        "cred_verified": False,          # 凭证是否经服务器真验证(在线存入未验证 / 真登录成功翻 True)
+        "cred_verified": False,          # 凭证是否经服务器真验证(仅 error2 置假,§7.3)
     }
 
 
@@ -76,7 +89,10 @@ def _is_early(cfg: dict, when: dt.datetime | None = None) -> bool:
 
 
 def _attempt_login(cfg: dict, uid: str, password: str) -> tuple[str, int, str]:
-    """单轮登录:retries 次 × retry_seconds 间隔。返回 (最终分类, 尝试次数, msg)。"""
+    """单轮登录:retries 次 × retry_seconds 间隔。返回 (最终分类, 尝试次数, msg)。
+
+    锚前(06:50 前)被拒直接收手 — 门都没开,重试只是对着墙敲门(绝不暴力尝试)。
+    """
     result, msg = drcom.UNREACHABLE, ""
     tries = 0
     for i in range(max(1, cfg["login_retries"])):
@@ -84,6 +100,8 @@ def _attempt_login(cfg: dict, uid: str, password: str) -> tuple[str, int, str]:
         result, msg = drcom.login(cfg["url"], uid, password,
                                   cfg.get("operator", "校园用户"))
         if result == drcom.SUCCESS:
+            break
+        if result == drcom.REJECTED and before_anchor():
             break
         if i < cfg["login_retries"] - 1:
             time.sleep(cfg["retry_seconds"])
@@ -129,9 +147,18 @@ def _ensure_online(cfg: dict, uid: str, password: str, allow_fallback: bool = Tr
 
 
 def _settle_rows(cfg: dict, uid: str, tries: int) -> None:
-    """当日首次成功:网络可达 / 已登录·打码 / 开门即试或收工(§5.3)。"""
+    """当日首次成功:网络可达 / 已登录·打码(线上他人学号如实记录)/ 开门即试或收工(§5.3)。"""
     logstore.append("ok", "网络可达", when=_now())
-    logstore.append("ok", f"已登录 · {drcom.mask_uid(uid)}", when=_now())
+    shown_uid = uid
+    if tries == 0:
+        # 桂桂没动手就在线:查线上真实学号(只读 chkstatus),他人会话只记日志不打扰(4.6)
+        online = drcom.chkstatus_uid(cfg["url"])
+        if online:
+            shown_uid = online
+            if online != uid:
+                logstore.append("note", f"线上的是 {drcom.mask_uid(online)}(不是配置的学号,只记录)",
+                                when=_now())
+    logstore.append("ok", f"已登录 · {drcom.mask_uid(shown_uid)}", when=_now())
     if _is_early(cfg):
         logstore.append("ok", "开门即试,一次登好 ✓", when=_now())
     else:
@@ -139,20 +166,26 @@ def _settle_rows(cfg: dict, uid: str, tries: int) -> None:
 
 
 def _apply_notify(cfg: dict, state: dict, *, connected: bool,
-                  login_attempted: bool, login_succeeded: bool) -> None:
-    """去重决策 + 发送 + 状态合并(connected 分支由调用方先置好其他键)。"""
+                  outcome: str | None = None) -> None:
+    """去重决策 + 发送 + 状态合并(connected 分支由调用方先置好其他键)。
+
+    锚前分支不会走到这(run() 已提前收线);此处 outcome 仅传失败形态。
+    """
     kind, updates = notify.decide_notify(
         state.get("last_net_state"), connected=connected,
-        login_attempted=login_attempted, login_succeeded=login_succeeded,
-        consecutive_fail=state.get("consecutive_fail", 0),
-        fail_notify_sent=state.get("fail_notify_sent", False),
+        outcome=outcome, before_anchor=False,
+        maintenance_streak=state.get("maintenance_streak", 0),
         last_recovered_date=state.get("last_recovered_notify_date"),
+        fail_notify_date=state.get("fail_notify_date"),
+        maintenance_notify_date=state.get("maintenance_notify_date"),
         today=_today(),
     )
     state.update(updates)
     if kind and cfg.get("notifications", True):
         if kind == notify.RECOVERED:
             notify.send("已连上 ✓", "网络回来了", notify.LAUNCH_MAIN)
+        elif kind == notify.MAINTENANCE:
+            notify.send("桂桂一直登不上", "点开看看", notify.LAUNCH_MAIN)
         else:
             notify.send("登录失败,密码改了?", "点这里改一下密码", notify.LAUNCH_CREDS)
 
@@ -166,13 +199,13 @@ def _apply_settle(cfg: dict, state: dict, today: str, uid: str, tries: int) -> N
     _settle_rows(cfg, uid, tries)
     state.update({
         "last_settle_date": today,
-        "consecutive_fail": 0, "fail_notify_sent": False,
+        "fail_notify_date": None, "maintenance_streak": 0,
+        "maintenance_notify_date": None,
         "unreachable_streak": 0, "silent": False,
         "last_result": {"date": today, "time": _now().strftime("%H:%M"),
                         "tries": tries, "outcome": "ok"},
     })
-    _apply_notify(cfg, state, connected=True,
-                  login_attempted=tries > 0, login_succeeded=True)
+    _apply_notify(cfg, state, connected=True, outcome=None)
 
 
 def settle_from_gui(cfg: dict, uid: str, tries: int) -> None:
@@ -201,6 +234,14 @@ def run() -> int:
 
     state = load_state()
     today = _today()
+
+    # 假期静默同日:进门即退,零探测请求(AC-10「每天只探 1 次」的字面兑现)
+    if state.get("silent") and state.get("last_unreachable_date") == today:
+        return 0
+
+    # 日志卫生:每拍顺带清一次 >90 天的日志文件(AC-18,只动桂桂自己目录)
+    logstore.cleanup_old()
+
     outcome, tries, msg = _ensure_online(cfg, uid, password)
 
     if outcome == "settled":
@@ -212,15 +253,29 @@ def run() -> int:
         save_state(state)
         return 0
 
+    # 开门锚点(AC-12):06:50 前的被拒/不可达一律只算「还没开门」—
+    # 不判失败、不计数、不通知、不动 cred_verified、不进假期静默状态机
+    if before_anchor():
+        logstore.append("note", "还没开门(06:50 前),等下一拍", when=_now())
+        save_state(state)
+        return 0
+
     if outcome in ("rejected", "unexpected"):
-        state["consecutive_fail"] = state.get("consecutive_fail", 0) + 1
-        state["cred_verified"] = False
-        text = "登录被拒:密码可能改过了" if outcome == "rejected" else "认证服务器返回了不认识的格式"
+        kind = drcom.classify_rejection(msg) if outcome == "rejected" else None
+        if outcome == "rejected":
+            text = "登录被拒:" + drcom.rejection_text(kind, msg or "密码可能改过了")
+            state["maintenance_streak"] = 0
+        else:
+            text = "认证服务器返回了不认识的格式"
+            state["maintenance_streak"] = state.get("maintenance_streak", 0) + 1
         logstore.append("fail", text, when=_now())
+        # 凭证可信度(§7.3):置假仅一条路 — 服务器明确说密码不对(error2);
+        # error1/bind/维护页都不冤枉密码
+        if outcome == "rejected" and kind == drcom.REJ_WRONG_PASSWORD:
+            state["cred_verified"] = False
         state["last_result"] = {"date": today, "time": _now().strftime("%H:%M"),
                                 "tries": tries, "outcome": "fail"}
-        _apply_notify(cfg, state, connected=False,
-                      login_attempted=True, login_succeeded=False)
+        _apply_notify(cfg, state, connected=False, outcome=outcome)
         save_state(state)
         return 0
 
@@ -242,7 +297,6 @@ def run() -> int:
                             "tries": 0, "outcome": "silent" if silent else "fail"},
         })
     # 同日后续拍:不重复记日志/不更新 last_result,只走通知判断(永不通知)
-    _apply_notify(cfg, state, connected=False,
-                  login_attempted=False, login_succeeded=False)
+    _apply_notify(cfg, state, connected=False, outcome=None)
     save_state(state)
     return 0

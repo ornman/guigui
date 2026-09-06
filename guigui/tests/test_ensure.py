@@ -1,17 +1,19 @@
-"""ensure:收工幂等/等门/被拒×3/假期静默/L4 兜底/恢复通知(全 mock + 固定时钟)。"""
+"""ensure:收工幂等/等门/锚点/当拍即弹/可信度语义/假期静默/L4 兜底(全 mock + 固定时钟)。"""
 
 import datetime as dt
 
 from guigui.core import config, ensure, logstore
 
-FIXED = dt.datetime(2026, 8, 31, 7, 0, 1)
+FIXED = dt.datetime(2026, 8, 31, 7, 0, 1)      # 锚后(>06:50)
+BEFORE_OPEN = dt.datetime(2026, 8, 31, 6, 30)  # 锚前(<06:50,窗口期)
 
 
 class Harness:
-    """按场景组装 mock:probe 序列 / login 序列 / wifi / 通知。"""
+    """按场景组装 mock:probe 序列 / login 序列 / chkstatus / wifi / 通知。"""
 
     def __init__(self, monkeypatch, *, cfg_over=None, probe_seq=None,
-                 login_seq=None, connect_ok=True, password="pw123"):
+                 login_seq=None, connect_ok=True, password="pw123",
+                 online_uid="2025000000001"):
         over = {"uid": "2025000000001"}
         over.update(cfg_over or {})
         self.cfg = config.save(dict(config.DEFAULTS, **over))
@@ -19,23 +21,38 @@ class Harness:
         self.logins = list(login_seq or [("success", "")])
         self.connect_calls = []
         self.gate_calls = []
+        self.probe_calls = 0
+        self.login_calls = 0
         self.sent = []
+        self.online_uid = online_uid
 
         monkeypatch.setattr(ensure, "_now", lambda: self.now)
         monkeypatch.setattr(logstore, "_now", lambda: self.now)
         self.now = FIXED
         monkeypatch.setattr(ensure.vault, "get_password", lambda uid: password)
-        monkeypatch.setattr(ensure.detect, "probe", lambda cfg=None: self._pop(self.probes))
+        monkeypatch.setattr(ensure.detect, "probe",
+                            lambda cfg=None: self._probe())
         monkeypatch.setattr(ensure.detect, "wait_for_gate",
                             lambda *a, **k: self.gate_calls.append(1) or True)
         monkeypatch.setattr(ensure.drcom, "login",
-                            lambda *a, **k: self._pop(self.logins))
+                            lambda *a, **k: self._login())
+        # 收工时线上真实学号(只读 chkstatus,PRD 4.6 他人会话如实记录)
+        monkeypatch.setattr(ensure.drcom, "chkstatus_uid",
+                            lambda base, timeout=5: self.online_uid)
         monkeypatch.setattr(ensure.time, "sleep", lambda s: None)
         monkeypatch.setattr(ensure.wifictl, "connect",
                             lambda ssid, timeout=90, progress=None:
                             self.connect_calls.append(ssid) or connect_ok)
         monkeypatch.setattr(ensure.notify, "send",
                             lambda t, m, launch=None: self.sent.append((t, launch)))
+
+    def _probe(self):
+        self.probe_calls += 1
+        return self._pop(self.probes)
+
+    def _login(self):
+        self.login_calls += 1
+        return self._pop(self.logins)
 
     @staticmethod
     def _pop(seq):
@@ -89,31 +106,94 @@ def test_early_success_uses_open_door_line(monkeypatch):
     assert h.today_entries()[-1]["text"] == "开门即试,一次登好 ✓"
 
 
-def test_rejected_three_runs_notify_once(monkeypatch):
+def test_rejected_notifies_immediately_once_per_day(monkeypatch):
+    """AC-13:开门后被拒当拍即弹(不再等 3 次),每日 ≤1。"""
     h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
-                login_seq=[("rejected", "密码错误")])
-    for _ in range(3):
-        h.run()
-    state = ensure.load_state()
-    assert state["consecutive_fail"] == 3
-    assert state["fail_notify_sent"] is True
+                login_seq=[("rejected", "userid error2")])
+    h.run()
     assert len(h.sent) == 1 and h.sent[0][1] == "guigui://creds"
-    assert h.today_entries()[-1]["text"] == "登录被拒:密码可能改过了"
-    # 第 4 拍:锁存不再发
-    h.run()
+    state = ensure.load_state()
+    assert state["fail_notify_date"] == "2026-08-31"
+    assert h.today_entries()[-1]["text"] == "登录被拒:密码不对,改一下再试"
+    h.run()                                          # 同日第二拍:不再弹
     assert len(h.sent) == 1
-    assert state["last_result"]["outcome"] == "fail"
 
 
-def test_success_resets_fail_counters(monkeypatch):
+def test_success_resets_fail_gate(monkeypatch):
     h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
-                login_seq=[("rejected", "x")])
+                login_seq=[("rejected", "userid error2")])
     h.run()
+    assert ensure.load_state()["fail_notify_date"] == "2026-08-31"
     h.probes = [{"state": "not_logged_in"}]
     h.logins = [("success", "")]
     h.run()
     state = ensure.load_state()
-    assert state["consecutive_fail"] == 0 and state["fail_notify_sent"] is False
+    assert state["fail_notify_date"] is None and state["maintenance_streak"] == 0
+
+
+def test_before_anchor_rejection_quarantined(monkeypatch):
+    """AC-12:06:50 前被拒 — 只记「还没开门」,不判失败/不通知/不清可信度/单发收手。"""
+    st = ensure.load_state(); st["cred_verified"] = True; ensure.save_state(st)
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("rejected", "userid error2")])
+    h.now = BEFORE_OPEN
+    h.run()
+    assert [e["text"] for e in h.today_entries()] == ["还没开门(06:50 前),等下一拍"]
+    assert h.sent == []                                # 不通知
+    assert h.login_calls == 1                          # 锚前被拒不重试(对墙敲门无意义)
+    state = ensure.load_state()
+    assert state["cred_verified"] is True              # 不冤枉密码
+    assert state["last_result"] is None                # 不判失败
+
+
+def test_before_anchor_unreachable_waits_for_open(monkeypatch):
+    """锚前不可达同样只记「还没开门」,不进假期静默状态机(防窗口期误累计)。"""
+    h = Harness(monkeypatch, probe_seq=[{"state": "unreachable"}])
+    h.now = BEFORE_OPEN
+    h.run()
+    state = ensure.load_state()
+    assert state["unreachable_streak"] == 0
+    assert state["last_unreachable_date"] is None
+    assert h.today_entries()[-1]["text"] == "还没开门(06:50 前),等下一拍"
+
+
+def test_bind_and_error1_keep_cred_verified(monkeypatch):
+    """§7.3:置假仅 error2 一条路;bind / error1 不冤枉密码(但依旧当拍即弹)。"""
+    st = ensure.load_state(); st["cred_verified"] = True; ensure.save_state(st)
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("rejected", "bind userid error")])
+    h.run()
+    assert ensure.load_state()["cred_verified"] is True
+    assert any("自助服务平台" in e["text"] for e in h.today_entries())
+    assert len(h.sent) == 1                            # 明确被拒仍即时通知
+    st = ensure.load_state(); st["cred_verified"] = True; ensure.save_state(st)
+    h2 = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                 login_seq=[("rejected", "userid error1")])
+    h2.run()
+    assert ensure.load_state()["cred_verified"] is True
+    assert any("学号或运营商" in e["text"] for e in h2.today_entries())
+
+
+def test_unknown_rejection_passthrough_keeps_verified(monkeypatch):
+    """不认识的拒绝原文进日志,可信度不动(不猜)。"""
+    st = ensure.load_state(); st["cred_verified"] = True; ensure.save_state(st)
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("rejected", "奇怪的新错误")])
+    h.run()
+    assert ensure.load_state()["cred_verified"] is True
+    assert h.today_entries()[-1]["text"] == "登录被拒:奇怪的新错误"
+
+
+def test_maintenance_page_three_beats_then_notify(monkeypatch):
+    """维护页:连续 ≥3 拍才弹(点开看主面板),每日一次。"""
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("unexpected", "维护页")])
+    h.run(); h.run()
+    assert h.sent == []
+    h.run()
+    assert len(h.sent) == 1 and h.sent[0][1] == "guigui://main"
+    h.run()
+    assert len(h.sent) == 1
 
 
 def test_waiting_then_gate_opens_then_settle(monkeypatch):
@@ -143,16 +223,28 @@ def test_vacation_silence_two_days(monkeypatch):
     assert n_before == n_after
 
 
-def test_silence_recovers_on_reachable(monkeypatch):
+def test_silence_recovers_next_day(monkeypatch):
+    h = Harness(monkeypatch, probe_seq=[{"state": "unreachable"}])
+    h.run()                                             # 第 1 天:普通不可达
+    h.now = FIXED + dt.timedelta(days=1)
+    h.run()                                             # 第 2 天 → 静默
+    assert ensure.load_state()["silent"] is True
+    h.now = FIXED + dt.timedelta(days=2)                # 第 3 天回校 → 恢复
+    h.probes = [{"state": "logged_in"}]
+    h.run()
+    state = ensure.load_state()
+    assert state["silent"] is False and state["unreachable_streak"] == 0
+
+
+def test_silent_same_day_beat_probes_nothing(monkeypatch):
+    """AC-10:静默日同日后续拍零探测(每天只探 1 次的字面兑现)。"""
     h = Harness(monkeypatch, probe_seq=[{"state": "unreachable"}])
     h.run()
     h.now = FIXED + dt.timedelta(days=1)
     h.run()                                             # 进入静默
-    assert ensure.load_state()["silent"] is True
-    h.probes = [{"state": "logged_in"}]                 # 回校
-    h.run()
-    state = ensure.load_state()
-    assert state["silent"] is False and state["unreachable_streak"] == 0
+    n_probes = h.probe_calls
+    h.run()                                             # 同日下一拍
+    assert h.probe_calls == n_probes                    # 一发探测都没发
 
 
 def test_recovered_notify_once_per_day(monkeypatch):
@@ -203,9 +295,9 @@ def test_cred_verified_true_after_real_login(monkeypatch):
     assert ensure.load_state()["cred_verified"] is True
 
 
-def test_cred_verified_false_on_rejected(monkeypatch):
+def test_cred_verified_false_on_error2(monkeypatch):
     h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
-                login_seq=[("rejected", "密码错误")])
+                login_seq=[("rejected", "userid error2")])
     h.run()
     assert ensure.load_state()["cred_verified"] is False
 
@@ -215,3 +307,14 @@ def test_cred_verified_default_false_when_already_online(monkeypatch):
     h = Harness(monkeypatch)                               # 默认 probe=logged_in → tries=0
     h.run()
     assert ensure.load_state()["cred_verified"] is False   # 在线存入未验证,不翻 True
+
+
+def test_settle_other_uid_recorded_not_disturbing(monkeypatch):
+    """4.6:线上是别人的学号 → 日志如实记一行,照常收工,不横幅不通知。"""
+    h = Harness(monkeypatch, online_uid="2025090270999")
+    h.run()
+    texts = [e["text"] for e in h.today_entries()]
+    assert "已登录 · 2025…0999" in texts                   # 记线上真实学号
+    assert any(t.startswith("线上的是 2025…0999") for t in texts)
+    assert h.sent == []
+    assert ensure.load_state()["last_result"]["outcome"] == "ok"

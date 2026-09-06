@@ -2,7 +2,9 @@
 
 - 通道移植 v1 src/notify.py(ShellExperienceHost AppId,零依赖生产验证);
   升级:toast 带 activationType=protocol,点击按路由唤起 GUI(技术方案 §9)。
-- decide_notify 是纯函数:v1 ensure.py:23-46 的状态翻转去重 + 连败×3 + 每日一次。
+- decide_notify 是纯函数:PRD §4.5 语义(2026-09-06 重梳理)—
+  开门后明确被拒当拍即弹(每日≤1)/ 维护页连续≥3拍才弹(每日≤1)/
+  断→通每日 1 次 / 锚前(06:50 前)一切失败永不通知。
 """
 
 from __future__ import annotations
@@ -15,7 +17,8 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 RECOVERED = "recovered"
-FAILED = "failed"
+FAILED = "failed"            # 开门后明确被拒 → 当拍即弹(PRD 4.5)
+MAINTENANCE = "maintenance"  # 维护页连续 ≥3 拍(PRD 4.5)
 
 LAUNCH_MAIN = "guigui://main"
 LAUNCH_CREDS = "guigui://creds"
@@ -82,14 +85,22 @@ def task_blocked() -> None:
 
 
 def decide_notify(prev_state: str | None, *, connected: bool,
-                  login_attempted: bool, login_succeeded: bool,
-                  consecutive_fail: int, fail_notify_sent: bool,
-                  last_recovered_date: str | None, today: str,
+                  outcome: str | None = None,
+                  before_anchor: bool = False, maintenance_streak: int = 0,
+                  last_recovered_date: str | None = None,
+                  fail_notify_date: str | None = None,
+                  maintenance_notify_date: str | None = None,
+                  today: str = "",
                   ) -> tuple[str | None, dict]:
-    """根据上次持久化状态与本次结果,决定通知种类与状态更新。
+    """根据上次持久化状态与本次结果,决定通知种类与状态更新(PRD 4.5)。
+
+    Args:
+        outcome: 本拍失败形态 — "rejected"(服务器明确拒绝)| "unexpected"(维护页)
+                 | None(不可达/未尝试登录)。
+        before_anchor: 06:50 开门前 → 一切失败只算「还没开门」,不算断网事件。
 
     Returns:
-        (notify_kind, updates):kind ∈ recovered | failed | None;
+        (notify_kind, updates):kind ∈ recovered | failed | maintenance | None;
         updates 为需要合并进 ensure_state 的键值(last_net_state 等)。
     """
     if connected:
@@ -101,14 +112,22 @@ def decide_notify(prev_state: str | None, *, connected: bool,
                 kind = RECOVERED
                 updates["last_recovered_notify_date"] = today
         return kind, updates
-    if login_attempted and not login_succeeded:
+    if before_anchor:
+        # 锚前被拒/不可达:不判失败、不发通知、不动 net_state(防窗口期错怪,AC-12)
+        return None, {}
+    if outcome == "rejected":
+        # 开门后明确被拒:当拍即弹,每日 ≤1 次(AC-13)
         updates = {"last_net_state": "failed"}
-        kind = None
-        if consecutive_fail >= 3 and not fail_notify_sent:
-            kind = FAILED
-            updates["fail_notify_sent"] = True
-        return kind, updates
-    # 不可达(未尝试登录):只记 down,不通知(防刷屏,v1 行为)
+        if fail_notify_date != today:
+            return FAILED, {**updates, "fail_notify_date": today}
+        return None, updates
+    if outcome == "unexpected":
+        # 维护页:连续 ≥3 拍才弹,每日 ≤1 次
+        updates = {"last_net_state": "failed"}
+        if maintenance_streak >= 3 and maintenance_notify_date != today:
+            return MAINTENANCE, {**updates, "maintenance_notify_date": today}
+        return None, updates
+    # 不可达(未尝试登录):只记 down,不通知(防刷屏)
     return None, {"last_net_state": "down"}
 
 

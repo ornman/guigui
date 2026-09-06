@@ -1,4 +1,4 @@
-"""notify:去重决策全表 + Toast 脚本(协议激活)+ XML 转义 + 协议注册。"""
+"""notify:去重决策全表(PRD 4.5,2026-09-06 换代)+ Toast 脚本 + XML 转义 + 协议注册。"""
 
 import sys
 import types
@@ -6,57 +6,71 @@ import types
 from guigui.core import notify
 
 
-# ── decide_notify(AC-04 全表)─────────────────────────────
+# ── decide_notify(PRD 4.5 全表)─────────────────────────────
 
 
 def test_first_run_online_no_notify():
-    kind, updates = notify.decide_notify(
-        None, connected=True, login_attempted=False, login_succeeded=False,
-        consecutive_fail=0, fail_notify_sent=False, last_recovered_date=None,
-        today="2026-08-31")
+    kind, updates = notify.decide_notify(None, connected=True, today="2026-09-06")
     assert kind is None and updates["last_net_state"] == "up"
 
 
 def test_broken_to_online_recovers_once_per_day():
-    kw = dict(connected=True, login_attempted=True, login_succeeded=True,
-              consecutive_fail=0, fail_notify_sent=False)
+    kw = dict(connected=True, today="2026-09-06")
     kind, updates = notify.decide_notify(
-        "down", last_recovered_date=None, today="2026-08-31", **kw)
+        "down", last_recovered_date=None, **kw)
     assert kind == notify.RECOVERED
-    assert updates["last_recovered_notify_date"] == "2026-08-31"
+    assert updates["last_recovered_notify_date"] == "2026-09-06"
     # 同日第二次翻转:不再发
     kind2, _ = notify.decide_notify(
-        "down", last_recovered_date="2026-08-31", today="2026-08-31", **kw)
+        "down", last_recovered_date="2026-09-06", **kw)
     assert kind2 is None
     # 次日再断→通:再发
     kind3, _ = notify.decide_notify(
-        "failed", last_recovered_date="2026-08-31", today="2026-09-01", **kw)
+        "failed", last_recovered_date="2026-09-06", connected=True, today="2026-09-07")
     assert kind3 == notify.RECOVERED
 
 
-def test_fail_notify_after_three_streaks_then_latch():
-    kw = dict(connected=False, login_attempted=True, login_succeeded=False,
-              last_recovered_date=None, today="2026-08-31")
-    # 第 1、2 拍:不通知
-    for n in (1, 2):
-        kind, _ = notify.decide_notify(
-            "failed", consecutive_fail=n, fail_notify_sent=False, **kw)
+def test_rejected_notifies_immediately_once_per_day():
+    """AC-13:开门后明确被拒当拍即弹,每日 ≤1 次(不再等连败×3)。"""
+    kw = dict(connected=False, outcome="rejected", today="2026-09-06")
+    kind, updates = notify.decide_notify("failed", fail_notify_date=None, **kw)
+    assert kind == notify.FAILED and updates["fail_notify_date"] == "2026-09-06"
+    # 同日第二拍:不再发
+    kind2, _ = notify.decide_notify("failed", fail_notify_date="2026-09-06", **kw)
+    assert kind2 is None
+    # 次日:闸门重开,再弹
+    kind3, _ = notify.decide_notify(
+        "failed", fail_notify_date="2026-09-06", connected=False,
+        outcome="rejected", today="2026-09-07")
+    assert kind3 == notify.FAILED
+
+
+def test_maintenance_needs_three_beats_then_daily_once():
+    """维护页(格式不认识):连续 ≥3 拍才弹,每日 ≤1 次。"""
+    kw = dict(connected=False, outcome="unexpected", today="2026-09-06")
+    for streak in (1, 2):
+        kind, _ = notify.decide_notify("failed", maintenance_streak=streak, **kw)
         assert kind is None
-    # 第 3 拍:发一次
-    kind, updates = notify.decide_notify(
-        "failed", consecutive_fail=3, fail_notify_sent=False, **kw)
-    assert kind == notify.FAILED and updates["fail_notify_sent"] is True
-    # 第 4 拍:锁存,不再发
-    kind, _ = notify.decide_notify(
-        "failed", consecutive_fail=4, fail_notify_sent=True, **kw)
-    assert kind is None
+    kind, updates = notify.decide_notify("failed", maintenance_streak=3, **kw)
+    assert kind == notify.MAINTENANCE
+    assert updates["maintenance_notify_date"] == "2026-09-06"
+    kind2, _ = notify.decide_notify(
+        "failed", maintenance_streak=4, maintenance_notify_date="2026-09-06", **kw)
+    assert kind2 is None
+
+
+def test_before_anchor_never_notifies():
+    """AC-12:06:50 前的被拒/维护/不可达一律不算断网事件,零通知零状态。"""
+    for outcome in ("rejected", "unexpected", None):
+        kind, updates = notify.decide_notify(
+            "down", connected=False, outcome=outcome, before_anchor=True,
+            today="2026-09-06")
+        assert kind is None and updates == {}
 
 
 def test_unreachable_never_notifies():
     kind, updates = notify.decide_notify(
-        "down", connected=False, login_attempted=False, login_succeeded=False,
-        consecutive_fail=0, fail_notify_sent=False, last_recovered_date=None,
-        today="2026-08-31")
+        "down", connected=False, outcome=None, today="2026-09-06")
     assert kind is None and updates["last_net_state"] == "down"
 
 

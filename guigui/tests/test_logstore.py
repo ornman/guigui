@@ -70,3 +70,29 @@ def test_bad_lines_skipped():
     p.write_text("not json\n" + '{"ts":"07:00:00","level":"ok","text":"好行"}\n', encoding="utf-8")
     entries = logstore.read_day(dt.date.today())
     assert len(entries) == 1 and entries[0]["text"] == "好行"
+
+
+# ── >90 天清理(AC-18)────────────────────────────────────
+
+
+def test_cleanup_old_removes_only_our_old_files():
+    logs = logstore.paths.logs_dir()
+    logs.mkdir(parents=True, exist_ok=True)
+    old = logs / "2026-06-01.jsonl"          # 97 天前(> 90)
+    edge = logs / "2026-06-08.jsonl"         # 90 天整(保留,cutoff 语义为「早于」)
+    fresh = logs / "2026-09-06.jsonl"
+    foreign = logs / "2026-01-01.txt"        # 不是桂桂命名 → 一律不碰
+    for p in (old, edge, fresh, foreign):
+        p.write_text('{"ts":"07:00:00","level":"ok","text":"x"}\n', encoding="utf-8")
+    removed = logstore.cleanup_old(keep_days=90, today=dt.date(2026, 9, 6))
+    assert removed == 1
+    assert not old.exists()
+    assert edge.exists() and fresh.exists() and foreign.exists()
+
+
+def test_cleanup_old_survives_garbage_names():
+    logs = logstore.paths.logs_dir()
+    logs.mkdir(parents=True, exist_ok=True)
+    (logs / "not-a-date.jsonl").write_text("x", encoding="utf-8")
+    assert logstore.cleanup_old(keep_days=90, today=dt.date(2026, 9, 6)) == 0
+    assert (logs / "not-a-date.jsonl").exists()

@@ -180,3 +180,22 @@ def test_campus_other_is_bare_uid():
     assert drcom.operator_suffix("校园其他") == ""
     url = drcom.build_login_url("http://x", "u", "p", operator="校园其他")
     assert "DDDDD=u&" in url                       # 裸学号,无后缀
+
+
+# ── 拒绝三态分类(AC-19,2026-09-06 实测)────────────────
+
+
+def test_classify_rejection_three_states():
+    assert drcom.classify_rejection("userid error2") == drcom.REJ_WRONG_PASSWORD
+    assert drcom.classify_rejection("userid error1") == drcom.REJ_WRONG_ACCOUNT
+    assert drcom.classify_rejection("bind userid error") == drcom.REJ_BOUND
+    assert drcom.classify_rejection("服务器维护中") is None      # 不认识 → 不猜
+    assert drcom.classify_rejection("") is None
+    assert drcom.classify_rejection(None) is None
+
+
+def test_rejection_text_three_states_and_fallback():
+    assert drcom.rejection_text(drcom.REJ_WRONG_ACCOUNT, "兜底") == "学号或运营商选错了,核对一下再试"
+    assert drcom.rejection_text(drcom.REJ_WRONG_PASSWORD, "兜底") == "密码不对,改一下再试"
+    assert "自助服务平台" in drcom.rejection_text(drcom.REJ_BOUND, "兜底")
+    assert drcom.rejection_text(None, "原文照显") == "原文照显"
