@@ -44,3 +44,6 @@ legacy-v1/docs/screenshots/
 # guigui 打包产物
 .venv-guigui/
 guigui/Output/
+
+# Git worktrees (isolated dev spaces)
+.worktrees/
