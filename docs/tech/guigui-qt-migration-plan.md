@@ -46,6 +46,25 @@
 
 **任一关不过 → 停,写结论归档,沉没成本 2 天。** 这是"大胆"的保险丝。
 
+**M0 实测结果(2026-09-06,worktree qt-migration,PySide6 6.11.2 / Python 3.12):**
+
+- 关1 圆角:**过**。无边框透明窗 + radius 8 + MultiEffect 阴影,实拍确认
+  圆角平滑、无黑/白/紫角残留、阴影柔和;拖拽走 `startSystemMove()` 原生路径。
+- 关2 字体:**过**。思源宋体 VF 三档字重(Light/Normal/Bold)渲染区别明显、
+  无豆腐;Inter 正常。
+- 关3 动画:**过(渲染能力)**。Shape 路径眼型 + SpringAnimation + Particles
+  500 粒彩带全部工作(内存峰值 265MB 即粒子发射实证);bot 状态切换的
+  逐帧手感留 M2 复刻时对照 CSS 数值细验。
+- 基线:冷启动 0.55-1.6s(含 import);稳态 RSS **121-123MB —— 超 <80MB
+  目标**,与 WebView2 版同量级(未瘦身)。列入 M4:按需 import + 裁 Qt 模块
+  + `QT_QPA_` 平台插件白名单,实测再定;若仍 >100MB,如实告知用户权衡。
+- 踩坑(踩三连环):QML `letterSpacing` 须挂 font 上、Emitter 无 `gravity`
+  属性(用 acceleration)、`font.pixelSize` 不收小数;QML 加载失败时窗口
+  全透明隐身(rootObject=None)。另:`QScreen.grabWindow` 抓的是合成画面,
+  窗口被遮挡即抓空,spike 截图验收必须在窗口无遮挡时进行。
+
+**结论:三关通过,M0 放行进 M1。**
+
 ### M1 · 壳(1-2 天)
 
 - `qtapp/main.py`:QApplication + 无边框窗口 + 标题行拖拽(mousePressEvent,
@@ -55,6 +74,17 @@
 - 删除等价物:rgn 全家、region keeper、Resize/LocationChanged 钩子。
 
 ### M2 · 视图迁移(核心三视图 3-5 天;全 8 视图 + 组件库 1-2 周)
+
+> **硬验收(用户 2026-09-06 拍板):100% 还原现在页面 UI。**
+> 现版 `app/static/index.html` 是唯一基准,不允许"近似复刻/QML 风格化"。
+> 每个视图迁移完成的判定方法:
+> 1. **并排对照**:同场景数据(mock 9 场景)下,web 版与 Qt 版同屏截图并排;
+> 2. **量化验收**:截图按视图关键区域(标题/表单/按钮/开关/下拉/日志行)
+>    做像素 diff,色差(ΔRGB 均值)与布局偏移(元素 bbox 中心距离)达标
+>    才算过 — 口径:颜色 perceptually 等价(OKLCH→hex 已有 sRGB 兜底映射,
+>    同色值直译)、字号/间距按 CSS 数值直译(DPI 换算一致)、圆角半径逐值对齐;
+> 3. **交互态全验**:hover/press/focus/disabled/leaving 过渡逐一对照,
+>    动效时长与缓动曲线从 CSS 数值直译(transition/animation 秒数照抄)。
 
 迁移顺序(由简到繁、先主干后枝叶):
 
