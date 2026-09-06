@@ -613,7 +613,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div id="log-days"></div>
     </div>
 
-    <!-- 高级设置(账号置顶 → 每日自动登录 → 保底 → 系统 → 进阶) -->
+    <!-- 高级设置(2026-09-07 重排,同类聚齐:何时登 → 补登录时机 → 断网保险 → 失败节奏 → 提醒 → 系统 → 求助;两种重试间隔并排对照,不再各埋一处) -->
     <div class="v" id="v-settings">
       <button class="back" onclick="backFrom('v-settings')">‹ 返回</button>
       <h1 style="font-size:22px">高级设置</h1>
@@ -635,44 +635,49 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
           <button class="preset" data-t="08:00">08:00</button>
         </div>
       </div>
-      <div class="micro-line">直接输入,或点常用时间 · 校园网 06:50 才开门 · 我提前 30 分钟开始试,登好就收工</div>
-      <div class="row"><div><div class="t">开机时补登录</div><div class="d">开机或重新登录系统时,桂桂顺手登一次</div></div>
+      <div class="micro-line">校园网 06:50 才开门</div>
+
+      <div class="tiny-label">补登录</div>
+      <div class="row"><div><div class="t">开机时补登录</div></div>
         <div class="sw on" data-cfg="boot_login" onclick="toggleCfg(this)"></div></div>
-      <div class="row"><div><div class="t">窗口内重试间隔</div><div class="d">登上就停,不浪费探测</div></div>
-        <div class="dd" data-cfg-key="heartbeat_minutes"><button class="dd-btn"><span class="dd-label">5 分钟</span><span class="car">▼</span></button>
-          <div class="dd-menu"><button class="on" data-v="5">5 分钟 <span class="ck">✓</span></button><button data-v="10">10 分钟 <span class="ck">✓</span></button><button data-v="15">15 分钟 <span class="ck">✓</span></button></div></div></div>
+      <div class="row"><div><div class="t">睡眠唤醒补登录</div></div>
+        <div class="sw" data-cfg="wake_login" onclick="toggleCfg(this)"></div></div>
 
       <div class="tiny-label">保底机制</div>
       <div class="row"><div><div class="t">WiFi 兜底</div><div class="d">认证服务器连不上时,自动切到下面选的网络</div></div>
         <div class="sw" id="sw-fallback" onclick="toggleFallback()"></div></div>
       <div id="fallback-pick" style="display:none;padding:6px 0 2px"></div>
-      <div class="row"><div><div class="t">白天巡逻</div><div class="d">白天意外断网时,自动悄悄重连</div></div>
+      <div class="row"><div><div class="t">白天巡逻</div><div class="d">意外断网时,悄悄重连</div></div>
         <div class="sw" data-cfg="patrol_enabled" onclick="toggleCfg(this)"></div></div>
-      <div class="row"><div><div class="t">巡逻间隔</div><div class="d">断网后每 N 分钟试一次</div></div>
+      <div class="row"><div><div class="t">巡逻间隔</div></div>
         <div class="dd" data-cfg-key="patrol_minutes"><button class="dd-btn"><span class="dd-label">30 分钟</span><span class="car">▼</span></button>
           <div class="dd-menu"><button data-v="15">15 分钟 <span class="ck">✓</span></button><button class="on" data-v="30">30 分钟 <span class="ck">✓</span></button><button data-v="60">60 分钟 <span class="ck">✓</span></button></div></div></div>
-      <div class="row"><div><div class="t">睡眠唤醒补登录</div><div class="d">合盖再打开 30 秒后补一次(笔记本推荐)</div></div>
-        <div class="sw" data-cfg="wake_login" onclick="toggleCfg(this)"></div></div>
       <div class="row"><div><div class="t">假期静默</div><div class="d">连续 2 天连不上(放假回家了?),自动降为每天 1 次、不打扰</div></div>
         <div class="sw on" data-cfg="vacation_silence" onclick="toggleCfg(this)"></div></div>
 
-      <div class="tiny-label">系统</div>
-      <div class="row"><div><div class="t">弹通知</div><div class="d">断网恢复、登录失败时才说,平时不打扰</div></div>
-        <div class="sw on" data-cfg="notifications" onclick="toggleCfg(this)"></div></div>
-      <div class="row"><div><div class="t">显示桂桂</div><div class="d">关掉后主页不再显示小桂桂,功能不受影响</div></div>
-        <div class="sw on" id="sw-gui" onclick="toggleGui(this)"></div></div>
-      <div class="row"><div><div class="t">后台自动化</div><div class="d">总开关:关掉后桂桂就退休,不再自动登录(与主页开关同步)</div></div>
-        <div class="sw on" id="sw-auto-set" onclick="toggleAuto()"></div></div>
-      <div class="row"><div><div class="t">定时任务</div><div class="d" id="task-status-d">…</div></div>
-        <button class="link" id="task-rebuild" style="display:none;margin-top:0;font-size:12.5px;white-space:nowrap" onclick="rebuildTask()">点此重建</button></div>
-
-      <div class="tiny-label">进阶</div>
-      <div class="row"><div><div class="t">登录失败重试</div><div class="d">单轮登录失败后,再试几回</div></div>
+      <div class="tiny-label">重试</div>
+      <div class="row"><div><div class="t">登录失败重试</div></div>
         <div class="dd" data-cfg-key="login_retries"><button class="dd-btn"><span class="dd-label">3 次</span><span class="car">▼</span></button>
           <div class="dd-menu"><button data-v="1">1 次 <span class="ck">✓</span></button><button class="on" data-v="3">3 次 <span class="ck">✓</span></button><button data-v="5">5 次 <span class="ck">✓</span></button></div></div></div>
-      <div class="row"><div><div class="t">重试间隔</div><div class="d">每次失败后歇一歇再试</div></div>
+      <div class="row"><div><div class="t">失败后重试间隔</div><div class="d">单轮里两次尝试之间,歇几秒再试</div></div>
         <div class="dd" data-cfg-key="retry_seconds"><button class="dd-btn"><span class="dd-label">5 秒</span><span class="car">▼</span></button>
           <div class="dd-menu"><button class="on" data-v="5">5 秒 <span class="ck">✓</span></button><button data-v="10">10 秒 <span class="ck">✓</span></button><button data-v="30">30 秒 <span class="ck">✓</span></button></div></div></div>
+      <div class="row"><div><div class="t">窗口内重试间隔</div><div class="d">早上窗口内每隔几分钟试一轮,登上就停</div></div>
+        <div class="dd" data-cfg-key="heartbeat_minutes"><button class="dd-btn"><span class="dd-label">5 分钟</span><span class="car">▼</span></button>
+          <div class="dd-menu"><button class="on" data-v="5">5 分钟 <span class="ck">✓</span></button><button data-v="10">10 分钟 <span class="ck">✓</span></button><button data-v="15">15 分钟 <span class="ck">✓</span></button></div></div></div>
+
+      <div class="tiny-label">提醒</div>
+      <div class="row"><div><div class="t">弹通知</div><div class="d">只在断网恢复、登录失败时说</div></div>
+        <div class="sw on" data-cfg="notifications" onclick="toggleCfg(this)"></div></div>
+
+      <div class="tiny-label">系统</div>
+      <div class="row"><div><div class="t">显示桂桂</div></div>
+        <div class="sw on" id="sw-gui" onclick="toggleGui(this)"></div></div>
+      <div class="row"><div><div class="t">定时任务</div><div class="d" id="task-status-d" style="display:none"></div></div>
+        <button class="link" id="task-rebuild" style="display:none;margin-top:0;font-size:12.5px;white-space:nowrap" onclick="rebuildTask()">点此重建</button></div>
+      <div class="row"><div><div class="t">后台自动化</div><div class="d">总开关,与主页开关同步</div></div>
+        <div class="sw on" id="sw-auto-set" onclick="toggleAuto()"></div></div>
+
       <div class="row"><div><div class="t">遇见问题?</div><div class="d">一键复制打码诊断信息,发给谁都不泄密</div></div>
         <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openDetail('v-feedback')">反馈</button></div>
       <div style="height:8px"></div>
@@ -1132,10 +1137,11 @@ GG.on('schedule:changed',e=>{
   if(e&&typeof e.master==='boolean')setAuto(e.master);
   if(e&&typeof e.task_ok==='boolean')renderTaskRow(e.task_ok);
 });
-/* 定时任务在岗状态(AC-17):在岗 ✓ / 被拦点此重建;重建仅用户点击触发 */
+/* 定时任务(AC-17):在岗不打扰(说明行隐藏),被拦才说话并给「点此重建」;重建仅用户点击触发 */
 function renderTaskRow(okk){
   const d=$('task-status-d'),b=$('task-rebuild');if(!d)return;
-  d.textContent=okk?'在岗 ✓ 每天到点开工':'被拦了,自动登录还没生效';
+  d.textContent=okk?'':'被拦了,自动登录还没生效';
+  d.style.display=okk?'none':'block';
   if(b)b.style.display=okk?'none':'inline-block';
 }
 async function rebuildTask(){
