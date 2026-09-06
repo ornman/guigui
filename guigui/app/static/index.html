@@ -220,7 +220,11 @@ input{width:100%;padding:11px 14px;border:1px solid oklch(60% 0.01 295 / 0.35);
   border-radius:12px;background:oklch(100% 0 0 / 0.6);font:15px/1.5 inherit;font-family:inherit;
   color:var(--ink);transition:border-color .18s,box-shadow .18s}
 input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-/* 密码框小眼睛:明文/隐藏切换(类名避开 bot 的 .eye 眼睛路径) */
+/* 密码框小眼睛:明文/隐藏切换(类名避开 bot 的 .eye 眼睛路径)。
+   WebView2/Chromium 对 type=password 另有原生密码揭示按钮(::-ms-reveal),
+   输入时自动出现,会和自绘眼睛叠成两个 — 一并禁掉 */
+input[type=password]::-ms-reveal,
+input[type=password]::-ms-clear{display:none}
 .pw-wrap{position:relative}
 .pw-wrap input{padding-right:46px}
 .pw-eye{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:34px;height:34px;
@@ -439,10 +443,16 @@ body.backdrop-black .taskbar{display:none}
 html.in-app,html.in-app body{background:transparent}
 html.in-app body::before{display:none}
 html.in-app body{padding:0}
-/* 圆角对齐系统窗口裁剪(gui.py SetWindowRgn = 8px):卡片若仍 22px,
-   角落会露出 WebView2 底色楔形(黑色块);两层弧线必须一致 */
-html.in-app .window{border-radius:8px}
-html.in-app #fx{border-radius:8px}
+/* 圆角对齐系统窗口裁剪:gui.py SetWindowRgn 半径 = 8px×DPI 取整。
+   CSS 这里取 9px 故意大一号 — 渲染后的卡片弧必大于裁剪弧,卡片颜料盖满
+   裁剪区内每一像素;取相等(8px)时 CSS 抗锯齿软边外会露 WebView 底色浅紫。
+   两层弧线必须保持 9 > 8 */
+html.in-app .window{border-radius:9px}
+html.in-app #fx{border-radius:9px}
+/* 外投影只属于浏览器黑底原型舞台;真窗口里卡片贴满窗格,两层黑投影
+   (0 24px 70px 黑/0.5 + 0 2px 8px 黑/0.3)全画在四角裁剪楔形上 = 黑角。
+   窗口与桌面的层次感交给系统,只保留内侧高光描边 */
+html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 0 oklch(100% 0 0 / 0.25)}
 </style>
 
 </head>
