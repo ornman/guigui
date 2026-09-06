@@ -220,10 +220,6 @@ input{width:100%;padding:11px 14px;border:1px solid oklch(60% 0.01 295 / 0.35);
   border-radius:12px;background:oklch(100% 0 0 / 0.6);font:15px/1.5 inherit;font-family:inherit;
   color:var(--ink);transition:border-color .18s,box-shadow .18s}
 input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-/* 密码遮罩圆点:Chromium 掩码点大小只跟字号 — 20px 出大圆点+放宽字距;
-   占位提示独立回 15px,与学号框视觉一致(不然「请输入密码」也跟着变大) */
-input[type=password]{font-size:20px;letter-spacing:.18em;line-height:22px}
-input[type=password]::placeholder{font-size:15px;letter-spacing:normal;line-height:22px}
 /* 密码框小眼睛:明文/隐藏切换(类名避开 bot 的 .eye 眼睛路径) */
 .pw-wrap{position:relative}
 .pw-wrap input{padding-right:46px}
@@ -443,11 +439,10 @@ body.backdrop-black .taskbar{display:none}
 html.in-app,html.in-app body{background:transparent}
 html.in-app body::before{display:none}
 html.in-app body{padding:0}
-/* 圆角对齐系统窗口裁剪(gui.py SetWindowRgn = 8px×DPI):CSS 取 9px 故意大 1px,
-   让卡片绘制弧线永远盖过裁剪弧 —— 否则 DPI 缩放取整差 1-2 物理像素时,
-   角上会露出壳底色浅紫边(2026-09-06 150% 屏实测);两层弧线必须保持 9>8 */
-html.in-app .window{border-radius:9px}
-html.in-app #fx{border-radius:9px}
+/* 圆角对齐系统窗口裁剪(gui.py SetWindowRgn = 8px):卡片若仍 22px,
+   角落会露出 WebView2 底色楔形(黑色块);两层弧线必须一致 */
+html.in-app .window{border-radius:8px}
+html.in-app #fx{border-radius:8px}
 </style>
 
 </head>
