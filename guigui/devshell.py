@@ -3,8 +3,10 @@
 以 pywebview(WebView2)加载 app/static,验证无边框窗口下的
 圆角/字体/拖拽保真;数据走 dev/mock.js(?dev=1 开发开关),窗口控制为真。
 
-窗口圆角:SetWindowRgn 裁剪(实测 WinForms+WebView2 做不到真透明,
-transparent=True 只透到窗体底色,四角露白;配方详见契约「集成待办」)。
+窗口圆角/SetWindowRgn 裁剪/壳底色三者必须与正式壳 gui.py 同参 —— devshell 带
+js_api,app.js 会挂 html.in-app(CSS 卡片弧随之变 9px);曾停留在原型配方
+(裁剪 22px + 深墨紫底色)时,in-app 卡片弧 9px 远小于裁剪弧 22px,四角
+露出深底色月牙 = 黑角(2026-09-06 实码定位,db6947f 引入 9px 后失配)。
 用法:python guigui/devshell.py [scene]   scene ∈ ok|out|down|waiting|daily|rejected(默认 ok)
 """
 import ctypes
@@ -18,7 +20,7 @@ import threading
 import webview
 
 ROOT = pathlib.Path(__file__).parent / "app" / "static"
-CORNER_CSS_PX = 22  # 设计 token:卡片圆角(PRD 原型 .window border-radius)
+CORNER_CSS_PX = 8   # 与 gui.py 同款:Win11 系统窗口圆角;CSS 卡片 9px 必须盖过此弧
 
 
 class _NoCache(http.server.SimpleHTTPRequestHandler):
@@ -33,9 +35,9 @@ class _NoCache(http.server.SimpleHTTPRequestHandler):
 
 
 def _apply_rounded_region():
-    """窗口裁成圆角:半径 = 22 CSS px × DPI 缩放。
+    """窗口裁成圆角:半径 = 8 CSS px × DPI 缩放(gui.py 同款;in-app 卡片弧 9px 盖过此弧)。
     注意 shadow 必须为 False —— pywebview 的 DWM 阴影 hack 会在圆角外铺白边(实测);
-    background_color 取 --ink 深色,兜圆角弧线与 CSS 卡片弧线间的亚像素缝隙。"""
+    background_color 取卡片浅底,兜圆角弧线与 CSS 卡片弧线间的亚像素缝隙。"""
     w = webview.windows[0]
     form = w.native
     hwnd = form.Handle.ToInt64()
@@ -78,7 +80,7 @@ def main():
         frameless=True,
         resizable=False,
         shadow=False,                # DWM 阴影 hack 会铺白边,禁用(见 _apply_rounded_region 注释)
-        background_color="#2b2740",  # ≈ --ink,兜圆角弧线亚像素缝隙
+        background_color="#e9e7f2",  # gui.py SHELL_BG 同款:卡片浅紫,兜弧线亚像素缝隙(深色会在四角露黑月牙)
         easy_drag=False,             # 与正式壳同款:只许标题行拖窗(.pywebview-drag-region)
     )
     win.events.before_show += _apply_rounded_region
