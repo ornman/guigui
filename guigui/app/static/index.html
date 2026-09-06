@@ -651,6 +651,8 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
         <div class="sw on" id="sw-auto-set" onclick="toggleAuto()"></div></div>
       <div class="row"><div><div class="t">账号与密码</div><div class="d">改学号 / 密码 / 运营商,提交当场走同一验证,通过才替换</div></div>
         <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openDetail('v-login')">修改</button></div>
+      <div class="row"><div><div class="t">自助服务平台</div><div class="d">学校的官方门户 · 改密码 / 查流量 / 解绑设备</div></div>
+        <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openSelfService(this)">打开</button></div>
       <div class="row"><div><div class="t">定时任务</div><div class="d" id="task-status-d">…</div></div>
         <button class="link" id="task-rebuild" style="display:none;margin-top:0;font-size:12.5px;white-space:nowrap" onclick="rebuildTask()">点此重建</button></div>
 
@@ -1120,6 +1122,11 @@ async function rebuildTask(){
   const r=await GG.api.rebuildTask();
   if(b)b.textContent='点此重建';
   if(r.ok)renderTaskRow(r.data.ok);
+}
+/* 自助服务平台:交系统默认浏览器,桂桂本体内不开网页;失败就地报,不弹窗 */
+async function openSelfService(btn){
+  const r=await GG.api.openSelfService();
+  if(!r.ok&&btn){btn.textContent='没能打开';setTimeout(()=>btn.textContent='打开',2000)}
 }
 /* ═══ F3 数据渲染层:硬编码内容 → 契约数据;生成的标记与 PRD 原型逐字节一致 ═══ */
 const SIGNAL_TXT={strong:'信号强',medium:'信号中',weak:'信号弱'};

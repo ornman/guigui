@@ -33,6 +33,9 @@ NOT_CONFIGURED = "NOT_CONFIGURED"
 SAVE_FAILED = "SAVE_FAILED"
 INTERNAL = "INTERNAL"
 
+# 学校自助服务平台(改密码 / 查流量 / 解绑设备)— openSelfService 交默认浏览器打开
+SELF_SERVICE_URL = "https://bcs.guat.edu.cn/Cas/Login?appid=71999680"
+
 
 def _configured(cfg: dict) -> bool:
     """首装完成判定:学号已存且凭据管理器里有密码(契约 §4 单行道终点)。"""
@@ -564,4 +567,15 @@ class GuiGuiApi:
                 self._window.destroy()   # 关闭=退出 GUI,自动化不受影响(方案 §10)
         except Exception:
             log.warning("api.winClose 失败")
+        return _ok({})
+
+    def openSelfService(self) -> dict:
+        """自助服务平台交系统默认浏览器;桂桂本体内不开网页(GUI 低频,感知面仅通知)。"""
+        import webbrowser
+
+        try:
+            webbrowser.open(SELF_SERVICE_URL)
+        except Exception:
+            log.exception("api.openSelfService")
+            return _err(INTERNAL, "浏览器没能打开,再试一次")
         return _ok({})

@@ -167,6 +167,7 @@ window.GGMock={
     return OK({text:lines.join('\n')});
   },
   async winMinimize(){},
-  async winClose(){}
+  async winClose(){},
+  async openSelfService(){window.open('https://bcs.guat.edu.cn/Cas/Login?appid=71999680','_blank')}
 };
 })();
