@@ -69,6 +69,19 @@ OPERATOR_TABLE: dict[str, str] = {
 }
 DEFAULT_OPERATOR = "校园用户"
 
+# 展示别名(2026-09-06 用户拍板):办了移动/广电套餐的学生按习惯选自家运营商,
+# 协议侧归一到「校园其他」(空后缀)— 移动/广电不在门户 carrier 配置里(双页实测,
+# 门户渲染器由 a41/a40.js 从 carrier 配置生成选项,无第五项),属套餐口径非登录后缀。
+OPERATOR_ALIASES: dict[str, str] = {
+    "中国移动": "校园其他",
+    "中国广电": "校园其他",
+}
+
+
+def canonical_operator(operator: str | None) -> str:
+    """展示名 → 协议名(别名归一);协议名/未知值原样返回。"""
+    return OPERATOR_ALIASES.get(operator or "", operator or DEFAULT_OPERATOR)
+
 
 def parse_operators(portal_html: str) -> dict[str, str]:
     """从门户页 carrier 配置解析运营商表(name → suffix)。
@@ -87,7 +100,7 @@ def parse_operators(portal_html: str) -> dict[str, str]:
 
 
 def operator_suffix(operator: str | None) -> str:
-    return OPERATOR_TABLE.get(operator or DEFAULT_OPERATOR, "")
+    return OPERATOR_TABLE.get(canonical_operator(operator), "")
 
 
 def build_login_url(base: str, uid: str, password: str,

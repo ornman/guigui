@@ -110,11 +110,12 @@ def validate(cfg: dict) -> dict:
             ok = isinstance(value, int) and not isinstance(value, bool) and value in _ENUMS[key]
             result[key] = value if ok else fallback
         elif key == "operator":
-            ok = isinstance(value, str) and value in drcom.OPERATOR_TABLE
+            ok = isinstance(value, str) and (
+                value in drcom.OPERATOR_TABLE or value in drcom.OPERATOR_ALIASES)
             result[key] = value if ok else fallback
             if not ok and value != fallback:
                 log.warning("config 'operator': %r 不在枚举 %s — 默认 %r",
-                            value, "/".join(drcom.OPERATOR_TABLE), fallback)
+                            value, "/".join([*drcom.OPERATOR_TABLE, *drcom.OPERATOR_ALIASES]), fallback)
         elif key == "wifi_fallback_ssid":
             ok = value is None or (isinstance(value, str) and value.strip())
             result[key] = value if ok else fallback
@@ -194,8 +195,10 @@ def apply_patch(cfg: dict, patch: dict) -> dict:
                 allowed = "/".join(str(v) for v in sorted(_ENUMS[key]))
                 raise ConfigError(f"{key} 只能取 {allowed}")
         if key == "operator":
-            if not isinstance(value, str) or value not in drcom.OPERATOR_TABLE:
-                raise ConfigError("运营商只能选 " + "/".join(drcom.OPERATOR_TABLE))
+            if not isinstance(value, str) or not (
+                    value in drcom.OPERATOR_TABLE or value in drcom.OPERATOR_ALIASES):
+                raise ConfigError("运营商只能选 " + "/".join(
+                    [*drcom.OPERATOR_TABLE, *drcom.OPERATOR_ALIASES]))
         if key == "wifi_fallback_ssid":
             if value is not None and (not isinstance(value, str) or not value.strip()):
                 raise ConfigError("兜底网络需从扫描列表选择")

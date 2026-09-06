@@ -197,7 +197,8 @@ class GuiGuiApi:
         门户不给注销配置或注销无效则降级存入(verified=false);
         失败时用旧凭据把网接回来(注销是破坏性动作,得给用户留条退路)。"""
         operator = payload.get("operator")
-        if not (isinstance(operator, str) and operator in drcom.OPERATOR_TABLE):
+        if not (isinstance(operator, str) and (
+                operator in drcom.OPERATOR_TABLE or operator in drcom.OPERATOR_ALIASES)):
             operator = cfg.get("operator") or drcom.DEFAULT_OPERATOR
         uid = sid or cfg.get("uid") or ""
         if not uid:

@@ -271,13 +271,19 @@ input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--a
   cursor:pointer;transition:border-color .15s,background .15s,color .15s}
 .preset:hover{border-color:var(--accent-2)}
 .preset.on{background:var(--ink);color:oklch(97% 0.005 295);border-color:var(--ink)}
-/* 学号行:输入框 + 运营商自绘下拉并排(登录用户名 = 学号+后缀,下拉是后缀的可视化) */
-.sid-row{display:flex;gap:8px;align-items:stretch}
-.sid-row input{flex:1 1 auto;min-width:0}
-.sid-row .dd-btn{min-width:104px;justify-content:space-between;border-radius:12px;
-  border-color:oklch(60% 0.01 295 / 0.35);background:oklch(100% 0 0 / 0.6);font-size:12.5px}
-/* 菜单与按钮严格同宽:左右边缘对齐按钮列,不再向左探出 */
-.sid-row .dd-menu{min-width:0;width:100%}
+/* 学号 = 复合输入组:输入框 + 运营商后缀下拉连体共享边框(登录用户名 = 学号+后缀)。
+   边框/聚焦环挂在组上,内部件透明;下拉按钮与输入区以内侧细分隔线分界 */
+.sid-row{display:flex;align-items:stretch;border:1px solid oklch(60% 0.01 295 / 0.35);
+  border-radius:12px;background:oklch(100% 0 0 / 0.6);transition:border-color .18s,box-shadow .18s}
+.sid-row:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.sid-row input{flex:1 1 auto;min-width:0;border:none;background:transparent;box-shadow:none}
+.sid-row input:focus{outline:none;border:none;box-shadow:none}
+.sid-row .dd{flex-shrink:0;display:flex}
+.sid-row .dd-btn{border:none;background:transparent;min-width:108px;justify-content:space-between;
+  border-left:1px solid oklch(60% 0.01 295 / 0.22);border-radius:0 12px 12px 0;font-size:12.5px}
+.sid-row .dd-btn:hover{background:oklch(58% 0.15 295 / 0.06)}
+/* 菜单与下拉区严格同宽(左右边缘对齐);六项全高可见不滚动 */
+.sid-row .dd-menu{min-width:0;width:100%;max-height:300px}
 /* 历史日志视图 */
 .day{margin-bottom:16px}
 .day-h{font-family:Inter,"PingFang SC",sans-serif;font-size:10.5px;font-weight:600;
@@ -476,6 +482,8 @@ html.in-app #fx{border-radius:8px}
             <button type="button" class="on" data-op="校园用户">校园用户 <span class="ck">✓</span></button>
             <button type="button" data-op="校园电信">校园电信 <span class="ck">✓</span></button>
             <button type="button" data-op="校园联通">校园联通 <span class="ck">✓</span></button>
+            <button type="button" data-op="中国移动">中国移动 <span class="ck">✓</span></button>
+            <button type="button" data-op="中国广电">中国广电 <span class="ck">✓</span></button>
             <button type="button" data-op="校园其他">校园其他 <span class="ck">✓</span></button>
           </div></div></div></div>
       <div class="f"><label>密码</label>
@@ -503,6 +511,8 @@ html.in-app #fx{border-radius:8px}
             <button type="button" class="on" data-op="校园用户">校园用户 <span class="ck">✓</span></button>
             <button type="button" data-op="校园电信">校园电信 <span class="ck">✓</span></button>
             <button type="button" data-op="校园联通">校园联通 <span class="ck">✓</span></button>
+            <button type="button" data-op="中国移动">中国移动 <span class="ck">✓</span></button>
+            <button type="button" data-op="中国广电">中国广电 <span class="ck">✓</span></button>
             <button type="button" data-op="校园其他">校园其他 <span class="ck">✓</span></button>
           </div></div></div></div>
       <div class="f"><label>密码</label>

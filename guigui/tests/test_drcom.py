@@ -199,3 +199,22 @@ def test_rejection_text_three_states_and_fallback():
     assert drcom.rejection_text(drcom.REJ_WRONG_PASSWORD, "兜底") == "密码不对,改一下再试"
     assert "自助服务平台" in drcom.rejection_text(drcom.REJ_BOUND, "兜底")
     assert drcom.rejection_text(None, "原文照显") == "原文照显"
+
+
+# ── 展示别名(移动/广电 → 校园其他,2026-09-06 用户拍板)────
+
+
+def test_operator_aliases_map_to_empty_suffix():
+    assert drcom.canonical_operator("中国移动") == "校园其他"
+    assert drcom.canonical_operator("中国广电") == "校园其他"
+    assert drcom.canonical_operator("校园电信") == "校园电信"   # 协议名原样
+    assert drcom.canonical_operator(None) == "校园用户"
+    assert drcom.canonical_operator("乱写") == "乱写"            # 未知原样(不猜)
+    assert drcom.operator_suffix("中国移动") == ""               # 空后缀 = 校园其他同落点
+    url = drcom.build_login_url("http://x", "u", "p", operator="中国移动")
+    assert "DDDDD=u%40" not in url and "DDDDD=u&" in url        # 裸学号
+
+
+def test_protocol_table_untouched_by_aliases():
+    # AC-20:协议表仍与门户 carrier 配置逐字一致(别名只在展示层)
+    assert set(drcom.OPERATOR_TABLE) == {"校园用户", "校园电信", "校园联通", "校园其他"}

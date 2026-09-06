@@ -72,7 +72,7 @@ def test_operator_default_value():
 
 
 def test_validate_invalid_operator_falls_back():
-    out = config.validate({**config.DEFAULTS, "operator": "中国移动"})
+    out = config.validate({**config.DEFAULTS, "operator": "乱写的运营商"})
     assert out["operator"] == "校园用户"
     out = config.validate({**config.DEFAULTS, "operator": 123})      # 类型错也回退
     assert out["operator"] == "校园用户"
@@ -83,7 +83,7 @@ def test_validate_invalid_operator_falls_back():
 def test_apply_patch_rejects_unknown_operator():
     cfg = dict(config.DEFAULTS)
     with pytest.raises(config.ConfigError, match="运营商"):
-        config.apply_patch(cfg, {"operator": "中国移动"})
+        config.apply_patch(cfg, {"operator": "乱写的运营商"})
 
 
 def test_apply_patch_accepts_valid_operator():
@@ -102,3 +102,11 @@ def test_operator_campus_other_valid_roundtrip():
     assert out["operator"] == "校园其他"
     ok = config.apply_patch(config.load(), {"operator": "校园其他"})
     assert ok["operator"] == "校园其他"
+
+
+def test_operator_alias_accepted():
+    # 2026-09-06:展示别名(移动/广电)合法入配置,登录侧归一到校园其他(空后缀)
+    out = config.validate({**config.DEFAULTS, "operator": "中国移动"})
+    assert out["operator"] == "中国移动"
+    merged = config.apply_patch(dict(config.DEFAULTS), {"operator": "中国广电"})
+    assert merged["operator"] == "中国广电"
