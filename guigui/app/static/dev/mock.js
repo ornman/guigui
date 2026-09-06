@@ -9,7 +9,10 @@
      down      首装·不可达,当前网是热点「iphone17 pro max」(仪式 → v-guide)
      waiting   日常·网络未就绪(bootWait 等门,约 3.2s 门开推 net:state)
      daily     日常·一切正常(直进 v-main)
-     rejected  登录一律被拒(QA 密码错误路径;网态同 out) */
+     rejected  登录一律被拒 reason=wrong_password(QA 密码错误路径;网态同 out)
+     bind      登录被 bind 拦 reason=bound(密码其实对;网态同 out)
+     other     日常·线上是别人的学号(提交走阶梯:logging_out 带 online_uid → 真登成功)
+     unverified 日常·密码未验证+今早失败(主页两横幅 QA) */
 (function(){
 'use strict';
 const LS_SCENE='gg-mock-scene',LS_CFG='gg-mock-cfg';
@@ -19,15 +22,15 @@ if(qs.get('scene'))localStorage.setItem(LS_SCENE,SCENE);
 
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const OK=d=>({ok:true,data:d});
-const ERR=(code,message)=>({ok:false,code,message});
+const ERR=(code,message,reason)=>reason?{ok:false,code,message,reason}:{ok:false,code,message};
 const emit=(type,payload)=>{if(typeof window.guiguiEmit==='function')window.guiguiEmit(type,payload)};
 const nowTs=()=>{const d=new Date();
   return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')};
 
-const UID='2025000000001',UID_MASK='2025…7209',SERVER='10.1.2.3';
+const UID='2025000000001',UID_MASK='2025…7209',OTHER_UID='2025000000002',SERVER='10.1.2.3';
 
 const S={
-  configured:false,pwd:null,
+  configured:false,pwd:null,verified:false,taskOk:true,
   net:{state:'logged_in',ssid:'Campus-WiFi',server:SERVER},
   cfg:JSON.parse(localStorage.getItem(LS_CFG)||'null')||{
     trigger_time:'07:00',boot_login:true,heartbeat_minutes:5,operator:'校园用户',
@@ -48,8 +51,13 @@ const S={
 if(SCENE==='out'){S.net.state='not_logged_in'}
 if(SCENE==='down'){S.net.state='unreachable';S.net.ssid='iphone17 pro max'}
 if(SCENE==='waiting'){S.configured=true;S.net.state='waiting'}
-if(SCENE==='daily'){S.configured=true}
+if(SCENE==='daily'){S.configured=true;S.verified=true}
 if(SCENE==='rejected'){S.net.state='not_logged_in'}
+if(SCENE==='bind'){S.net.state='not_logged_in'}
+if(SCENE==='other'){S.configured=true;S.verified=true}
+if(SCENE==='unverified'){S.configured=true;S.verified=false;
+  S.last={when:'今早',time:'07:00',tries:3,outcome:'fail'};
+  S.logs[0].entries=[{ts:'07:00:01',level:'fail',text:'登录被拒:密码不对,改一下再试'}]}
 
 const saveCfg=()=>localStorage.setItem(LS_CFG,JSON.stringify(S.cfg));
 const netEmit=()=>emit('net:state',{state:S.net.state,ssid:S.net.ssid});
@@ -62,6 +70,7 @@ window.GGMock={
   },
   async identify(){
     await delay(250);
+    if(SCENE==='other')return OK({uid:OTHER_UID,source:'chkstatus'});   /* 线上是别人的号 */
     if(S.net.state==='logged_in')return OK({uid:UID,source:'chkstatus'});
     if(S.configured)return OK({uid:UID,source:'config'});
     return OK({uid:null,source:'none'});
@@ -71,13 +80,28 @@ window.GGMock={
     if(S.net.state==='unreachable')return ERR('NET_UNREACHABLE',SERVER+' 不可达,先连校园网');
     if(S.net.state==='waiting')return ERR('NET_UNREACHABLE','网络还没就绪,稍等一下再试');
     if(a&&a.operator){S.cfg.operator=a.operator;saveCfg()}   /* 登录即存,getConfig 回填胶囊 */
-    if(S.net.state==='logged_in')return OK({result:'already',uid:UID_MASK,attempts:0,verified:false});
+    if(S.net.state==='logged_in'&&SCENE==='other'&&(a&&a.password)){
+      /* 验证阶梯:线上是他人学号 → 注销(如实注明)→ 翻转 → 真登一次 */
+      emit('login:progress',{phase:'logging_out',online_uid:'6503…6503'});
+      await delay(1400);
+      S.net.state='not_logged_in';
+      emit('login:progress',{phase:'requesting',attempt:1,attempts:1});
+      await delay(900);
+      S.pwd=a.password;S.verified=true;S.net.state='logged_in';
+      const e={ts:nowTs(),level:'ok',text:'已登录 · '+UID_MASK};
+      S.logs[0].entries.push(e);
+      emit('log:appended',{day_label:'今天',entry:e});
+      netEmit();
+      return OK({result:'success',uid:UID_MASK,attempts:1,verified:true});
+    }
+    if(S.net.state==='logged_in')return OK({result:'already',uid:UID_MASK,attempts:0,verified:S.verified});
     const pwd=(a&&a.password)!=null&&a.password!==''?a.password:S.pwd;
     if(!pwd)return ERR('NOT_CONFIGURED','还没存密码,先填一次');
     emit('login:progress',{phase:'requesting',attempt:1,attempts:S.cfg.login_retries});
     await delay(900);
-    if(SCENE==='rejected')return ERR('AUTH_REJECTED','密码被服务器拒绝了,改一下再试');
-    S.pwd=pwd;S.net.state='logged_in';
+    if(SCENE==='rejected')return ERR('AUTH_REJECTED','密码不对,改一下再试','wrong_password');
+    if(SCENE==='bind')return ERR('AUTH_REJECTED','密码是对的,但这个账号被绑在别处/受限 — 去自助服务平台看看绑定','bound');
+    S.pwd=pwd;S.net.state='logged_in';S.verified=true;
     const e={ts:nowTs(),level:'ok',text:'已登录 · '+UID_MASK};
     S.logs[0].entries.push(e);
     emit('log:appended',{day_label:'今天',entry:e});
@@ -111,6 +135,7 @@ window.GGMock={
   async masterToggle(on){
     await delay(100);
     S.cfg.master=!!on;saveCfg();
+    emit('schedule:changed',{master:S.cfg.master,trigger_time:S.cfg.trigger_time,task_ok:S.taskOk});
     return OK({master:S.cfg.master});
   },
   async logs(a){
@@ -118,7 +143,14 @@ window.GGMock={
     const n=Math.min(Math.max((a&&a.days)||14,1),90);
     return OK({days:S.logs.slice(0,n)});
   },
-  async recentResult(){await delay(50);return OK({...S.last})},
+  async recentResult(){await delay(50);return OK({...S.last,verified:S.verified})},
+  async taskStatus(){await delay(80);return S.cfg.master?OK({ok:S.taskOk}):OK({ok:true,note:'off'})},
+  async rebuildTask(){
+    await delay(600);
+    S.taskOk=true;   /* QA:重建一次就修好 */
+    emit('schedule:changed',{master:S.cfg.master,trigger_time:S.cfg.trigger_time,task_ok:true});
+    return OK({ok:true,changed:true});
+  },
   async feedback(){
     await delay(400);
     const lines=[

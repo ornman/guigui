@@ -1,4 +1,4 @@
-# 桂桂 v2 · JS↔Python 桥接契约 v1.1.1
+# 桂桂 v2 · JS↔Python 桥接契约 v1.2.0
 
 > **地位**:前后端通信协议的**唯一权威**(《guigui-work-split.md》§一.2)。后端 bridge 实现以此为准;`static/dev/mock.js` 是它的可执行规范(仅开发)。
 > **绑定**:命名空间 `window.guigui.*`。pywebview 经 `js_api` 暴露,实现侧自行决定 camelCase 方法名或 snake_case+映射(契约只锁 JS 侧名字)。
@@ -12,6 +12,7 @@
 - **统一信封**:所有方法返回 Promise。
   - 成功:`{ok:true, data:<载荷>}`
   - 失败:`{ok:false, code:<错误码>, message:<人话,可直显>}` —— 后端**不得抛异常代替信封**。
+    失败信封可带可选 `reason`(结构化归因,见 §2.3;前端据此渲染,缺省直显 message)。
 - **凭据纪律**:密码**永不下行**(任何返回都不含 password 字段);学号(uid)可以下行。登录时前端把用户键入的密码上行一次,后端存入 OS 凭据管理器。
 - **视图路由不进契约**:三分流(ok/掉线/不可达)、来路栈、庆祝触发时机全部是前端逻辑;契约只供状态数据。
 - **并发**:方法可并发调用;后端不得因一个长动作(登录/连 WiFi)阻塞查询类方法。
@@ -62,12 +63,19 @@
 
 ```jsonc
 { "result": "success", "uid": "2025…7209", "attempts": 1, "verified": true }
-// result: success | already | rejected | unreachable
+// result: success | already | stored | rejected | unreachable
 // already = 探测发现已登录(等效成功,不算失败)
-// verified = 凭证是否已经服务器真验证;真登录成功 true;already+false = 在线存入未验证(门户无注销配置/注销无效降级)
+// stored  = 06:50 开门前提交被拒 → 不判密码错误,密码已存(verified=false),
+//           reason="before_open",明早首拍真验证(1.2.0,PRD 4.1.2)
+// verified = 凭证是否已经服务器真验证;真登录成功 true;already/stored+false = 未验证
 ```
 
 失败:`AUTH_REJECTED` / `NET_UNREACHABLE`(信封),`result` 不出现在失败信封里。
+
+`AUTH_REJECTED` 失败信封可带 `reason`(1.2.0,拒绝三态 AC-19):
+`wrong_password`(密码不对)| `wrong_account`(学号或运营商选错)| `bound`(密码正确但账号绑定被拦)
+| `before_open`(已存密码、明早自动验证 — 仅限已存凭据路径)。message 已按三态拼好人话,前端直显即可;
+`reason` 缺省 = 服务器原文透传,前端不猜。
 
 ### 2.4 scanWifi() — 扫描可用网络(v-guide 列表 / 设置 WiFi 兜底选择)
 
@@ -140,8 +148,9 @@
 ### 2.10 recentResult() — 「昨晚」一行(主页第三行体检)
 
 ```jsonc
-{ "when": "今早", "time": "07:00", "tries": 1, "outcome": "ok" }
+{ "when": "今早", "time": "07:00", "tries": 1, "outcome": "ok", "verified": true }
 // outcome: ok | fail | silent | none(无记录)
+// verified = 凭证可信度单一真源(1.2.0):驱动主页横幅①「密码还没验证过 — 去改一下」
 // 前端映射示例:ok+tries=1 →「07:00 第一次就登好了 ✓」
 ```
 
@@ -162,6 +171,18 @@
 // 前端负责展示 + 一键复制到剪贴板(复制动作在前端,后端只产文本)。
 ```
 
+### 2.13 taskStatus() — 定时任务在岗状态(1.2.0 新增,AC-17)
+
+```jsonc
+{ "ok": true }                 // ok=false = 被拦/丢失(设置页「点此重建」)
+// { "ok": true, "note": "off" } = 总开关关着,任务本就不存在,不算被拦
+```
+
+### 2.14 rebuildTask() — 一键重建定时任务(1.2.0 新增;仅用户点击触发)
+
+后端按当前配置跑一次对齐(幂等),返回 `{ "ok": <是否达成>, "changed": <是否发生改动> }`,
+并推 `schedule:changed`(带 `task_ok`)。**绝不后台静默重建**(PRD 8.5.2)。
+
 ## 3. 事件推送(后端 → 前端)
 
 后端经 `evaluate_js` 调用 `window.guiguiEmit(type, payload)`;payload 一律为对象。前端忽略未知 type(向前兼容)。
@@ -169,9 +190,9 @@
 | type | payload | 触发 |
 |---|---|---|
 | `net:state` | `{state, ssid}`(同 probe.net 子集) | GUI 打开期间网络状态变化(含 connectWifi 之后、等待开门开门后) |
-| `login:progress` | `{phase, attempt?, attempts?}`;phase ∈ probe\|connecting_wifi\|requesting\|retrying | login/connectWifi 执行中 |
+| `login:progress` | `{phase, attempt?, attempts?, online_uid?}`;phase ∈ probe\|connecting_wifi\|logging_out\|requesting\|retrying | login/connectWifi 执行中;`logging_out` = 验证阶梯正在注销当前会话(断几秒),线上是别人的学号时带 `online_uid`(打码)如实注明(1.2.0,PRD 4.1.2) |
 | `log:appended` | `{day_label, entry}`(entry 同 2.9) | 静默 ensure 落日志(GUI 开着时主页内嵌日志追加) |
-| `schedule:changed` | `{master, trigger_time}` | selfheal 对齐/外部变更后,前端同步两处开关与 desc |
+| `schedule:changed` | `{master, trigger_time, task_ok}` | selfheal 对齐/外部变更后,前端同步两处开关与 desc;`task_ok`=任务在岗(1.2.0,设置页「定时任务」行) |
 
 ## 4. 启动时序(约定,非方法)
 
@@ -188,7 +209,8 @@
 | 1.0.1 | 2026-08-31 | mock 移入 `static/dev/`,仅 `?dev=1` 加载;生产无绑定返回 `BRIDGE_MISSING` 诚实报错(错误码 +1);打包必须排除 `static/dev/` | 前端已实现;后端已适配(guigui.spec 递归排除 dev/,commit 2026-08-31)— **生效** |
 | 1.0.2 | 2026-08-31 | `wake_login` 默认值对齐 PRD §5(→ false,清待办#1);§4 收编深链注入 `window.__guigui_launch`(清待办#2,后端已按此注入) | 前端已实现;后端联调实测生效(wake_login=false 落盘验证,commit 17c0eb1)— **生效** |
 | 1.1.0 | 2026-08-31 | 新增 `feedback()`(§2.12):返回打码诊断文本(用户拍板:反馈动作=复制诊断信息);方法 11→12 | 后端已实现(diagnostics+api.feedback,120 测);前端已接(反馈视图+设置入口,commit 1bb4083)— **生效** |
-| 1.1.1 | 2026-08-31 | §2.6 getConfig/saveConfig 新增 `operator` 枚举(校园用户/校园电信/校园联通/校园其他,注销页 carrier 实测抓全);§2.3 login payload 新增可选 `operator`;login 响应新增 `verified` | 后端已落地(提交密码先验证后入库 + verified 随信封下行);前端适配待接 |
+| 1.1.1 | 2026-08-31 | §2.6 getConfig/saveConfig 新增 `operator` 枚举(校园用户/校园电信/校园联通/校园其他,注销页 carrier 实测抓全);§2.3 login payload 新增可选 `operator`;login 响应新增 `verified` | 后端已落地(提交密码先验证后入库 + verified 随信封下行);前端已接(三胶囊)|
+| 1.2.0 | 2026-09-06 | PRD 重梳理(af19e1b)落地:§2.3 失败信封可带 `reason`(拒绝三态 AC-19)+ 成功新增 `result:"stored"`(06:50 前提交存未验证);§2.10 recentResult 新增 `verified`(横幅①数据源);新增 §2.13 `taskStatus()` / §2.14 `rebuildTask()`(AC-17,仅点击重建);事件 `login:progress` 新增 `logging_out` 相位(+`online_uid`)、`schedule:changed` 扩 `task_ok`(兑现 §6 增强票);方法 12→14 | 后端已实现(5a018c8,188 测全绿);前端待接 |
 
 ## 6. 集成待办(联调问题记这里)
 
@@ -196,5 +218,5 @@
 - **`recentResult` tries=0 文案** → 前端已修复(2026-08-31):`tries===0` 映射「(时间) 已经在线 ✓」。
 - **`recentResult` when 与行标题** → 前端已修复(2026-08-31):行标题改用 `when`(id=main-last-t),缺省「昨晚」。
 - **窗口圆角配方(恢复 + 半径改 8px,2026-08-31 二次拍板)**:原生窗口方案当天试用后弃用(双层标题栏观感差),回到无边框 + `SetWindowRgn` 裁剪,gui.py 现行为 `CORNER_CSS_PX=8`(对齐 Win11 系统圆角;原 22px 是 CSS 卡片 token,已弃)。配方要点不变:①`shadow=False`;②`background_color='#2b2740'` 兜弧线缝隙;③`before_show`/`restored` 双挂,半径 = `round(8 × GetDpiForWindow/96)`,rgn = `ClientSize+1`。**前端自绘标题行保留,无需拆除**——原生窗口中间态(75682e8)已回退。
-- **【增强待办(后端记,2026-08-31)】`schedule:changed` 载荷可扩 `task_ok: bool`**:建/删任务被安全软件拦截时,后端目前只走系统 toast 兜底(api._toast_task_blocked,commit 见 git);前端若想在设置页常驻显示「任务已生效/被拦截」状态,提出即加字段(bump 1.1.1),后端 selfheal.reconcile 已返回 misaligned 供消费。
+- **【已兑现 2026-09-06,v1.2.0】`schedule:changed` 载荷扩 `task_ok: bool`**:原增强票已随 1.2.0 落地(§3),并加码提供了 `taskStatus()` / `rebuildTask()` 两个方法(§2.13/§2.14)——设置页「定时任务」行常驻显示在岗状态,被拦时「点此重建」仅用户点击触发。
 - **【已关闭 2026-08-31】拆自绘标题行票**:随原生窗口方案一并作废,前端标题行(`桂桂 / GUIGUI` + `×`/`–` + 拖拽区)是无边框方案的正式组件。§2.11 `winMinimize`/`winClose` 恢复唯一窗口控制通道地位。
