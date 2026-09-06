@@ -651,8 +651,6 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
         <div class="sw on" id="sw-auto-set" onclick="toggleAuto()"></div></div>
       <div class="row"><div><div class="t">账号与密码</div><div class="d">改学号 / 密码 / 运营商,提交当场走同一验证,通过才替换</div></div>
         <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openDetail('v-login')">修改</button></div>
-      <div class="row"><div><div class="t">自助服务平台</div><div class="d">学校的官方门户 · 改密码 / 查流量 / 解绑设备</div></div>
-        <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openSelfService(this)">打开</button></div>
       <div class="row"><div><div class="t">定时任务</div><div class="d" id="task-status-d">…</div></div>
         <button class="link" id="task-rebuild" style="display:none;margin-top:0;font-size:12.5px;white-space:nowrap" onclick="rebuildTask()">点此重建</button></div>
 
@@ -951,14 +949,14 @@ function showSuccess(verifiedTrue,reason){
 async function enableDaily(){
   const btn=document.querySelector('#v-ok .btn');
   const pwd=$('f-pwd').value.trim();
-  const warn=$('pwd-warn'),warnTxt=warn.lastElementChild;
+  const warn=$('pwd-warn'),warnTxt=warn.children[1];   /* 固定取文案 span;bind 链接追加在其内部,勿用 lastElementChild */
   if(!pwd){warnTxt.textContent='密码还没填呢';warn.style.display='block';return}
   setBusy(btn,true,'验证中…');
   await GG.api.saveConfig({trigger_time:currentTriggerTime});
   const r=await GG.api.login({sid:$('f-sid').value.trim()||undefined,password:pwd,operator:pickedOperator('#op-dd')});
   setBusy(btn,false);hideSubmitNotes();
   if(r.ok){configured=true;hasPwd=true;showSuccess(r.data.verified===true,r.data.reason);return}
-  if(r.code==='AUTH_REJECTED'){warnTxt.textContent=r.message||'密码被服务器拒绝了,核对一下再试';warn.style.display='block';return}
+  if(r.code==='AUTH_REJECTED'){rejectionText(warnTxt,r.message||'密码被服务器拒绝了,核对一下再试',r.reason);warn.style.display='block';return}
   if(r.code==='NET_UNREACHABLE'){goDaily();return}
 }
 let loginLandingUid=null,uidChangeArmed=false;
@@ -982,10 +980,21 @@ async function loginNow(){
   if(r.ok){configured=true;hasPwd=true;
     if(sidVal)loginLandingUid=sidVal;
     showSuccess(r.data.verified===true,r.data.reason);renderBannersRefresh();return}
-  if(r.code==='AUTH_REJECTED'){showLoginErr(r.message||'登录被拒');return}
+  if(r.code==='AUTH_REJECTED'){showLoginErr(r.message||'登录被拒',r.reason);return}
   if(r.code==='NET_UNREACHABLE'){openDetail('v-guide');return}
 }
-function showLoginErr(text){$('login-err-text').textContent='⚠ '+text;$('login-err').style.display='block'}
+/* 登录被拒提示:文案来自后端信封(契约 1.2.0,与 mock 逐字一致);
+   bind 被拒时文案说「去自助服务平台看看绑定」,句尾给真入口(默认浏览器) */
+function rejectionText(el,text,reason){
+  el.textContent=text;   /* 赋值即清空,上一轮追加的链接自然移除 */
+  if(reason!=='bound')return;
+  const b=document.createElement('button');
+  b.className='link';b.textContent='去自助服务平台 ›';
+  b.style.cssText='margin:0 0 0 6px;font-size:inherit;white-space:nowrap';
+  b.onclick=()=>openSelfService(b);
+  el.appendChild(b);
+}
+function showLoginErr(text,reason){rejectionText($('login-err-text'),'⚠ '+text,reason);$('login-err').style.display='block'}
 function confirmUidChange(go){
   if(go){uidChangeArmed=true;loginNow()}
   else{uidChangeArmed=false;$('login-confirm').style.display='none'}
