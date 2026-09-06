@@ -426,7 +426,7 @@ body.backdrop-black .taskbar{display:none}
   .s-line{opacity:1!important;transform:none!important}
   .v-success-stage{opacity:1!important}
   .bot-success{opacity:1!important}
-  #boot-bot,#boot-bot-greet-ok,#boot-bot-greet-main{animation:none !important;opacity:1!important;transform:none!important}
+  #boot-bot,#boot-bot-greet-ok,#boot-bot-greet-main,#boot-bot-greet-login{animation:none !important;opacity:1!important;transform:none!important}
 }
 </style>
 <style id="app-overrides">
@@ -510,8 +510,13 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
     <!-- 登录表单(首装未登录落地页 / 日常改密页共用:提交走同一验证阶梯,AC-14) -->
     <div class="v" id="v-login">
       <button class="back" onclick="backFrom('v-login')">‹ 返回</button>
-      <h1 style="font-size:22px">登录校园网。</h1>
-      <p class="lede">连上了校园网,还没登录。填一次,以后每天都是桂桂的事:</p>
+      <div class="greet">
+        <div class="bot bot-greet" id="boot-bot-greet-login" data-state="happy" data-size="58"></div>
+        <div>
+          <h1 style="font-size:22px">登录校园网。</h1>
+          <p class="lede">连上了校园网,还没登录。填一次,以后每天都是桂桂的事:</p>
+        </div>
+      </div>
       <div class="status warn"><span class="dot"></span><span id="login-status">…</span></div>
       <div class="micro-line" id="login-err" style="display:none"><span style="color:var(--warm)" id="login-err-text">⚠ 登录被拒</span></div>
       <div class="f"><label>学号</label>
