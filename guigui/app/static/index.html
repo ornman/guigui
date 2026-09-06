@@ -220,8 +220,10 @@ input{width:100%;padding:11px 14px;border:1px solid oklch(60% 0.01 295 / 0.35);
   border-radius:12px;background:oklch(100% 0 0 / 0.6);font:15px/1.5 inherit;font-family:inherit;
   color:var(--ink);transition:border-color .18s,box-shadow .18s}
 input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-/* 密码遮罩圆点放大:Chromium 的掩码点大小跟字号,17px+字距让密文更醒目 */
-input[type=password]{font-size:17px;letter-spacing:.08em}
+/* 密码遮罩圆点:Chromium 掩码点大小只跟字号 — 20px 出大圆点+放宽字距;
+   占位提示独立回 15px,与学号框视觉一致(不然「请输入密码」也跟着变大) */
+input[type=password]{font-size:20px;letter-spacing:.18em;line-height:22px}
+input[type=password]::placeholder{font-size:15px;letter-spacing:normal;line-height:22px}
 /* 密码框小眼睛:明文/隐藏切换(类名避开 bot 的 .eye 眼睛路径) */
 .pw-wrap{position:relative}
 .pw-wrap input{padding-right:46px}
