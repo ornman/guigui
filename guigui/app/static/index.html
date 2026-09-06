@@ -245,6 +245,25 @@ input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--a
 .btn.quiet{background:oklch(100% 0 0 / 0.6);color:var(--ink);font-weight:600;
   border:1px solid oklch(60% 0.01 295 / 0.4)}
 .btn.quiet:hover{border-color:var(--accent);color:var(--accent)}
+/* 按钮等待态(AC-11):发网络请求的按钮置灰禁用 + 旋转图标 + 文案「验证中…」,
+   等待中重复提交 = 并发跑两次注销→登录,属正确性问题不只是视觉 */
+.btn.busy{pointer-events:none;opacity:.62}
+.btn.busy::after{content:"";display:inline-block;width:13px;height:13px;margin-left:9px;vertical-align:-2px;
+  border:2px solid oklch(100% 0 0 / .35);border-top-color:oklch(97% 0.005 295);border-radius:50%;
+  animation:spin .8s linear infinite}
+.btn.quiet.busy::after{border-color:oklch(23% 0.015 295 / .25);border-top-color:var(--ink)}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* 主页横幅(AC-15):仅「密码未验证 / 今早没登上」两种,点击直达改密页 */
+.banner{display:flex;align-items:center;gap:8px;margin:10px 0 0;padding:9px 12px;border-radius:10px;
+  background:oklch(58% 0.15 295 / 0.07);border:1px solid oklch(58% 0.15 295 / 0.22);
+  font:500 12.5px/1.5 Inter,"PingFang SC",sans-serif;color:var(--accent);cursor:pointer;
+  transition:background .15s,border-color .15s}
+.banner:hover{background:oklch(58% 0.15 295 / 0.12);border-color:var(--accent-2)}
+.banner .arr{margin-left:auto;font-size:12px;opacity:.65}
+/* 提交等待行(4.1.2):验证中/注销告知/线上他人学号注明 — 提交期间的一行小字 */
+.submit-note{display:flex;align-items:center;gap:6px;margin:8px 0 0;padding:8px 12px;border-radius:10px;
+  background:oklch(58% 0.15 295 / 0.06);font:500 12px/1.5 Inter,"PingFang SC",sans-serif;color:var(--ink-2)}
+.submit-note .link{margin-top:0;font-size:12px}
 /* 常用时间药丸:一键填充输入框 */
 .presets{display:flex;gap:6px;flex-wrap:wrap}
 .preset{padding:7px 12px;border-radius:99px;border:1px solid oklch(60% 0.01 295 / 0.3);
@@ -465,16 +484,17 @@ html.in-app #fx{border-radius:8px}
           <button type="button" class="op-cap" data-op="校园联通">联通</button>
           <button type="button" class="op-cap" data-op="校园其他">其他</button>
         </div></div>
+      <div class="submit-note" id="ok-note" style="display:none"></div>
       <button class="btn" onclick="enableDaily()">开启每日自动登录</button>
     </div>
 
-    <!-- 登录表单 -->
+    <!-- 登录表单(首装未登录落地页 / 日常改密页共用:提交走同一验证阶梯,AC-14) -->
     <div class="v" id="v-login">
       <button class="back" onclick="backFrom('v-login')">‹ 返回</button>
       <h1 style="font-size:22px">登录校园网。</h1>
       <p class="lede">连上了校园网,还没登录。填一次,以后每天都是桂桂的事:</p>
       <div class="status warn"><span class="dot"></span><span id="login-status">…</span></div>
-      <div class="micro-line" id="login-err" style="display:none"><span style="color:var(--warm)">⚠ 上次登录被拒:密码可能改过了,改下面的密码再点一次</span></div>
+      <div class="micro-line" id="login-err" style="display:none"><span style="color:var(--warm)" id="login-err-text">⚠ 登录被拒</span></div>
       <div class="f"><label>学号</label><input id="f-sid-login" value="" autocomplete="username"></div>
       <div class="f"><label>密码</label>
         <div class="pw-wrap"><input type="password" id="f-pwd-login" value="" autocomplete="new-password">
@@ -489,6 +509,12 @@ html.in-app #fx{border-radius:8px}
           <button type="button" class="op-cap" data-op="校园联通">联通</button>
           <button type="button" class="op-cap" data-op="校园其他">其他</button>
         </div></div>
+      <div class="submit-note" id="login-confirm" style="display:none">
+        <span id="login-confirm-text"></span>
+        <button class="link" style="margin:0 0 0 auto;font-size:12px" onclick="confirmUidChange(true)">继续</button>
+        <button class="link" style="margin:0;font-size:12px" onclick="confirmUidChange(false)">取消</button>
+      </div>
+      <div class="submit-note" id="login-note" style="display:none"></div>
       <button class="btn" onclick="loginNow()">立即登录</button>
     </div>
 
@@ -526,6 +552,7 @@ html.in-app #fx{border-radius:8px}
         </div>
       </div>
       <div class="status warn" id="main-status" style="display:none"><span class="dot"></span><span id="main-status-text"></span></div>
+      <div id="main-banners"></div>
 
       <div style="height:10px"></div>
       <div class="row"><div><div class="t">自动登录</div>
@@ -536,7 +563,7 @@ html.in-app #fx{border-radius:8px}
       <div class="row"><div><div class="t" id="main-last-t">昨晚</div>
         <div class="d" id="main-last">…</div></div></div>
 
-      <button class="btn quiet" id="main-btn" onclick="quickLogin()">立即重新登录</button>
+      <button class="btn quiet" id="main-btn" onclick="mainAction()">立即重新登录</button>
       <button class="link" style="display:block;width:fit-content;margin-top:10px;font-size:12px" onclick="openDetail('v-settings')">高级设置</button>
 
       <div class="log">
@@ -600,6 +627,10 @@ html.in-app #fx{border-radius:8px}
         <div class="sw on" id="sw-gui" onclick="toggleGui(this)"></div></div>
       <div class="row"><div><div class="t">后台自动化</div><div class="d">总开关:关掉后桂桂就退休,不再自动登录(与主页开关同步)</div></div>
         <div class="sw on" id="sw-auto-set" onclick="toggleAuto()"></div></div>
+      <div class="row"><div><div class="t">账号与密码</div><div class="d">改学号 / 密码 / 运营商,提交当场走同一验证,通过才替换</div></div>
+        <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openDetail('v-login')">修改</button></div>
+      <div class="row"><div><div class="t">定时任务</div><div class="d" id="task-status-d">…</div></div>
+        <button class="link" id="task-rebuild" style="display:none;margin-top:0;font-size:12.5px;white-space:nowrap" onclick="rebuildTask()">点此重建</button></div>
 
       <div class="tiny-label">进阶</div>
       <div class="row"><div><div class="t">登录失败重试</div><div class="d">单轮登录失败后,再试几回</div></div>
@@ -812,6 +843,28 @@ function togglePw(id,btn){
   const inp=$(id);const showPw=inp.type==='password';
   inp.type=showPw?'text':'password';btn.classList.toggle('off',!showPw);
 }
+/* 按钮等待态(AC-11):发网络请求期间置灰禁用+旋转+换文案,防重复提交 */
+function setBusy(btn,on,text){
+  if(!btn)return;
+  if(on){btn.dataset.orig=btn.textContent;btn.classList.add('busy');btn.disabled=true;
+    btn.textContent=text||'验证中…'}
+  else{btn.classList.remove('busy');btn.disabled=false;
+    if(btn.dataset.orig!==undefined)btn.textContent=btn.dataset.orig}
+}
+/* 提交等待行(4.1.2):验证中/注销告知/线上他人学号,由 login:progress 事件驱动 */
+function hideSubmitNotes(){['ok-note','login-note'].forEach(id=>{const n=$(id);if(n)n.style.display='none'})}
+GG.on('login:progress',e=>{
+  if(!e||!e.phase)return;
+  const note=document.querySelector('#v-ok.on')?$('ok-note'):(document.querySelector('#v-login.on')?$('login-note'):null);
+  if(!note)return;
+  if(e.phase==='probe'){note.style.display='flex';note.textContent='正在验证密码,大概 5~15 秒…'}
+  else if(e.phase==='logging_out'){note.style.display='flex';
+    note.textContent=e.online_uid
+      ?'现在线上的是 '+e.online_uid+',验证时会先注销它,网络会断几秒'
+      :'验证时会先注销当前会话,网络会断几秒'}
+  else if(e.phase==='requesting'){note.style.display='flex';note.textContent='正在登录…'}
+  else if(e.phase==='retrying'){note.style.display='flex';note.textContent='被节流了,稍等再试一次…'}
+});
 /* 运营商三胶囊:首装/改密码页共用;data-op 为后端契约值,默认校园用户 */
 function pickedOperator(sel){
   const c=document.querySelector((sel||'#op-pick')+' .op-cap.on');
@@ -828,27 +881,35 @@ document.querySelectorAll('.op-pick').forEach(box=>box.addEventListener('click',
    注:同一份监听器在文件下方"自定义时间"段又重复注册了一次(原代码遗留),已合并到单点;
    这里仅保留 mainAction,详见下方唯一一份 ct-h/ct-m 监听。 */
 function mainAction(){
-  if(mainState==='ok'){quickLogin()}
-  else if(mainState==='out'){openDetail('v-login')}
-  else{openDetail('v-guide')}
+  if(mainState==='down'){openDetail('v-guide');return}
+  quickLogin()   /* ok=立即重新登录 / out=立即登录,都是一键已存凭据(AC-16) */
 }
-/* 主页上的重登:就地反馈,不跳庆祝页(庆祝只属于首次/修复成功) */
+/* 主页上的重登:就地反馈,不跳庆祝页(庆祝只属于首次/修复成功);等待态防重复提交 */
 async function quickLogin(){
   const gb=document.querySelector('#boot-bot-greet-main');
   mood(gb,'happy');
   $('main-lede').textContent='刚刚把网帮你接回来啦 ✓';
+  setBusy($('main-btn'),true,'登录中…');
   const r=await GG.api.login({});
-  if(!r.ok&&r.code==='AUTH_REJECTED'){$('main-lede').textContent='密码好像不对,去登录页改一下吧'}
+  setBusy($('main-btn'),false);
+  if(r.ok){renderBannersRefresh();return}
+  if(r.code==='AUTH_REJECTED'){$('main-lede').textContent=(r.message||'密码好像不对')+',去改一下再试'}
+  else if(r.code==='NOT_CONFIGURED'){openDetail('v-login')}
 }
 /* 流程动作 */
 /* 庆祝页入场:重新给 stage 加 .in class 触发 CSS animation(display:none→block 不会自动重启动画)
-   verified===false:存密码时本来就在线,还没真验证过,如实说一句 */
-function showSuccess(verified){
+   庆祝只给真实成功(AC-11):verified!==true / 锚前存入都不撒彩带,文案如实 */
+function showSuccess(verifiedTrue,reason){
   renderTriggerTime();   /* 同步最新触发时间,避免 lede 写死 07:00 */
   const lede=$('success-time');
-  if(lede)lede.innerHTML=verified===false
-    ?'现在已在线 ✓ 密码也存好了。明早 '+currentTriggerTime+' 第一次自动登录时会真验证一遍,万一不对会弹通知提醒你改。'
-    :'明早 '+currentTriggerTime+' 开始。现在关掉就行。';
+  if(lede){
+    if(reason==='before_open')
+      lede.textContent='还没到开门时间(06:50),密码先存着,明早 '+currentTriggerTime+' 第一次自动登录会真验证,不对桂桂会提醒你。';
+    else if(verifiedTrue!==true)
+      lede.textContent='现在已在线 ✓ 密码也存好了。明早 '+currentTriggerTime+' 第一次自动登录时会真验证一遍,万一不对会弹通知提醒你改。';
+    else
+      lede.textContent='明早 '+currentTriggerTime+' 开始。现在关掉就行。';
+  }
   show('v-success');
   const stage=document.querySelector('#v-success .v-success-stage');
   if(stage){
@@ -856,25 +917,51 @@ function showSuccess(verified){
     void stage.offsetWidth;  /* 强制 reflow */
     stage.classList.add('in');
   }
-  greet();party();
+  greet();
+  if(verifiedTrue===true)party();
 }
-/* 交钥匙即开启:密码必填,为空只给一句温柔提醒 */
+/* 交钥匙即开启:密码必填,为空只给一句温柔提醒;等待态防重复提交(AC-11) */
 async function enableDaily(){
+  const btn=document.querySelector('#v-ok .btn');
   const pwd=$('f-pwd').value.trim();
   const warn=$('pwd-warn'),warnTxt=warn.lastElementChild;
   if(!pwd){warnTxt.textContent='密码还没填呢';warn.style.display='block';return}
+  setBusy(btn,true,'验证中…');
   await GG.api.saveConfig({trigger_time:currentTriggerTime});
   const r=await GG.api.login({sid:$('f-sid').value.trim()||undefined,password:pwd,operator:pickedOperator()});
-  if(r.ok){configured=true;hasPwd=true;showSuccess(r.data.verified);return}
-  if(r.code==='AUTH_REJECTED'){warnTxt.textContent='密码被服务器拒绝了,核对一下再试';warn.style.display='block';return}
+  setBusy(btn,false);hideSubmitNotes();
+  if(r.ok){configured=true;hasPwd=true;showSuccess(r.data.verified===true,r.data.reason);return}
+  if(r.code==='AUTH_REJECTED'){warnTxt.textContent=r.message||'密码被服务器拒绝了,核对一下再试';warn.style.display='block';return}
   if(r.code==='NET_UNREACHABLE'){goDaily();return}
 }
+let loginLandingUid=null,uidChangeArmed=false;
+/* 改密页提交(首装未登录/日常改凭据共用):换学号先内联确认(密码迁移,防手滑,AC-14) */
 async function loginNow(){
   $('login-err').style.display='none';
-  const r=await GG.api.login({password:$('f-pwd-login').value||undefined,operator:pickedOperator('#op-pick-login')});
-  if(r.ok){configured=true;hasPwd=true;showSuccess(r.data.verified===false?false:true);return}
-  if(r.code==='AUTH_REJECTED'){$('login-err').style.display='block';return}
+  const btn=document.querySelector('#v-login .btn');
+  const sidVal=$('f-sid-login').value.trim();
+  const pwdVal=$('f-pwd-login').value;
+  if(sidVal&&loginLandingUid&&sidVal!==loginLandingUid){
+    if(!pwdVal){showLoginErr('换了学号,密码也要填一次(会迁移到新学号)');return}
+    if(!uidChangeArmed){
+      $('login-confirm-text').textContent='学号将从 '+loginLandingUid+' 改为 '+sidVal+',密码会迁移到新学号';
+      $('login-confirm').style.display='flex';return
+    }
+  }
+  uidChangeArmed=false;$('login-confirm').style.display='none';
+  setBusy(btn,true,'验证中…');
+  const r=await GG.api.login({sid:sidVal||undefined,password:pwdVal||undefined,operator:pickedOperator('#op-pick-login')});
+  setBusy(btn,false);hideSubmitNotes();
+  if(r.ok){configured=true;hasPwd=true;
+    if(sidVal)loginLandingUid=sidVal;
+    showSuccess(r.data.verified===true,r.data.reason);renderBannersRefresh();return}
+  if(r.code==='AUTH_REJECTED'){showLoginErr(r.message||'登录被拒');return}
   if(r.code==='NET_UNREACHABLE'){openDetail('v-guide');return}
+}
+function showLoginErr(text){$('login-err-text').textContent='⚠ '+text;$('login-err').style.display='block'}
+function confirmUidChange(go){
+  if(go){uidChangeArmed=true;loginNow()}
+  else{uidChangeArmed=false;$('login-confirm').style.display='none'}
 }
 async function pickWifi(el){
   el.classList.add('on');
@@ -993,7 +1080,22 @@ GG.on('net:state',e=>{
     mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
     renderMain();renderMainData()}
 });
-GG.on('schedule:changed',e=>{if(e&&typeof e.master==='boolean')setAuto(e.master)});
+GG.on('schedule:changed',e=>{
+  if(e&&typeof e.master==='boolean')setAuto(e.master);
+  if(e&&typeof e.task_ok==='boolean')renderTaskRow(e.task_ok);
+});
+/* 定时任务在岗状态(AC-17):在岗 ✓ / 被拦点此重建;重建仅用户点击触发 */
+function renderTaskRow(okk){
+  const d=$('task-status-d'),b=$('task-rebuild');if(!d)return;
+  d.textContent=okk?'在岗 ✓ 每天到点开工':'被拦了,自动登录还没生效';
+  if(b)b.style.display=okk?'none':'inline-block';
+}
+async function rebuildTask(){
+  const b=$('task-rebuild');if(b)b.textContent='重建中…';
+  const r=await GG.api.rebuildTask();
+  if(b)b.textContent='点此重建';
+  if(r.ok)renderTaskRow(r.data.ok);
+}
 /* ═══ F3 数据渲染层:硬编码内容 → 契约数据;生成的标记与 PRD 原型逐字节一致 ═══ */
 const SIGNAL_TXT={strong:'信号强',medium:'信号中',weak:'信号弱'};
 let lastNet=null,curCfg=null;
@@ -1006,6 +1108,18 @@ function lastText(r){
   if(r.tries===0)return (r.time||'')+' 已经在线 ✓';   /* 首装时本来就在线(联调实测) */
   return (r.time||'')+(r.tries===1?' 第一次就登好了 ✓':' 第 '+r.tries+' 次登好 ✓');
 }
+/* 主页横幅(AC-15):仅两种 — ①密码未验证 ②今早没登上;点击直达改密页,改对即消失。
+   会话自然续期的正常早晨永无横幅;线上他人学号只进日志,不横幅不通知 */
+function renderBanners(rec){
+  const box=$('main-banners');if(!box)return;
+  let h='';
+  if(configured&&rec&&rec.verified===false)
+    h+='<div class="banner" onclick="openDetail(\'v-login\')"><span>密码还没验证过 — 去改一下</span><span class="arr">›</span></div>';
+  if(configured&&rec&&rec.outcome==='fail'&&rec.when==='今早')
+    h+='<div class="banner" onclick="openDetail(\'v-login\')"><span>今早没登上 — 去改一下</span><span class="arr">›</span></div>';
+  box.innerHTML=h;
+}
+async function renderBannersRefresh(){const l=await GG.api.recentResult();if(l.ok)renderBanners(l.data)}
 function logLineHTML(e){
   return '<div><span class="ts">'+esc(e.ts)+'</span>'+(e.level==='ok'?'<span class="ok">[OK]</span> ':'')+esc(e.text)+'</div>';
 }
@@ -1021,8 +1135,9 @@ function renderWifiList(box,networks,opts){
 async function fillLoginLanding(){
   const net=lastNet||{};
   $('login-status').textContent=(net.ssid||'校园网')+' · 未认证';
+  $('login-confirm').style.display='none';uidChangeArmed=false;
   const id=await GG.api.identify();
-  if(id.ok&&id.data.uid&&!$('f-sid-login').value)$('f-sid-login').value=id.data.uid;
+  if(id.ok&&id.data.uid&&!$('f-sid-login').value){$('f-sid-login').value=id.data.uid;loginLandingUid=id.data.uid}
   const c=await GG.api.getConfig();   /* 运营商胶囊按已存选择回填 */
   if(c.ok&&c.data.operator)setOperatorPick('#op-pick-login',c.data.operator);
 }
@@ -1072,7 +1187,8 @@ async function renderMainData(){
     $('sw-gui').classList.toggle('on',curCfg.show_gui!==false);
   }
   if(lastNet)$('main-net').textContent=netText(lastNet);
-  if(l.ok){$('main-last-t').textContent=l.data.when||'昨晚';$('main-last').textContent=lastText(l.data)}
+  if(l.ok){$('main-last-t').textContent=l.data.when||'昨晚';$('main-last').textContent=lastText(l.data);
+    renderBanners(l.data)}
   /* 主页日志是「钉底最近几条」,全天完整历史在 v-log;不裁剪会把
      「历史日志 →」顶出可视区(2026-08-31 实测) */
   if(g.ok&&g.data.days[0])$('main-log-entries').innerHTML=g.data.days[0].entries.slice(-MAIN_LOG_KEEP).map(logLineHTML).join('');
@@ -1105,6 +1221,7 @@ async function loadSettings(){
     const s=await GG.api.scanWifi();
     if(s.ok)renderWifiList($('fallback-pick'),s.data.networks,{pick:true,selected:curCfg.wifi_fallback_ssid});
   }
+  GG.api.taskStatus().then(t=>{if(t.ok)renderTaskRow(t.data.ok)});
 }
 function toggleCfg(el){el.classList.toggle('on');GG.api.saveConfig({[el.dataset.cfg]:el.classList.contains('on')})}
 /* 问题反馈(契约 §2.12):拉取打码诊断文本,展示 + 一键复制(复制动作在前端) */
@@ -1123,7 +1240,8 @@ async function copyFeedback(btn){
   catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}
   btn.textContent='已复制 ✓';setTimeout(()=>{btn.textContent='复制诊断信息'},1800);
 }
-/* 日志追加事件:主页内嵌(只保最近几条,防止把「历史日志 →」顶飞) + 历史页今天组同步追加 */
+/* 日志追加事件:主页内嵌(只保最近几条,防止把「历史日志 →」顶飞) + 历史页今天组同步追加
+   + 静默拍落盘后重拉 recentResult(横幅随「今早没登上」出现/消失) */
 GG.on('log:appended',e=>{
   if(!e||!e.entry)return;
   const m=$('main-log-entries');
@@ -1131,6 +1249,7 @@ GG.on('log:appended',e=>{
     while(m.children.length>MAIN_LOG_KEEP)m.firstElementChild.remove()}
   const d=document.querySelector('#log-days .day:first-child .log');
   if(d)d.insertAdjacentHTML('beforeend',logLineHTML(e.entry));
+  if(currentView()==='v-main')renderBannersRefresh();
 });
 /* 窗口控制:GG.win —— 真最小化 / 真退出(GUI 非常驻,自动化由任务计划继续) */
 function minimize(){GG.win('minimize')}
