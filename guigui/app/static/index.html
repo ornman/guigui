@@ -354,6 +354,17 @@ input[type=password]::-ms-clear{display:none}
 
 .tiny-label{font-family:Inter,"PingFang SC",sans-serif;font-size:10.5px;font-weight:600;
   letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin:18px 0 6px}
+/* 账号入口卡片(高级设置置顶,整行可点;2026-09-06 从「系统」区第4行提级,用户拍板) */
+.cred-card{display:flex;width:100%;margin:4px 0 2px;padding:13px 14px;gap:16px;
+  align-items:center;justify-content:space-between;text-align:left;cursor:pointer;
+  border:1px solid oklch(60% 0.01 295 / 0.4);border-radius:12px;background:oklch(100% 0 0 / 0.6);
+  font:inherit;color:inherit;transition:border-color .18s}
+.cred-card:hover{border-color:var(--accent)}
+.cred-card .t{display:block;font-size:14.5px}
+.cred-card .d{display:block;font-size:12px;color:var(--ink-3);margin-top:1px;font-family:Inter,"PingFang SC",sans-serif}
+.cred-card .go{font:600 12.5px/1.4 inherit;font-family:inherit;color:var(--ink-3);
+  white-space:nowrap;flex-shrink:0;transition:color .18s}
+.cred-card:hover .go{color:var(--accent)}
 .check-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
   padding:9px 0;border-bottom:1px solid oklch(60% 0.01 295 / 0.15);font-size:14px}
 .check-row .k{color:var(--ink-3);font-size:12.5px;flex-shrink:0;font-family:Inter,"PingFang SC",sans-serif}
@@ -607,10 +618,15 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div id="log-days"></div>
     </div>
 
-    <!-- 高级设置(按使用频率排序:核心 → 保底 → 系统 → 进阶) -->
+    <!-- 高级设置(账号置顶 → 每日自动登录 → 保底 → 系统 → 进阶) -->
     <div class="v" id="v-settings">
       <button class="back" onclick="backFrom('v-settings')">‹ 返回</button>
       <h1 style="font-size:22px">高级设置</h1>
+
+      <button class="cred-card" onclick="openDetail('v-login')">
+        <span><span class="t">账号与密码</span><span class="d">改学号 / 密码 / 运营商,提交当场走同一验证,通过才替换</span></span>
+        <span class="go">修改 ›</span>
+      </button>
 
       <div class="tiny-label">每日自动登录</div>
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:2px 0 4px">
@@ -654,8 +670,6 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
         <div class="sw on" id="sw-gui" onclick="toggleGui(this)"></div></div>
       <div class="row"><div><div class="t">后台自动化</div><div class="d">总开关:关掉后桂桂就退休,不再自动登录(与主页开关同步)</div></div>
         <div class="sw on" id="sw-auto-set" onclick="toggleAuto()"></div></div>
-      <div class="row"><div><div class="t">账号与密码</div><div class="d">改学号 / 密码 / 运营商,提交当场走同一验证,通过才替换</div></div>
-        <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openDetail('v-login')">修改</button></div>
       <div class="row"><div><div class="t">定时任务</div><div class="d" id="task-status-d">…</div></div>
         <button class="link" id="task-rebuild" style="display:none;margin-top:0;font-size:12.5px;white-space:nowrap" onclick="rebuildTask()">点此重建</button></div>
 
