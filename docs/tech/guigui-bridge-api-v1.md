@@ -217,6 +217,6 @@
 - **学号打码示例说明(后端记,已随 1.0.1 登记)**:打码规则=前4…后4,对真实学号 2025000000001 得 `2025…0001`;PRD/契约示例里的 `2025…7209` 是手打示意串、非规则推得。前端如做正则校验请以规则为准。
 - **`recentResult` tries=0 文案** → 前端已修复(2026-08-31):`tries===0` 映射「(时间) 已经在线 ✓」。
 - **`recentResult` when 与行标题** → 前端已修复(2026-08-31):行标题改用 `when`(id=main-last-t),缺省「昨晚」。
-- **窗口圆角配方(恢复 + 半径改 8px,2026-08-31 二次拍板)**:原生窗口方案当天试用后弃用(双层标题栏观感差),回到无边框 + `SetWindowRgn` 裁剪,gui.py 现行为 `CORNER_CSS_PX=8`(对齐 Win11 系统圆角;原 22px 是 CSS 卡片 token,已弃)。配方要点不变:①`shadow=False`;②`background_color='#2b2740'` 兜弧线缝隙;③`before_show`/`restored` 双挂,半径 = `round(8 × GetDpiForWindow/96)`,rgn = `ClientSize+1`。**前端自绘标题行保留,无需拆除**——原生窗口中间态(75682e8)已回退。
+- **窗口圆角配方(DWM 优先,2026-09-06 更新)**:Win11 起首选 `DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND`(系统 8px 抗锯齿圆角,随尺寸/DPI 自适应,keeper/事件跟踪全免;spike_mica.py 实机验证);`SetWindowRgn` 8px 裁剪(`CORNER_CSS_PX=8`,rgn=`ClientSize+1`)降为 Win10 兜底 —— DWM 属性调用失败时才启用(rgn + Resize/LocationChanged 跟踪 + 1.5s keeper 重贴)。两路共同点不变:①`shadow=False`(DWM 阴影 hack 在圆角外铺白边);②`background_color='#e9e7f2'` 兜弧线亚像素缝隙;③in-app 卡片弧 9px 盖过窗角 8px。**前端自绘标题行保留,无需拆除**——原生窗口中间态(75682e8)已回退。另:真玻璃(Mica 材质 + WebView2 透明)spike 已探明壳层可行、卡在 pywebview 6.2.1 的 WebView2 背景不透明(transparent=True 未生效,环带刷白),证据与配方存 `guigui/spike_mica.py`,要做真玻璃时从那里续。
 - **【已兑现 2026-09-06,v1.2.0】`schedule:changed` 载荷扩 `task_ok: bool`**:原增强票已随 1.2.0 落地(§3),并加码提供了 `taskStatus()` / `rebuildTask()` 两个方法(§2.13/§2.14)——设置页「定时任务」行常驻显示在岗状态,被拦时「点此重建」仅用户点击触发。
 - **【已关闭 2026-08-31】拆自绘标题行票**:随原生窗口方案一并作废,前端标题行(`桂桂 / GUIGUI` + `×`/`–` + 拖拽区)是无边框方案的正式组件。§2.11 `winMinimize`/`winClose` 恢复唯一窗口控制通道地位。

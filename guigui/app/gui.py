@@ -29,8 +29,9 @@ WATCH_INTERVAL = 2.0
 PENDING_VIEW_NAME = "pending_view.json"   # 深链二实例 → 主实例的接力文件
 PENDING_VIEW_TTL = 120.0                  # 超龄视为残留,静默丢弃
 # 无边框方案(2026-08-31 二次拍板:原生窗口试用后回到无边框自绘):
-# SetWindowRgn 裁圆角,半径 8 CSS px × DPI —— 对齐 Win11 系统圆角观感(原 22px 已弃)。
-# WinForms+WebView2 做不到真透明(transparent=True 四角露白),配方详见契约「集成待办」。
+# Win11 走 DWM 系统圆角(DWMWA_WINDOW_CORNER_PREFERENCE,抗锯齿、缩放自适应,
+# 2026-09-06 spike 实机验证)→ SetWindowRgn 8px 裁剪降为 Win10 兜底配方。
+# WinForms+WebView2 做不到真透明(transparent=True 四角露白),玻璃配方的实测记录在 spike_mica.py。
 CORNER_CSS_PX = 8                  # Win11 系统窗口圆角规格(非 CSS 卡片 token)
 # 取卡片浅底(≈ .window 渐变的浅紫),兜首帧闪色与弧线亚像素缝隙;
 # 深色会在浅色卡片的角落露楔形(2026-08-31 实机踩坑)
@@ -171,8 +172,30 @@ def _forward_deep_link(view: str) -> None:
     _activate_existing_window()
 
 
+def _apply_system_rounded_corners(window) -> bool:
+    """Win11+:DWM 系统圆角(DWMWCP_ROUND,8 DIP × DPI,抗锯齿,随尺寸/缩放自适应)。
+
+    比 SetWindowRgn 优:无 1bit 锯齿、跨屏变 DPI 不脱节、拖动零重贴成本,
+    因此 keeper/事件跟踪整组都不需要。Win10/老 Win11 无此属性,返回 False
+    → 调用方回退 rgn 配方(2026-09-06 spike_mica.py 实机验证,四角弧外
+    确实透出窗口身后的像素)。"""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        v = ctypes.c_int(2)  # DWMWCP_ROUND
+        hr = ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            wintypes.HWND(window.native.Handle.ToInt64()),
+            33,                      # DWMWA_WINDOW_CORNER_PREFERENCE
+            ctypes.byref(v), ctypes.sizeof(v))
+        return hr == 0
+    except Exception as e:
+        log.warning("gui: DWM 圆角设置失败: %s", e)
+        return False
+
+
 def _apply_rounded_region(window):
-    """窗口裁成圆角:半径 = 8 CSS px × DPI 缩放(devshell._apply_rounded_region 同款)。
+    """Win10 兜底:窗口裁成圆角,半径 = 8 CSS px × DPI 缩放(devshell 同款)。
 
     shadow 必须为 False —— pywebview 的 DWM 阴影 hack 会在圆角外铺白边(前端实测);
     任一步失败只记日志,窗口退化为直角(不影响功能)。
@@ -311,14 +334,14 @@ def run(view: str | None = None) -> int:
     api.attach_window(window)
 
     def _on_before_show():
-        _apply_rounded_region(window)
-        # native 在 webview.start() 后才存在,事件挂钩必须等窗体诞生(挂早了
-        # window.native=None,Resize 永远追不上 DPI 定型后的最终尺寸)
-        _hook_region_trackers(window)
+        if _apply_system_rounded_corners(window):
+            return  # DWM 圆角自适应一切,无需跟踪
+        _apply_rounded_region(window)      # Win10 兜底:rgn 裁剪 + 事件跟踪 + 定时重贴
+        _hook_region_trackers(window)      # (native 在 webview.start() 后才存在,必须等窗体诞生)
         _start_region_keeper(window)
+        window.events.restored += lambda: _apply_rounded_region(window)  # 最小化还原后重挂
 
     window.events.before_show += _on_before_show
-    window.events.restored += lambda: _apply_rounded_region(window)  # 最小化还原后重挂,保险
 
     if view:
         window.events.loaded += lambda: _inject_launch(window, view)
