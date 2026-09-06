@@ -355,16 +355,16 @@ input[type=password]::-ms-clear{display:none}
 .tiny-label{font-family:Inter,"PingFang SC",sans-serif;font-size:10.5px;font-weight:600;
   letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin:18px 0 6px}
 /* 账号入口卡片(高级设置置顶,整行可点;2026-09-06 从「系统」区第4行提级,用户拍板) */
-.cred-card{display:flex;width:100%;margin:4px 0 2px;padding:13px 14px;gap:16px;
+.cred-card{display:flex;width:100%;margin:4px 0 2px;padding:12px 14px;gap:16px;
   align-items:center;justify-content:space-between;text-align:left;cursor:pointer;
   border:1px solid oklch(60% 0.01 295 / 0.4);border-radius:12px;background:oklch(100% 0 0 / 0.6);
   font:inherit;color:inherit;transition:border-color .18s}
 .cred-card:hover{border-color:var(--accent)}
 .cred-card .t{display:block;font-size:14.5px}
-.cred-card .d{display:block;font-size:12px;color:var(--ink-3);margin-top:1px;font-family:Inter,"PingFang SC",sans-serif}
-.cred-card .go{font:600 12.5px/1.4 inherit;font-family:inherit;color:var(--ink-3);
-  white-space:nowrap;flex-shrink:0;transition:color .18s}
-.cred-card:hover .go{color:var(--accent)}
+.cred-card .go{flex-shrink:0;padding:7px 16px;border:none;border-radius:10px;
+  background:var(--ink);color:oklch(97% 0.005 295);font:600 12.5px/1.4 inherit;font-family:inherit;
+  cursor:pointer;transition:transform .15s ease-out}
+.cred-card .go:hover{transform:translateY(-1px)}
 .check-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
   padding:9px 0;border-bottom:1px solid oklch(60% 0.01 295 / 0.15);font-size:14px}
 .check-row .k{color:var(--ink-3);font-size:12.5px;flex-shrink:0;font-family:Inter,"PingFang SC",sans-serif}
@@ -623,10 +623,10 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <button class="back" onclick="backFrom('v-settings')">‹ 返回</button>
       <h1 style="font-size:22px">高级设置</h1>
 
-      <button class="cred-card" onclick="openDetail('v-login')">
-        <span><span class="t">账号与密码</span><span class="d">改学号 / 密码 / 运营商,提交当场走同一验证,通过才替换</span></span>
-        <span class="go">修改 ›</span>
-      </button>
+      <div class="cred-card" onclick="openDetail('v-login')">
+        <span class="t">账号与密码</span>
+        <button class="go" type="button">修改</button>
+      </div>
 
       <div class="tiny-label">每日自动登录</div>
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:2px 0 4px">
