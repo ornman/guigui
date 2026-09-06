@@ -176,6 +176,9 @@ def _apply_rounded_region(window):
 
     shadow 必须为 False —— pywebview 的 DWM 阴影 hack 会在圆角外铺白边(前端实测);
     任一步失败只记日志,窗口退化为直角(不影响功能)。
+    同参短路:窗口区域只由宽高/DPI 决定,与位置无关;SetWindowRgn(bRedraw=True)
+    是全窗强制重绘 + DWM 重算,而拖动时 LocationChanged 每帧触发,不短路就
+    每帧全窗重绘 —— WebView2 大表面上就是拖动卡顿的根因(2026-09-06 定位)。
     """
     try:
         import ctypes
@@ -185,10 +188,14 @@ def _apply_rounded_region(window):
         user32 = ctypes.windll.user32
         scale = (user32.GetDpiForWindow(hwnd) or 96) / 96.0
         r = int(round(CORNER_CSS_PX * scale))
+        w, h = form.ClientSize.Width, form.ClientSize.Height
+        if getattr(_apply_rounded_region, "_last", None) == (w, h, r):
+            return
         hrgn = ctypes.windll.gdi32.CreateRoundRectRgn(
-            0, 0, form.ClientSize.Width + 1, form.ClientSize.Height + 1,
-            r * 2, r * 2)
-        if not user32.SetWindowRgn(hwnd, hrgn, True):
+            0, 0, w + 1, h + 1, r * 2, r * 2)
+        if user32.SetWindowRgn(hwnd, hrgn, True):
+            _apply_rounded_region._last = (w, h, r)  # 只记成功,失败留给 keeper 下轮
+        else:
             # 成功后 region 归系统;失败必须自删,keeper 每 1.5s 重贴会累积泄漏
             ctypes.windll.gdi32.DeleteObject(hrgn)
     except Exception as e:
