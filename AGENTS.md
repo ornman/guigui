@@ -41,3 +41,16 @@
 - **imagegen-frontend-web 强制每 section 一独立横图**,不适合密集短 section 共用背景的页面——那种需求需要先放宽这条。
 - **严格遵循 AGENTS.md 的 Git 规范**:新增/修改了 skill 引用说明后,立即 `git add` + `git commit`。
 - **产品主原型(8 视图 / 表单 / 设置 / 日志)不在 design-taste-frontend 的「适用」范围**(见该 skill §13 — NOT for dense product UI / dashboards)。它针对的是 marketing landing 与 portfolio。**产品原型阶段的修复只用其「哨兵」子集**:§9.G em-dash 全禁 / §6.B prefers-reduced-motion 全清 / §6.A 只动 transform+opacity / §4.5 button contrast / §9.A 禁纯黑纯白 / §9.F 禁版本号徽标 / §9.F 禁 scroll cue / §4.4 shape consistency。**跳过**:Hero 适配 / bento / GSAP sticky-stack / logo wall / serif discipline / premium-consumer palette(那些针对 marketing 页)。2026-08-31 PRD bot 拆分(commit dae62fd ~ 0ccf93e)即按此口径自检通过。
+
+## 图表工具(archify)
+
+`archify`(MIT,Source: `tt-a1i/archify`)已装于 `C:\Users\ASUS\.agents\skills\archify`(2026-09-06 安装;本机 git 代理 127.0.0.1:7890 失效时 GitHub 直连不通,经 `gh-proxy.com` 镜像 clone)。
+
+**用法**:写类型化 JSON(workflow v2 / lifecycle / architecture / sequence / dataflow,schema 在 `skills/archify/schemas/`)→ `node bin/archify.mjs validate <type> <json> --quality showcase --json` 迭代到 0 诊断 → `deliver <type> <json> <html> --quality showcase`(产物=自包含交互 HTML,冻结规格并记 SHA-256 收据)。桂桂业务流程图源在 `docs/prd/flows/*.json`(2026-09-06 三张全 showcase)。
+
+**踩坑记录**(2026-09-06 实测):
+
+- lifecycle 的「事件/终态泳道」列号是**相对映射**:事件列 0..2 对齐主轨列 2..4 正下方,不当绝对列用;异常态挂在其源状态正下方、回环走页边距是渲染器最吃的布局语言。
+- workflow 泳道+列决定落位;col4-5 走廊最易拥堵,删低价值边永远优先于加路由控制。
+- via 角点必须与端口坐标**逐像素对齐**(差 2px 就出斜线段被 orthogonal-arrows 拦下);`labelAt` 是中心点语义,标签放泳道间空带最稳。
+- `visual-check` 需要本机 Chrome,本机没有 → 按交付契约如实记「环境跳过」,不强求。
