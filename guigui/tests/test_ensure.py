@@ -18,7 +18,7 @@ class Harness:
 
     def __init__(self, monkeypatch, *, cfg_over=None, probe_seq=None,
                  login_seq=None, connect_ok=True, password="pw123",
-                 online_uid="2025000000001"):
+                 online_uid="2025000000001", task_xml="<Task><Command>x</Command></Task>"):
         over = {"uid": "2025000000001"}
         over.update(cfg_over or {})
         self.cfg = config.save(dict(config.DEFAULTS, **over))
@@ -30,6 +30,8 @@ class Harness:
         self.login_calls = 0
         self.sent = []
         self.online_uid = online_uid
+        self.task_xml = task_xml        # 默认任务在岗(空 Command 桩路径不存在)
+        self.task_query_calls = 0
 
         monkeypatch.setattr(ensure, "_now", lambda: self.now)
         monkeypatch.setattr(logstore, "_now", lambda: self.now)
@@ -54,6 +56,17 @@ class Harness:
                             self.connect_calls.append(ssid) or connect_ok)
         monkeypatch.setattr(ensure.notify, "send",
                             lambda t, m, launch=None: self.sent.append((t, launch)))
+        # 任务在岗自检(QA P1-5):默认任务在岗(空 Command 桩路径不存在 → 视为坏任务
+        # 走「失联」分支);测在岗路径时给 task_xml 含真实 Command
+        # (用 sys.executable 之类真实存在的路径,或干脆 action_target_exists 改桩)
+        monkeypatch.setattr(ensure.scheduler, "query_xml",
+                            lambda name: (self.task_query_calls_inc() or self.task_xml))
+        monkeypatch.setattr(ensure.scheduler, "action_target_exists",
+                            lambda xml: bool(xml and "<Command>" in xml))
+
+    def task_query_calls_inc(self):
+        self.task_query_calls += 1
+        return None
 
     def _probe(self):
         self.probe_calls += 1
@@ -400,3 +413,66 @@ def test_error2_rejection_still_resets_cred_verified(monkeypatch):
     d = [e for e in h.today_entries() if e["level"] == "fail"][0]["data"]
     assert d["rej"] == "error2"
     assert "server_view_ip" not in d                        # 普通拒绝无现场四件
+
+
+# ── P1-5:任务在岗自检(ensure 收尾轻量探测)──────────────
+
+
+def test_task_in_place_silent_zero_overhead(monkeypatch):
+    """任务在岗 → 零开销:不写 task_lost_notify_date,不弹通知。"""
+    st = ensure.load_state(); st.pop("task_lost_notify_date", None)
+    ensure.save_state(st)
+    h = Harness(monkeypatch)                 # 默认 task_xml 在岗
+    h.run()
+    state = ensure.load_state()
+    assert state.get("task_lost_notify_date") is None
+    # 主线通知决策(recovered/fail/maintenance)不因自检产生新条目
+    assert h.sent == []
+
+
+def test_task_missing_records_and_notifies_once(monkeypatch):
+    """任务失联 → 当日一条通知,记 task_lost_notify_date;再跑一拍不刷屏。"""
+    st = ensure.load_state(); st.pop("task_lost_notify_date", None)
+    ensure.save_state(st)
+    h = Harness(monkeypatch, task_xml=None)  # query_xml → None
+    h.run()
+    state = ensure.load_state()
+    assert state.get("task_lost_notify_date") == "2026-08-31"
+    # 通知去重:task_lost 弹一次 + 弹给设置页(契约 §2.14 rebuild 入口)
+    lost = [s for s in h.sent if s[1] == "guigui://settings"]
+    assert len(lost) == 1
+
+    # 同日重拍:不刷屏
+    h2 = Harness(monkeypatch, task_xml=None)
+    h2.now = FIXED
+    h2.run()
+    lost2 = [s for s in h2.sent if s[1] == "guigui://settings"]
+    assert lost2 == []                       # 同日已报过
+
+
+def test_silent_day_skips_task_check(monkeypatch):
+    """假期静默同日(秒退那条路)→ 不查任务、不通知。"""
+    today = "2026-08-31"
+    st = ensure.load_state()
+    st["silent"] = True
+    st["last_unreachable_date"] = today
+    st["unreachable_streak"] = 3
+    ensure.save_state(st)
+    h = Harness(monkeypatch, task_xml=None)  # 即便任务真没了也不报警
+    h.now = FIXED
+    calls = []
+    monkeypatch.setattr(ensure.scheduler, "query_xml",
+                        lambda name: (calls.append(1) or None))
+    h.run()
+    assert calls == []                       # 自检根本没跑
+
+
+def test_task_check_runs_on_fail_and_unreachable(monkeypatch):
+    """失败/不可达分支也走自检(任务失联与本次登录成败正交)。"""
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("rejected", "userid error2",
+                            {"msga": "userid error2"}, 200)],
+                task_xml=None)
+    h.run()
+    assert h.task_query_calls >= 1
+    assert ensure.load_state().get("task_lost_notify_date") == "2026-08-31"

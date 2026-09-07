@@ -18,7 +18,7 @@ import os
 import tempfile
 import time
 
-from . import config, detect, drcom, logstore, notify, vault, wifictl
+from . import config, detect, drcom, logstore, notify, scheduler, vault, wifictl
 from . import paths
 
 log = logging.getLogger(__name__)
@@ -49,6 +49,7 @@ def _default_state() -> dict:
         "last_settle_date": None,
         "last_result": None,             # {date, time, tries, outcome}
         "cred_verified": False,          # 凭证是否经服务器真验证(仅 error2 置假,§7.3)
+        "task_lost_notify_date": None,   # 定时任务失联通知每日闸(QA P1-5)
     }
 
 
@@ -211,6 +212,37 @@ def _today() -> str:
     return _now().strftime("%Y-%m-%d")
 
 
+def _check_task_in_place(state: dict, cfg: dict, today: str) -> None:
+    """任务在岗自检(QA P1-5):主任务被拦/丢失/挪走时如实记录 + 每日弹一次。
+
+    触发条件:不在假期静默同日(那路径本就跑不到这里);master 关时不自检
+    (run 早就 return 了,这里的 cfg.master 必然 True)。
+    设计原则:--ensure 短进程**只报告不重建**(plan §67)。rebuild 是 GUI 侧
+    rebuildTask(契约 §2.14)的职责,避免静默进程和管理侧抢,也不在静默
+    路径里和 selfheal 互锁。
+    """
+    if state.get("silent"):
+        return
+    xml = scheduler.query_xml(scheduler.TASK_MAIN)
+    if xml is not None and scheduler.action_target_exists(xml):
+        return
+    # 任务失联:仅记日期 + 每日一拍(去重靠 task_lost_notify_date,避免连拍刷屏)
+    if state.get("task_lost_notify_date") != today:
+        state["task_lost_notify_date"] = today
+        if cfg.get("notifications", True):
+            notify.task_lost()
+
+
+def _persist(state: dict, cfg: dict, today: str) -> int:
+    """落盘 + 任务在岗自检(QA P1-5)+ 必要时再落一次。统一收尾,run() 五个分支都用。"""
+    save_state(state)
+    prev = state.get("task_lost_notify_date")
+    _check_task_in_place(state, cfg, today)
+    if state.get("task_lost_notify_date") != prev:
+        save_state(state)
+    return 0
+
+
 def _apply_settle(cfg: dict, state: dict, today: str, uid: str, tries: int) -> None:
     """当日首次成功:收工三行 + 计数复位 + last_result + 通知判断(不落盘)。"""
     _settle_rows(cfg, uid, tries)
@@ -294,19 +326,17 @@ def run() -> int:
 
     if outcome == "settled":
         if state.get("last_settle_date") == today:
-            return 0  # 登上就停:后续拍零日志零通知
+            return 0  # 登上就停:后续拍零日志零通知(任务在岗已在首拍查过)
         _apply_settle(cfg, state, today, uid, tries)
         if tries > 0:
             state["cred_verified"] = True  # 真登录成功 = 凭证经服务器验证
-        save_state(state)
-        return 0
+        return _persist(state, cfg, today)
 
     # 开门锚点(AC-12):06:50 前的被拒/不可达一律只算「还没开门」—
     # 不判失败、不计数、不通知、不动 cred_verified、不进假期静默状态机
     if before_anchor():
         logstore.append("note", "还没开门(06:50 前),等下一拍", when=_now())
-        save_state(state)
-        return 0
+        return _persist(state, cfg, today)
 
     if outcome in ("rejected", "unexpected"):
         kind = drcom.classify_rejection(msg) if outcome == "rejected" else None
@@ -325,8 +355,7 @@ def run() -> int:
         state["last_result"] = {"date": today, "time": _now().strftime("%H:%M"),
                                 "tries": tries, "outcome": "fail"}
         _apply_notify(cfg, state, connected=False, outcome=outcome)
-        save_state(state)
-        return 0
+        return _persist(state, cfg, today)
 
     # unreachable:假期静默状态机(AC-10)
     if state.get("last_unreachable_date") != today:
@@ -347,5 +376,4 @@ def run() -> int:
         })
     # 同日后续拍:不重复记日志/不更新 last_result,只走通知判断(永不通知)
     _apply_notify(cfg, state, connected=False, outcome=None)
-    save_state(state)
-    return 0
+    return _persist(state, cfg, today)

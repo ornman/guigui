@@ -19,6 +19,7 @@ log = logging.getLogger(__name__)
 RECOVERED = "recovered"
 FAILED = "failed"            # 开门后明确被拒 → 当拍即弹(PRD 4.5)
 MAINTENANCE = "maintenance"  # 维护页连续 ≥3 拍(PRD 4.5)
+TASK_LOST = "task_lost"      # 任务被拦/丢失(ensure 自检发现,QA P1-5)
 
 LAUNCH_MAIN = "guigui://main"
 LAUNCH_CREDS = "guigui://creds"
@@ -93,6 +94,22 @@ def task_linger() -> None:
         "桂桂",
         "没关干净:定时任务还在,明早还会自动登录。"
         "点开设置,把开关再关一次试试。",
+        launch=LAUNCH_SETTINGS,
+    )
+
+
+def task_lost() -> None:
+    """ensure 静默自检发现定时任务不在岗(QA P1-5)。
+
+    区别 task_blocked:那边是「建任务当场被拦」,用户已看见保存提示;
+    这边是「昨天建好今天消失」(安全软件事后删 / exe 被挪),悄无声息 —
+    必须告知,否则「每天 07:00」最大长期承诺已死无人知晓;回设置页点
+    「点此重建」即可(契约 §2.14 rebuildTask 仅用户点击触发,绝不在
+    --ensure 静默进程里重建,避免静默进程和管理侧抢)。"""
+    send(
+        "桂桂",
+        "定时任务不见了,自动登录可能已经停了。"
+        "点开设置,按「点此重建」就好。",
         launch=LAUNCH_SETTINGS,
     )
 
