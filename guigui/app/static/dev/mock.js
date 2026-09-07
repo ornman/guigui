@@ -12,6 +12,7 @@
      rejected  登录一律被拒 reason=wrong_password(QA 密码错误路径;网态同 out)
      bind      登录被 bind 拦 reason=bound(密码其实对;网态同 out)
      limit     登录被 limit_users 拒 reason=limit_users(已在别处登录,不冤枉密码;网态同 out)
+     fbdg      反馈提交走 SUBMITTED_DEGRADED(D1 成功、issue 延后;用户应无感照常「已收到」)
      other     日常·线上是别人的学号(提交走阶梯:logging_out 带 online_uid → 真登成功)
      unverified 日常·密码未验证+今早失败(主页两横幅 QA) */
 (function(){
@@ -169,6 +170,7 @@ window.GGMock={
     await delay(700);
     const kind=(a&&Array.isArray(a.kind)&&a.kind.length)?a.kind:['problem'];
     if(!a||!String(a.what||'').trim())return ERR('FB_VALIDATION','说说具体情况(必填)');
+    if(SCENE==='fbdg')return OK({result:'submitted_degraded',id:'GG-37'});
     if(SCENE==='down'){                          /* 断网 → 入队(QA:AC-F3) */
       const q=JSON.parse(localStorage.getItem('gg-mock-fbq')||'[]');
       q.push({kind,what:a.what,contact:a.contact||''});
