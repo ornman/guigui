@@ -225,7 +225,7 @@ textarea{width:100%;padding:11px 14px;border:1px solid oklch(60% 0.01 295 / 0.35
   border-radius:12px;background:oklch(100% 0 0 / 0.6);font:15px/1.5 inherit;font-family:inherit;
   color:var(--ink);resize:none;transition:border-color .18s,box-shadow .18s}
 textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-#v-feedback details{margin:2px 0 6px}
+#v-feedback details{margin:0}
 #v-feedback summary{cursor:pointer;font:500 13px/1.6 inherit;color:var(--ink-2);
   list-style:none;display:flex;align-items:center;gap:6px;user-select:none}
 #v-feedback summary::before{content:"▸";font-size:11px;color:var(--ink-3);transition:transform .15s}
@@ -637,7 +637,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
           <span class="colon">:</span>
           <input id="ct-m" inputmode="numeric" maxlength="2" value="00" aria-label="分钟">
         </div>
-        <div class="presets">
+        <div class="presets" id="time-presets">
           <button class="preset" data-t="06:45">06:45</button>
           <button class="preset on" data-t="07:00">07:00</button>
           <button class="preset" data-t="07:30">07:30</button>
@@ -684,7 +684,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
     <div class="v" id="v-feedback">
       <button class="back" onclick="backFrom('v-feedback')">‹ 返回</button>
       <h1 style="font-size:22px">说给桂桂听。</h1>
-      <div class="presets" id="fb-kinds" style="margin:0 0 16px">
+      <div class="presets" id="fb-kinds" style="margin:0 0 14px">
         <button type="button" class="preset on" data-kind="problem" onclick="fbToggleKind('problem')">问题</button>
         <button type="button" class="preset" data-kind="suggestion" onclick="fbToggleKind('suggestion')">建议</button>
       </div>
@@ -701,7 +701,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
         <div class="log" id="feedback-text" style="margin-top:0;max-height:240px;white-space:pre-wrap">正在生成…</div>
       </details>
       <button class="btn" id="fb-send" onclick="sendFeedback(this)">发送反馈</button>
-      <button class="link" id="fb-copy" style="margin-top:10px;font-size:12.5px" onclick="copyFeedback(this)">复制文本</button>
+      <button class="link" id="fb-copy" style="margin-top:10px;font-size:12px" onclick="copyFeedback(this)">复制文本</button>
       <div class="micro-line" id="fb-pending" style="display:none;margin-top:10px"></div>
     </div>
 
@@ -1142,9 +1142,11 @@ document.querySelectorAll('.dd').forEach(dd=>{
   }));
 });
 document.addEventListener('click',()=>document.querySelectorAll('.dd.open').forEach(o=>o.classList.remove('open')));
-/* 自定义时间:输入常驻,常用时间一键填充;手动键入自动跳格 + 范围约束 */
-document.querySelectorAll('.preset').forEach(b=>b.addEventListener('click',()=>{
-  document.querySelectorAll('.preset').forEach(x=>x.classList.remove('on'));
+/* 自定义时间:输入常驻,常用时间一键填充;手动键入自动跳格 + 范围约束。
+   选择器必须锁 #time-presets:反馈页分类药丸同用 .preset 类(多选),
+   裸 .preset 会把单选逻辑绑过去 — 清选中态 + data-t 抛错,两页互相弄乱 */
+document.querySelectorAll('#time-presets .preset').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#time-presets .preset').forEach(x=>x.classList.remove('on'));
   b.classList.add('on');
   const t=b.dataset.t.split(':');
   $('ct-h').value=t[0];$('ct-m').value=t[1];
@@ -1157,7 +1159,7 @@ document.querySelectorAll('.preset').forEach(b=>b.addEventListener('click',()=>{
   el.addEventListener('input',()=>{
     el.value=el.value.replace(/\D/g,'').slice(0,2);
     el.classList.remove('err');
-    document.querySelectorAll('.preset').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('#time-presets .preset').forEach(x=>x.classList.remove('on'));
     if(el.value.length===2&&i<arr.length-1)$(arr[i+1]).focus();
     renderTriggerTime();
     setAuto($('sw-auto').classList.contains('on'));
@@ -1299,7 +1301,7 @@ async function renderMainData(){
       currentTriggerTime=curCfg.trigger_time;
       const t=currentTriggerTime.split(':');
       $('ct-h').value=t[0];$('ct-m').value=t[1];
-      document.querySelectorAll('.preset').forEach(x=>x.classList.toggle('on',x.dataset.t===currentTriggerTime));
+      document.querySelectorAll('#time-presets .preset').forEach(x=>x.classList.toggle('on',x.dataset.t===currentTriggerTime));
     }
     setAuto(curCfg.master);
     document.body.classList.toggle('hide-gui',curCfg.show_gui===false);
@@ -1324,7 +1326,7 @@ async function loadSettings(){
   curCfg=c.data;
   const t=(curCfg.trigger_time||'07:00').split(':');
   $('ct-h').value=t[0];$('ct-m').value=t[1];currentTriggerTime=curCfg.trigger_time||'07:00';
-  document.querySelectorAll('.preset').forEach(x=>x.classList.toggle('on',x.dataset.t===currentTriggerTime));
+  document.querySelectorAll('#time-presets .preset').forEach(x=>x.classList.toggle('on',x.dataset.t===currentTriggerTime));
   document.querySelectorAll('#v-settings .sw[data-cfg]').forEach(sw=>sw.classList.toggle('on',!!curCfg[sw.dataset.cfg]));
   setAuto(!!curCfg.master);
   $('sw-gui').classList.toggle('on',curCfg.show_gui!==false);
