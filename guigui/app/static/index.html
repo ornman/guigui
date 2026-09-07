@@ -1048,16 +1048,31 @@ async function loginNow(){
     showLoginErr(r.message||'登录被拒',r.reason);return}
   if(r.code==='NET_UNREACHABLE'){openDetail('v-guide');return}
 }
-/* 登录被拒提示:文案来自后端信封(契约 1.2.0,与 mock 逐字一致);
-   bind 被拒时文案说「去自助服务平台看看绑定」,句尾给真入口(默认浏览器) */
+/* 登录被拒提示:文案来自后端信封(契约 1.2.0,与 mock 逐字一致),前端直显;
+   bind 被拒时句中已有「…去自助服务平台看看绑定」— 把平台名这六个字本身
+   做成可点入口(下划线示意,默认浏览器打开),文案即入口,不另加链接 */
 function rejectionText(el,text,reason){
-  el.textContent=text;   /* 赋值即清空,上一轮追加的链接自然移除 */
-  if(reason!=='bound')return;
-  const b=document.createElement('button');
-  b.className='link';b.textContent='去自助服务平台 ›';
-  b.style.cssText='margin:0 0 0 6px;font-size:inherit;white-space:nowrap';
-  b.onclick=()=>openSelfService(b);
-  el.appendChild(b);
+  const i=reason==='bound'&&text?text.indexOf('自助服务平台'):-1;
+  if(i<0){
+    el.textContent=text;   /* 赋值即清空,上一轮的内联链接自然移除 */
+    if(reason==='bound'){
+      /* 兜底:后端文案若不含平台名(不应发生),退回句尾独立链接,出口不能丢 */
+      const b=document.createElement('button');
+      b.className='link';b.textContent='去自助服务平台 ›';
+      b.style.cssText='margin:0 0 0 6px;font-size:inherit;white-space:nowrap';
+      b.onclick=()=>openSelfService(b);
+      el.appendChild(b);
+    }
+    return;
+  }
+  el.textContent='';
+  el.append(document.createTextNode(text.slice(0,i)));
+  const a=document.createElement('span');
+  a.textContent='自助服务平台';
+  a.style.cssText='text-decoration:underline;text-underline-offset:.22em;cursor:pointer';
+  a.onclick=()=>openSelfService(a,'没能打开','自助服务平台');
+  el.appendChild(a);
+  el.append(document.createTextNode(text.slice(i+6)));
 }
 function showLoginErr(text,reason){rejectionText($('login-err-text'),'⚠ '+text,reason);$('login-err').style.display='block'}
 function confirmUidChange(go){
@@ -1210,9 +1225,13 @@ async function rebuildTask(){
   if(r.ok)renderTaskRow(r.data.ok);
 }
 /* 自助服务平台:交系统默认浏览器,桂桂本体内不开网页;失败就地报,不弹窗 */
-async function openSelfService(btn){
+async function openSelfService(btn,failText,origText){
   const r=await GG.api.openSelfService();
-  if(!r.ok&&btn){btn.textContent='没能打开';setTimeout(()=>btn.textContent='打开',2000)}
+  if(!r.ok&&btn){
+    /* 失败就地反馈:内联场景换字后还原为平台名,不吞点击 */
+    btn.textContent=failText||'没能打开';
+    setTimeout(()=>{if(btn.isConnected)btn.textContent=origText||'打开'},2000)
+  }
 }
 /* ═══ F3 数据渲染层:硬编码内容 → 契约数据;生成的标记与 PRD 原型逐字节一致 ═══ */
 const SIGNAL_TXT={strong:'信号强',medium:'信号中',weak:'信号弱'};
