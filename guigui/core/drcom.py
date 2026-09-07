@@ -38,6 +38,7 @@ REJ_WRONG_PASSWORD = "wrong_password"
 REJ_WRONG_ACCOUNT = "wrong_account"
 REJ_BOUND = "bound"
 REJ_LIMIT_USERS = "limit_users"
+REJ_THROTTLED = "throttled"  # 服务器节流(让等 N 秒再试,QA P1-6);不算密码错
 
 # 诊断包/日志 data.rej 用的服务器码(§4.1/§5;与契约 §2.3 reason 枚举不同源)
 REJ_CODE = {
@@ -45,10 +46,52 @@ REJ_CODE = {
     REJ_WRONG_PASSWORD: "error2",
     REJ_BOUND: "bind",
     REJ_LIMIT_USERS: "limit_users",
+    REJ_THROTTLED: "throttled",
 }
+
+# waitsec 节流秒数上限(QA P1-6 经验值,实测后校准):服务器给的秒数过大时
+# 客户端按 30s 封顶等,剩余时间透传信封让前端「稍后再试」;防止一次 waitsec
+# 把交互/静默重试循环卡死分钟级
+WAITSEC_CAP = 30
 
 # 学号形数字串(≥10 位)→ 打码;诊断红线「打码在采集时完成」的工具面
 _UID_RUN = re.compile(r"\d{10,14}")
+
+# waitsec 节流秒数解析(QA P1-6 实测后校准):实测前先按经验写两种形态 —
+# 1) JSON 字段 {"waitsec": N} 或 "waittime" 同义(Dr.COM 系列常见键名);
+# 2) msga 文本中的数字(中文「请等待 30 秒」类)+ wait/秒 关键词辅助;
+# 节流判定:关键词命中即按节流处理,数字解析失败则按最小保守值 1 秒,
+# 关键词也靠 regex 模糊匹配(实测响应文案可能含多余空格/标点)。
+_WAIT_HINT = re.compile(
+    r"wait\s*sec|waitsec|wait\s*time|wait\s*\d|秒|请\s*等|稍后再试|稍候|等待|too\s*fast|太\s*快",
+    re.I)
+_WAIT_NUM = re.compile(r"\d+")
+
+
+def parse_waitsec(payload: dict | None, msg: str | None) -> int | None:
+    """从响应里抽「让等几秒」的整数;抽不到返回 None(调用方按无节流处理)。
+
+    优先级:JSON 字段("waitsec"/"waittime"/"wait") → msga 文本 + 关键词命中。
+    JSON 字段疑似 0/负数按 None(节流秒数不能是 0)。"""
+    if isinstance(payload, dict):
+        for k in ("waitsec", "waittime", "wait"):
+            v = payload.get(k)
+            try:
+                n = int(v)
+                if n > 0:
+                    return n
+            except (TypeError, ValueError):
+                pass
+    msg = str(msg or "")
+    if not msg:
+        return None
+    if not _WAIT_HINT.search(msg):
+        return None
+    m = _WAIT_NUM.search(msg)
+    if not m:
+        return 1   # 命中关键词但抽不到数字,按 1s 保守等
+    n = int(m.group(0))
+    return n if n > 0 else 1
 
 
 def scrub_uids(text: str) -> str:
@@ -56,8 +99,16 @@ def scrub_uids(text: str) -> str:
     return _UID_RUN.sub(lambda m: mask_uid(m.group(0)), str(text or ""))
 
 
-def classify_rejection(msg: str | None) -> str | None:
-    """把服务器拒绝文案归类为四态之一;不认识返回 None(原文展示,不猜)。"""
+def classify_rejection(msg: str | None, *,
+                       waitsec: int | None = None,
+                       payload: dict | None = None) -> str | None:
+    """把服务器拒绝文案归类为四态之一;不认识返回 None(原文展示,不猜)。
+
+    节流优先(QA P1-6):waitsec 命中即返 REJ_THROTTLED,绝不让节流文案误诊成
+    密码错(error2 msga 可能混着节流说明)。节流检测先看参数 waitsec,再看
+    payload/msga 自行 parse — 调用方若已知道 waitsec 直接传省一次解析。"""
+    if waitsec is not None or parse_waitsec(payload, msg) is not None:
+        return REJ_THROTTLED
     msg = str(msg or "")
     if "bind userid error" in msg:
         return REJ_BOUND
@@ -81,6 +132,8 @@ def rejection_text(kind: str | None, fallback: str) -> str:
     if kind == REJ_LIMIT_USERS:
         return ("这个学号已在别的设备上登录(比如在别处登过没下线),"
                 "那边下线后桂桂会自动登好")
+    if kind == REJ_THROTTLED:
+        return "校园网侧说太快了,先等等再来(QA P1-6 节流)"
     return fallback
 
 # 门户后缀表(2026-08-31 从注销页 carrier 配置实测抓全,共 4 项;
@@ -145,12 +198,14 @@ def build_login_url(base: str, uid: str, password: str,
 class LoginResult(NamedTuple):
     """login_ex 的返回:result 同 login();payload=拒绝响应的 JSONP 原文
     (limit_users 现场四件 ss5/ss1/ss4/aolno/ubind 从这取,§5);
-    http=HTTP 状态码(不可达 None)。请求 URL(含 upass=)永不进这里。"""
+    http=HTTP 状态码(不可达 None);waitsec=服务器节流秒数(QA P1-6,None=不限速)。
+    请求 URL(含 upass=)永不进这里。"""
 
     result: str
     msg: str
     payload: dict | None
     http: int | None
+    waitsec: int | None = None
 
 
 def _parse_jsonp(body: str) -> dict | None:
@@ -188,15 +243,16 @@ def login_ex(base: str, uid: str, password: str,
             status = resp.status
     except Exception as e:
         log.info("drcom: 登录请求失败(%s)", type(e).__name__)
-        return LoginResult(UNREACHABLE, "够不着认证服务器", None, None)
+        return LoginResult(UNREACHABLE, "够不着认证服务器", None, None, None)
     data = _parse_jsonp(body)
     if data is None:
         log.warning("drcom: 非 JSONP 响应: %r", body[:80])
-        return LoginResult(UNEXPECTED, "认证服务器返回了不认识的格式", None, status)
+        return LoginResult(UNEXPECTED, "认证服务器返回了不认识的格式", None, status, None)
     if data.get("result") == 1:
-        return LoginResult(SUCCESS, "", data, status)
+        return LoginResult(SUCCESS, "", data, status, None)
     msg = str(data.get("msga") or "").strip()
-    return LoginResult(REJECTED, msg or "密码可能改过了", data, status)
+    waitsec = parse_waitsec(data, msg)
+    return LoginResult(REJECTED, msg or "密码可能改过了", data, status, waitsec)
 
 
 def chkstatus_uid(base: str, timeout: int = CHKSTATUS_TIMEOUT) -> str | None:

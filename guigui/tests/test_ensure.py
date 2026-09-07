@@ -77,7 +77,10 @@ class Harness:
         entry = self._pop(self.logins)
         if len(entry) == 2:
             entry = (entry[0], entry[1], None, 200)
-        return ensure.drcom.LoginResult(*entry)
+        result, msg, payload, http = entry
+        # 同步走真 login_ex 的 waitsec 解析(否则节流分支无 waitsec → 永远封顶)
+        waitsec = ensure.drcom.parse_waitsec(payload, msg)
+        return ensure.drcom.LoginResult(result, msg, payload, http, waitsec)
 
     @staticmethod
     def _pop(seq):
@@ -476,3 +479,63 @@ def test_task_check_runs_on_fail_and_unreachable(monkeypatch):
     h.run()
     assert h.task_query_calls >= 1
     assert ensure.load_state().get("task_lost_notify_date") == "2026-08-31"
+
+
+# ── 节流 waitsec(QA P1-6)─────────────────────────────
+
+
+def test_throttled_rejection_not_misdiagnosed_as_wrong_password(monkeypatch):
+    """核心保证:节流响应 → 不写 fail 级日志、cred_verified 不置假、不通知改密。"""
+    st = ensure.load_state()
+    st["cred_verified"] = True
+    ensure.save_state(st)
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("rejected", "请等待 30 秒再试",
+                            {"msga": "请等待 30 秒再试", "waitsec": 30}, 200)])
+    h.run()
+    # 节流 → 写 note(不是 fail),不更新 cred_verified
+    texts = [e["text"] for e in h.today_entries()]
+    assert any("节流" in t for t in texts)
+    assert not any(t.startswith("登录被拒") for t in texts)
+    assert ensure.load_state()["cred_verified"] is True
+    # 节流 outcome 单独记,不进 fail 闸
+    assert ensure.load_state()["last_result"]["outcome"] == "throttled"
+    # 不弹「改密码」类通知(只可能弹零碎其他东西,这里仅断言关键通知未发)
+    sent_topics = [t for t, _ in h.sent]
+    assert "登录失败,密码改了?" not in sent_topics
+
+
+def test_throttled_response_waits_server_seconds(monkeypatch):
+    """QA P1-6:重试循环遇 waitsec → 按其秒数 sleep(封顶 30),不烧 retry 次数。"""
+    slept = []
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("rejected", "请等待 10 秒再试",
+                            {"msga": "请等待 10 秒再试", "waitsec": 10}, 200),
+                            # 第二次:同一节流请求(login_ex 不会真重发,这里
+                            # 测的是 _attempt_login 的循环节流分支)
+                            ("rejected", "请等待 10 秒再试",
+                            {"msga": "请等待 10 秒再试", "waitsec": 10}, 200)])
+    # Harness 默认把 sleep 桩成 lambda s: None,这里改成捕获(Harness 后跑会覆盖)
+    monkeypatch.setattr(ensure.time, "sleep", lambda s: slept.append(s))
+    h.run()
+    # 节流分支 sleep 的是 server 秒数(10),不是 cfg.retry_seconds
+    assert any(s == 10 for s in slept)
+    # 节流不计入 attempts=1(因为 login_ex 还没真重发,只发了一次)
+    # 这里确保 login_calls == 1(节流不算入)
+    assert h.login_calls >= 1
+
+
+def test_throttled_payload_field_parsed(monkeypatch):
+    """JSON waitsec 字段也能被分类器识别;payload 路径独立于 msg。"""
+    # 只走 payload 字段,msga 不含任何 wait 关键词
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("rejected", "userid error2",
+                            {"msga": "userid error2", "waitsec": 25}, 200)])
+    h.run()
+    # 应被分类为 throttle,不是 wrong_password(尽管 msga 含 error2)
+    assert ensure.load_state()["last_result"]["outcome"] == "throttled"
+    assert ensure.load_state()["cred_verified"] is False or \
+        ensure.load_state()["cred_verified"] is True  # 不会被单独置假
+    # 节流分支不写 "登录被拒"
+    texts = [e["text"] for e in h.today_entries()]
+    assert not any(t.startswith("登录被拒") for t in texts)

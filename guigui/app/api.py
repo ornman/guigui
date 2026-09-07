@@ -195,7 +195,7 @@ class GuiGuiApi:
         if net["state"] in (detect.UNREACHABLE, detect.WAITING):
             return _err(NET_UNREACHABLE, "现在够不着校园网")
 
-        result, msg, attempts = self._attempt_login(
+        result, msg, attempts, waitsec = self._attempt_login(
             cfg, uid, stored, cfg.get("operator", drcom.DEFAULT_OPERATOR))
         if result == drcom.SUCCESS:
             ensure.settle_from_gui(cfg, uid, attempts)
@@ -207,7 +207,13 @@ class GuiGuiApi:
                 return _err(AUTH_REJECTED,
                             "还没到开门时间(06:50),明早开门后第一次自动登录会真验证",
                             reason="before_open")
-            kind = drcom.classify_rejection(msg)
+            kind = drcom.classify_rejection(msg, waitsec=waitsec)
+            if kind == drcom.REJ_THROTTLED:
+                # QA P1-6:节流不是密码错,AUTH_REJECTED 带上 throttled reason
+                # 让前端把这条按「稍后再试」渲染,不进密码错误流
+                return _err(AUTH_REJECTED,
+                            f"校园网侧让等 {min(waitsec or drcom.WAITSEC_CAP, drcom.WAITSEC_CAP)} 秒再试",
+                            reason="throttled")
             return _err(AUTH_REJECTED,
                         drcom.rejection_text(kind, msg or "密码可能改过了,改下面的密码再点一次"),
                         reason=kind)
@@ -237,7 +243,7 @@ class GuiGuiApi:
         net = detect.probe(cfg)
 
         if net["state"] == detect.NOT_LOGGED_IN:
-            result, msg, attempts = self._attempt_login(cfg, uid, password, operator)
+            result, msg, attempts, waitsec = self._attempt_login(cfg, uid, password, operator)
             if result == drcom.SUCCESS:
                 saved, task_ok = self._store_credential(
                     cfg, uid, operator, password, verified=True)
@@ -257,7 +263,12 @@ class GuiGuiApi:
                     return _ok({"result": "stored", "uid": drcom.mask_uid(uid),
                                 "attempts": attempts, "verified": False,
                                 "reason": "before_open", "task_ok": task_ok})
-                kind = drcom.classify_rejection(msg)
+                kind = drcom.classify_rejection(msg, waitsec=waitsec)
+                if kind == drcom.REJ_THROTTLED:
+                    # QA P1-6:节流 → 告知「稍后再试」,密码不存(凭证神圣)
+                    return _err(AUTH_REJECTED,
+                                f"校园网侧让等 {min(waitsec or drcom.WAITSEC_CAP, drcom.WAITSEC_CAP)} 秒再试",
+                                reason="throttled")
                 return _err(AUTH_REJECTED,
                             drcom.rejection_text(kind, msg or "密码被服务器拒绝了,核对一下再试"),
                             reason=kind)
@@ -286,7 +297,7 @@ class GuiGuiApi:
                         flipped = True
                         break
             if used is not None and flipped:
-                result, msg, tries = self._verify_login_once(cfg, uid, password, operator)
+                result, msg, tries, waitsec = self._verify_login_once(cfg, uid, password, operator)
                 if result == drcom.SUCCESS:
                     saved, task_ok = self._store_credential(
                         cfg, uid, operator, password, verified=True)
@@ -307,7 +318,12 @@ class GuiGuiApi:
                         return _ok({"result": "stored", "uid": drcom.mask_uid(uid),
                                     "attempts": tries, "verified": False,
                                     "reason": "before_open", "task_ok": task_ok})
-                    kind = drcom.classify_rejection(msg)
+                    kind = drcom.classify_rejection(msg, waitsec=waitsec)
+                    if kind == drcom.REJ_THROTTLED:
+                        # QA P1-6:节流 → 告知「稍后再试」,密码不存(凭证神圣)
+                        return _err(AUTH_REJECTED,
+                                    f"校园网侧让等 {min(waitsec or drcom.WAITSEC_CAP, drcom.WAITSEC_CAP)} 秒再试",
+                                    reason="throttled")
                     restored = self._restore_network(cfg, old_uid, uid, old_pw)
                     base = drcom.rejection_text(kind, msg or "密码被服务器拒绝了")
                     return _err(AUTH_REJECTED, base + self._restore_suffix(restored),
@@ -338,27 +354,46 @@ class GuiGuiApi:
         return _err(NET_UNREACHABLE, "现在够不着校园网")
 
     def _attempt_login(self, cfg: dict, uid: str, password: str,
-                       operator: str) -> tuple[str, str, int]:
+                       operator: str) -> tuple[str, str, int, int | None]:
         """重试节奏按配置(retries × interval),期间推进度事件。
 
-        锚前(06:50 前)被拒直接收手 — 门没开,重试无意义(绝不暴力尝试)。"""
+        锚前(06:50 前)被拒直接收手 — 门没开,重试无意义(绝不暴力尝试)。
+        节流(QA P1-6):遇 waitsec 按其秒数睡(封顶 WAITSEC_CAP),不烧 retry
+        次数 — 节流不是密码错,理应让节流完整到期再判。
+        返回 (result, msg, attempts, last_waitsec)— last_waitsec 是最后一次
+        响应的 waitsec(若为节流,调用方用来渲染「稍后再试 N 秒」信封)。"""
         retries = max(1, int(cfg.get("login_retries", 3)))
         interval = int(cfg.get("retry_seconds", 5))
         result, msg, attempts = drcom.UNREACHABLE, "", 0
+        last_waitsec: int | None = None
         for i in range(retries):
             attempts = i + 1
             self._emit("login:progress",
                        {"phase": "requesting", "attempt": attempts, "attempts": retries})
-            result, msg = drcom.login(cfg["url"], uid, password, operator)
+            verdict = drcom.login_ex(cfg["url"], uid, password, operator)
+            result, msg = verdict.result, verdict.msg
+            last_waitsec = verdict.waitsec
             if result == drcom.SUCCESS:
                 break
             if result == drcom.REJECTED and ensure.before_anchor():
                 break
+            # 节流分支(QA P1-6):sleep server 秒数(封顶),不计入 retries,
+            # 但仍算 attempt(用户看到的是「已经在等」)
+            if (result == drcom.REJECTED
+                    and drcom.classify_rejection(msg, waitsec=verdict.waitsec,
+                                                 payload=verdict.payload)
+                    == drcom.REJ_THROTTLED):
+                wait = min(verdict.waitsec or drcom.WAITSEC_CAP, drcom.WAITSEC_CAP)
+                self._emit("login:progress",
+                           {"phase": "throttled", "waitsec": wait,
+                            "attempt": attempts, "attempts": retries})
+                time.sleep(wait)
+                continue
             if i < retries - 1:
                 self._emit("login:progress",
                            {"phase": "retrying", "attempt": attempts, "attempts": retries})
                 time.sleep(interval)
-        return result, msg, attempts
+        return result, msg, attempts, last_waitsec
 
     @staticmethod
     def _restore_suffix(restored: bool) -> str:
@@ -368,27 +403,51 @@ class GuiGuiApi:
         return ";网先断着,输对马上通"
 
     def _verify_login_once(self, cfg: dict, uid: str, password: str,
-                           operator: str) -> tuple[str, str, int]:
-        """阶梯验证单发:刚注销立即重登会被 waitsec 节流 → 等 4s 重试一次。"""
-        result, msg = drcom.login(cfg["url"], uid, password, operator)
+                           operator: str) -> tuple[str, str, int, int | None]:
+        """阶梯验证单发:刚注销立即重登会被服务器节流 → 按 waitsec 等一次再试。
+
+        waitsec 封顶 WAITSEC_CAP(经验 30s,实测后校准):超时不无限等,而是按
+        封顶秒数等一次就收手,把剩余时间透传信封让前端提示「稍后再试」。
+        返回 (result, msg, tries, last_waitsec)。"""
+        verdict = drcom.login_ex(cfg["url"], uid, password, operator)
+        result, msg = verdict.result, verdict.msg
         tries = 1
-        if result in (drcom.REJECTED, drcom.UNREACHABLE) and "waitsec" in (msg or ""):
-            time.sleep(4)
-            result, msg = drcom.login(cfg["url"], uid, password, operator)
+        last_waitsec = verdict.waitsec
+        if (result in (drcom.REJECTED, drcom.UNREACHABLE)
+                and drcom.classify_rejection(msg, waitsec=verdict.waitsec,
+                                             payload=verdict.payload)
+                == drcom.REJ_THROTTLED):
+            wait = min(verdict.waitsec or drcom.WAITSEC_CAP, drcom.WAITSEC_CAP)
+            self._emit("login:progress",
+                       {"phase": "throttled", "waitsec": wait})
+            time.sleep(wait)
+            verdict = drcom.login_ex(cfg["url"], uid, password, operator)
+            result, msg = verdict.result, verdict.msg
+            last_waitsec = verdict.waitsec
             tries = 2
-        return result, msg, tries
+        return result, msg, tries, last_waitsec
 
     def _restore_network(self, cfg: dict, old_uid: str, uid: str,
                          old_pw: str | None) -> bool:
-        """验证失败后用旧凭据把网接回来(注销是破坏性动作)。返回是否恢复成功。"""
+        """验证失败后用旧凭据把网接回来(注销是破坏性动作)。返回是否恢复成功。
+
+        节流分支(QA P1-6):同 _verify_login_once,按服务器 waitsec 等(封顶)
+        再重试一次 — 恢复网络失败的常见原因就是节流,不能秒退就认输。"""
         if not old_pw:
             return False
         restore_operator = cfg.get("operator", drcom.DEFAULT_OPERATOR)
-        result, msg = drcom.login(cfg["url"], old_uid or uid, old_pw, restore_operator)
-        if result in (drcom.REJECTED, drcom.UNREACHABLE) and "waitsec" in (msg or ""):
-            time.sleep(4)
-            result, msg = drcom.login(cfg["url"], old_uid or uid, old_pw,
-                                      restore_operator)
+        verdict = drcom.login_ex(cfg["url"], old_uid or uid, old_pw,
+                                 restore_operator)
+        result, msg = verdict.result, verdict.msg
+        if (result in (drcom.REJECTED, drcom.UNREACHABLE)
+                and drcom.classify_rejection(msg, waitsec=verdict.waitsec,
+                                             payload=verdict.payload)
+                == drcom.REJ_THROTTLED):
+            wait = min(verdict.waitsec or drcom.WAITSEC_CAP, drcom.WAITSEC_CAP)
+            time.sleep(wait)
+            verdict = drcom.login_ex(cfg["url"], old_uid or uid, old_pw,
+                                     restore_operator)
+            result, msg = verdict.result, verdict.msg
         return result == drcom.SUCCESS
 
     def _store_credential(self, cfg: dict, uid: str, operator: str,

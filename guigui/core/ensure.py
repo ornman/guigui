@@ -95,7 +95,8 @@ def _attempt_login(cfg: dict, uid: str, password: str):
 
     verdict = 最后一次 login_ex 完整结果(拒绝现场入日志 data 用,PRD §4.1)。
     锚前(06:50 前)被拒直接收手 — 门都没开,重试只是对着墙敲门(绝不暴力尝试)。
-    """
+    节流(QA P1-6):服务器让等 waitsec → 按其秒数睡(封顶 WAITSEC_CAP),不烧
+    retry 次数 — 节流不是密码错,理应让节流完整到期再判失败。"""
     result, msg = drcom.UNREACHABLE, ""
     tries = 0
     verdict = None
@@ -108,6 +109,14 @@ def _attempt_login(cfg: dict, uid: str, password: str):
             break
         if result == drcom.REJECTED and before_anchor():
             break
+        # 节流分支(QA P1-6):不计入重试节奏,直接睡到服务器让的时间再试
+        if (result == drcom.REJECTED
+                and drcom.classify_rejection(msg, waitsec=verdict.waitsec,
+                                             payload=verdict.payload)
+                == drcom.REJ_THROTTLED):
+            wait = min(verdict.waitsec or drcom.WAITSEC_CAP, drcom.WAITSEC_CAP)
+            time.sleep(wait)
+            continue
         if i < cfg["login_retries"] - 1:
             time.sleep(cfg["retry_seconds"])
     return result, tries, msg, verdict
@@ -339,7 +348,20 @@ def run() -> int:
         return _persist(state, cfg, today)
 
     if outcome in ("rejected", "unexpected"):
-        kind = drcom.classify_rejection(msg) if outcome == "rejected" else None
+        kind = (drcom.classify_rejection(msg, waitsec=verdict.waitsec,
+                                         payload=verdict.payload)
+                if outcome == "rejected" else None)
+        # 节流(QA P1-6):服务器让等几秒再试,不是密码错也不进失败闸;
+        # _attempt_login 已按 waitsec 睡过,这里仅记一笔 note + 结束当拍,
+        # 下次任务计划触发会重试
+        if outcome == "rejected" and kind == drcom.REJ_THROTTLED:
+            wait = min(verdict.waitsec or drcom.WAITSEC_CAP, drcom.WAITSEC_CAP)
+            logstore.append("note",
+                            f"服务器让等 {wait} 秒再试(节流,非密码错)",
+                            when=_now())
+            state["last_result"] = {"date": today, "time": _now().strftime("%H:%M"),
+                                    "tries": tries, "outcome": "throttled"}
+            return _persist(state, cfg, today)
         if outcome == "rejected":
             text = "登录被拒:" + drcom.rejection_text(kind, msg or "密码可能改过了")
             state["maintenance_streak"] = 0
@@ -349,7 +371,7 @@ def run() -> int:
         logstore.append("fail", text, when=_now(),
                         data=_fail_data(kind, verdict, tries))
         # 凭证可信度(§7.3):置假仅一条路 — 服务器明确说密码不对(error2);
-        # error1/bind/维护页都不冤枉密码
+        # error1/bind/维护页/节流都不冤枉密码
         if outcome == "rejected" and kind == drcom.REJ_WRONG_PASSWORD:
             state["cred_verified"] = False
         state["last_result"] = {"date": today, "time": _now().strftime("%H:%M"),

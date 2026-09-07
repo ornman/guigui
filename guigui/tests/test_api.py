@@ -69,6 +69,7 @@ class Ctx:
         monkeypatch.setattr(api_mod.detect, "portal_html",
                             lambda cfg=None, timeout=5: self.portal_html_text)
         monkeypatch.setattr(api_mod.drcom, "login", self._login_stub)
+        monkeypatch.setattr(api_mod.drcom, "login_ex", self._login_ex_stub)
         monkeypatch.setattr(api_mod.drcom, "logout",
                             lambda html, base, timeout=5: self.logout_url)
         monkeypatch.setattr(api_mod.drcom, "chkstatus_uid",
@@ -99,6 +100,22 @@ class Ctx:
         if len(self.login_seq) > 1:
             return self.login_seq.pop(0)
         return self.login_seq[0]
+
+    def _login_ex_stub(self, base, uid, password, operator=..., timeout=...):
+        """drcom.login_ex 桩(QA P1-6):把 login_seq 提升为 LoginResult,默认 waitsec=None。
+        seq 元素若 4 元组 → 直接用作 LoginResult;若 2 元组 → 视为 (result, msg) 包装。
+        调用记录统一挂到 self.login_calls(沿用旧 test 期望,等同 login 桩语义)。"""
+        self.login_calls.append((base, uid, password, operator))
+        if len(self.login_seq) > 1:
+            entry = self.login_seq.pop(0)
+        else:
+            entry = self.login_seq[0]
+        if len(entry) == 4:
+            result, msg, payload, http = entry
+        else:
+            result, msg = entry
+            payload, http = None, 200
+        return api_mod.drcom.LoginResult(result, msg, payload, http, None)
 
     def _reconcile_stub(self, cfg):
         self.reconciled.append(cfg["master"])
@@ -498,6 +515,10 @@ def test_login_reads_vault_once_across_retries(ctx, monkeypatch):
     seq = [("rejected", "x"), ("rejected", "x"), ("success", "")]
     # Ctx 的 login 桩只回第一个元素不前进;这里覆写成逐次弹出,驱动真实重试
     monkeypatch.setattr(api_mod.drcom, "login", lambda *a, **k: seq.pop(0))
+    # _attempt_login 走 login_ex(QA P1-6):同步覆写,保证重试循环正确推进
+    monkeypatch.setattr(api_mod.drcom, "login_ex",
+                        lambda *a, **k: api_mod.drcom.LoginResult(
+                            *seq.pop(0), None, 200, None))
     calls = []
     monkeypatch.setattr(api_mod.vault, "get_password",
                         lambda uid: (calls.append(uid) or "pw"))

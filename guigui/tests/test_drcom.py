@@ -277,3 +277,71 @@ def test_operator_aliases_map_to_empty_suffix():
 def test_protocol_table_untouched_by_aliases():
     # AC-20:协议表仍与门户 carrier 配置逐字一致(别名只在展示层)
     assert set(drcom.OPERATOR_TABLE) == {"校园用户", "校园电信", "校园联通", "校园其他"}
+
+
+# ── 节流 waitsec 三件套(QA P1-6)───────────────────
+
+
+def test_parse_waitsec_from_json_field_waitsec():
+    """实测前先按经验写:Dr.COM 系列常见 JSON 字段名 waitsec。"""
+    assert drcom.parse_waitsec({"waitsec": 30}, "") == 30
+    assert drcom.parse_waitsec({"waittime": 45}, "") == 45
+    assert drcom.parse_waitsec({"wait": 12}, "") == 12
+
+
+def test_parse_waitsec_fallback_to_msga_text():
+    """JSON 没给字段时,从 msga 文本里抽数字(中文「请等待 30 秒」类)。"""
+    assert drcom.parse_waitsec(None, "请等待 30 秒再试") == 30
+    assert drcom.parse_waitsec(None, "wait 15 seconds") == 15
+    assert drcom.parse_waitsec(None, "操作太频繁,请稍后再试") == 1   # 关键词命中无数字 → 保守 1s
+
+
+def test_parse_waitsec_returns_none_when_no_throttle_signal():
+    """无任何节流信号 → None(调用方按无节流处理,不要误诊)。"""
+    assert drcom.parse_waitsec({"result": 0}, "userid error2") is None
+    assert drcom.parse_waitsec(None, "") is None
+    assert drcom.parse_waitsec(None, "userid error1") is None
+
+
+def test_classify_rejection_throttle_wins_over_error2():
+    """QA P1-6 核心保证:节流绝不被翻译成密码错。
+    即便 msga 文本里同时含 error2 标记 + waitsec 提示,分类结果必须是 THROTTLED。"""
+    # 显式传 waitsec 优先级最高
+    assert drcom.classify_rejection("userid error2",
+                                    waitsec=30) == drcom.REJ_THROTTLED
+    # 从 payload 自己 parse 也能识出
+    assert drcom.classify_rejection("userid error2 wait 5s",
+                                    payload={"waitsec": 5}) == drcom.REJ_THROTTLED
+    # 节流关键词 + 数字 → 归 throttle(无需 payload)
+    assert drcom.classify_rejection("操作太频繁,请等待 10 秒",
+                                    payload=None) == drcom.REJ_THROTTLED
+    # 纯 error2 + 无节流信号 → 仍归 wrong_password(基线不漂)
+    assert drcom.classify_rejection("userid error2") == drcom.REJ_WRONG_PASSWORD
+
+
+def test_login_ex_captures_waitsec_from_payload(monkeypatch):
+    """login_ex 解析 JSON waitsec 字段并写入 LoginResult.waitsec。"""
+    body = 'dr1003({"result":0,"msga":"太快了","waitsec":12})'
+    _stub_urlopen(monkeypatch, body=body)
+    r = drcom.login_ex("http://10.1.2.3", "u", "p")
+    assert r.result == drcom.REJECTED
+    assert r.waitsec == 12
+
+
+def test_login_ex_waitsec_none_when_field_absent(monkeypatch):
+    body = 'dr1003({"result":0,"msga":"userid error2"})'
+    _stub_urlopen(monkeypatch, body=body)
+    r = drcom.login_ex("http://10.1.2.3", "u", "p")
+    assert r.waitsec is None
+
+
+def test_rej_code_map_includes_throttled():
+    """诊断包 data.rej = throttled;契约 reason 仍用「throttled」枚举。"""
+    assert drcom.REJ_CODE[drcom.REJ_THROTTLED] == "throttled"
+    assert drcom.REJ_THROTTLED in drcom.REJ_CODE
+
+
+def test_rejection_text_throttled_does_not_blame_password():
+    """节流文案不能出现「密码」字样。"""
+    text = drcom.rejection_text(drcom.REJ_THROTTLED, "兜底")
+    assert "密码" not in text
