@@ -531,7 +531,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
         <div class="bot bot-greet" id="boot-bot-greet-login" data-state="happy" data-size="58"></div>
         <div>
           <h1 style="font-size:22px">登录校园网。</h1>
-          <p class="lede">连上了校园网,还没登录。填一次,以后每天都是桂桂的事:</p>
+          <p class="lede">还没登录,填一次,以后每天都是桂桂的事:</p>
         </div>
       </div>
       <div class="status warn"><span class="dot"></span><span id="login-status">…</span></div>
@@ -1273,8 +1273,12 @@ function renderWifiList(box,networks,opts){
    误抓由登录被拒(wrong_account 文案)自纠;identify 回填行为本身不变 */
 async function fillLoginLanding(){
   const net=lastNet||{};
-  /* 状态行说认证服务器(SSID 在热点场景是"iphone17 pro max"这类噪声,不帮用户判断) */
-  $('login-status').textContent=((net.server||'10.1.2.3'))+' · 已连通,还没登录';
+  /* 状态行只报连通性(登录状态归副标题说);说认证服务器而不说 SSID —
+     SSID 在热点场景是"iphone17 pro max"这类噪声,不帮用户判断 */
+  const up=net.state!=='unreachable';
+  const bar=$('login-status').parentElement;
+  bar.className='status '+(up?'ok':'danger');
+  $('login-status').textContent=(net.server||'10.1.2.3')+(up?' · 已连通':' · 连不上');
   $('login-confirm').style.display='none';uidChangeArmed=false;
   const id=await GG.api.identify();
   if(id.ok&&id.data.uid&&!$('f-sid-login').value){$('f-sid-login').value=id.data.uid;loginLandingUid=id.data.uid}
