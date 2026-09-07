@@ -941,17 +941,17 @@ function mainAction(){
   if(mainState==='down'){openDetail('v-guide');return}
   quickLogin()   /* ok=立即重新登录 / out=立即登录,都是一键已存凭据(AC-16) */
 }
-/* 主页上的重登:就地反馈,不跳庆祝页(庆祝只属于首次/修复成功);等待态防重复提交 */
+/* 主页上的重登:就地反馈,不跳庆祝页(庆祝只属于首次/修复成功);等待态防重复提交;
+   成功表情/文案等 r.ok 确认后才切——点击即切,失败或跳登录页时会留一句假成功 */
 async function quickLogin(){
   const gb=document.querySelector('#boot-bot-greet-main');
-  mood(gb,'happy');
-  $('main-lede').textContent='刚刚把网帮你接回来啦 ✓';
   setBusy($('main-btn'),true,'登录中…');
   const r=await GG.api.login({});
   setBusy($('main-btn'),false);
-  if(r.ok){renderBannersRefresh();return}
+  if(r.ok){mood(gb,'happy');$('main-lede').textContent='刚刚把网帮你接回来啦 ✓';renderBannersRefresh();return}
   if(r.code==='AUTH_REJECTED'){$('main-lede').textContent=(r.message||'密码好像不对')+',去改一下再试'}
   else if(r.code==='NOT_CONFIGURED'){openDetail('v-login')}
+  else if(r.code==='NET_UNREACHABLE'){openDetail('v-guide')}
 }
 /* 流程动作 */
 /* 庆祝页入场:重新给 stage 加 .in class 触发 CSS animation(display:none→block 不会自动重启动画)
