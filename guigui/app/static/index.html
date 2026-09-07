@@ -1187,11 +1187,20 @@ GG.on('schedule:changed',e=>{
   if(e&&typeof e.master==='boolean')setAuto(e.master);
   if(e&&typeof e.task_ok==='boolean')renderTaskRow(e.task_ok);
 });
-/* 定时任务(AC-17):在岗整行不打扰(行隐藏),被拦才出现并给「点此重建」;重建仅用户点击触发 */
+/* 定时任务(AC-17):在岗整行不打扰(行隐藏),被拦才出现并给「点此重建」;重建仅用户点击触发
+   4 拍任务名(P1-7 拆分:日历/开机/唤醒/巡逻)随被拦态列出 —— 用户在杀软拦截记录、
+   任务计划程序里按名字对得上号;按配置只列该存在的(唤醒/巡逻默认关) */
+function taskBeatNames(){
+  const ns=['GuiGui'];
+  if(!curCfg||curCfg.boot_login!==false)ns.push('GuiGui-Boot');
+  if(curCfg&&curCfg.wake_login)ns.push('GuiGui-Wake');
+  if(curCfg&&curCfg.patrol_enabled)ns.push('GuiGui-Patrol');
+  return ns.join(' / ');
+}
 function renderTaskRow(okk){
   const r=$('task-row'),d=$('task-status-d'),b=$('task-rebuild');
   if(r)r.style.display=okk?'none':'flex';
-  if(d)d.textContent=okk?'':'被拦了,自动登录还没生效';
+  if(d)d.innerHTML=okk?'':'被拦了,自动登录还没生效 — 杀毒软件放行桂桂后点「点此重建」<br>计划任务名:'+taskBeatNames();
   if(b)b.style.display=okk?'none':'inline-block';
 }
 async function rebuildTask(){
