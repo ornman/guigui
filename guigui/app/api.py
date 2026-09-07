@@ -54,8 +54,9 @@ def _ok(data: dict) -> dict:
 
 
 def _err(code: str, message: str, reason: str | None = None) -> dict:
-    """reason ∈ wrong_password|wrong_account|bound|before_open(契约 1.2.0,
-    前端据此渲染拒绝三态文案;None=不分类,前端直显 message)。"""
+    """reason ∈ wrong_password|wrong_account|bound|before_open|throttled
+    (契约 1.2.0+1.4.0:throttled 由 QA P1-6 引入,前端须按节流展示而不
+    当密码错;None=不分类,前端直显 message)。"""
     out = {"ok": False, "code": code, "message": message}
     if reason:
         out["reason"] = reason
