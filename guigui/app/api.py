@@ -321,10 +321,14 @@ class GuiGuiApi:
                                     "reason": "before_open", "task_ok": task_ok})
                     kind = drcom.classify_rejection(msg, waitsec=waitsec)
                     if kind == drcom.REJ_THROTTLED:
-                        # QA P1-6:节流 → 告知「稍后再试」,密码不存(凭证神圣)
-                        return _err(AUTH_REJECTED,
-                                    f"校园网侧让等 {min(waitsec or drcom.WAITSEC_CAP, drcom.WAITSEC_CAP)} 秒再试",
-                                    reason="throttled")
+                        # QA P1-6:节流 → 告知「稍后再试」,密码不存(凭证神圣)。
+                        # 此分支已注销过会话,不恢复 = 网断着被节流(三重伤害),必须尽力接回
+                        restored = self._restore_network(cfg, old_uid, uid, old_pw)
+                        return _err(
+                            AUTH_REJECTED,
+                            f"校园网侧让等 {min(waitsec or drcom.WAITSEC_CAP, drcom.WAITSEC_CAP)} 秒再试"
+                            + self._restore_suffix(restored),
+                            reason="throttled")
                     restored = self._restore_network(cfg, old_uid, uid, old_pw)
                     base = drcom.rejection_text(kind, msg or "密码被服务器拒绝了")
                     return _err(AUTH_REJECTED, base + self._restore_suffix(restored),

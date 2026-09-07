@@ -587,6 +587,21 @@ def test_submit_password_online_throttle_retries_once(ctx):
     assert out["data"]["attempts"] == 2 and out["data"]["verified"] is True
 
 
+def test_submit_password_online_throttle_stuck_restores_network(ctx):
+    """场景 4 节流变体:注销→真登一路被节流拒到底 → 网络必须用旧凭据尽力接回
+    (不恢复 = 用户网断着+密码没存+还被节流三重伤害),信封如实带恢复说明。
+    桩 waitsec 恒 None → 信封按封顶 30s 如实展示。"""
+    _online_flip(ctx)
+    ctx.login_seq = [("rejected", "error5 waitsec <3"),   # 验证单发被节流
+                     ("rejected", "error5 waitsec <3"),   # 等 waitsec 后重试仍节流
+                     ("success", "")]                     # 旧凭据恢复接回成功
+    out = ctx.api.login({"sid": "2025000000001", "password": "garbage"})
+    assert out == {"ok": False, "code": "AUTH_REJECTED", "reason": "throttled",
+                   "message": "校园网侧让等 30 秒再试;已用旧密码把网接回来了,改对再点一次"}
+    assert ctx.set_calls == []                                # 节流 ≠ 密码错,不入库
+    assert ctx.login_calls[-1] == ("http://10.1.2.3", "2025000000001", "old", "校园用户")
+
+
 def test_submit_password_offline_wrong_never_stored(ctx):
     ctx.probe_state = {"state": "not_logged_in", "ssid": "x", "detail": ""}
     ctx.login_seq = [("rejected", "密码错误")] * 3
