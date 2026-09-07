@@ -251,9 +251,61 @@
 4. **issue 后建**(尽力):调 GitHub API `POST /repos/{repo}/issues`,标题 `[反馈·问题] GG-3X · <what 前 40 字>`,标签 `problem`/`suggestion` 预建,正文由 fb.js 从结构化包渲染(分区、长日志折 `<details>`)——**issue 版式改边缘端即时生效,不等客户端升级**;
 5. D1 挂 → 跳过 3 直接建 issue(记 `storage=issue_only`);双挂 → `SINK_DOWN`。
 
-### 6.2 限频修正(校园 NAT 挤兑)
+### 6.2 限频(四层,设计规模 4 万装机)
 
-现行 8 条/IP/时在校园共享出口下会把灾情反馈掐死(真出事那天人人来反馈,第 9 人起全 429)。修正:桌面端(UA=GuiguiDesktop + 合法 client_id)30 条/IP/时;网页表单维持 8。429 一律带 `retry_after`。
+| 层 | 限额 | 挡什么 |
+|---|---|---|
+| per `client_id` | 30 条/时 | 单台装机刷屏(含队列补发自然限额) |
+| per IP · 桌面标记(GuiguiDesktop UA + 合法 client_id) | 300 条/时 | 校园 NAT 灾情挤兑:4 千人灾情日 × 十个出口 IP,单人 30 + 出口 300,足够放行灾情、挡住单 IP 洪水 |
+| per IP · 匿名(网页表单) | 8 条/时 | 最低信任层 |
+| payload | Content-Length > 64KB 早拒(不进 JSON 解析);字段限额照 §4.1 | 大包炸弹 |
+
+429 一律带 `retry_after`;桌面端收 429 → 入队退避,不丢。
+
+### 6.5 GitHub 集成(鉴权 · 错误映射 · issue 预算)
+
+**鉴权**:fb.js 持 fine-grained PAT(仅目标仓、仅 Issues 读写权限、90 天有效期),存 Cloudflare secret `GH_PAT`,只存在服务端,任何响应/日志不下发。轮换:`wrangler secret put GH_PAT` 一次,对账端点随即追平积压。过期不致丢——见映射表。
+
+**GitHub 错误 → 本系统信封映射(fb.js 按此实现,不变量:GitHub 的任何失败都不失败用户请求)**:
+
+| GitHub 侧 | fb.js 行为 | 用户侧信封 |
+|---|---|---|
+| 2xx | 记 `issue_id` | `SUBMITTED` |
+| 401(PAT 无效/过期) | issue=null;失败计数 +1 | `SUBMITTED_DEGRADED` |
+| 403(secondary rate limit) | issue=null;尊重 `Retry-After` | `SUBMITTED_DEGRADED` |
+| 404(仓不存在/PAT 范围错) | issue=null;**PAT 配置类故障打标**(见报警路径) | `SUBMITTED_DEGRADED` |
+| 5xx / timeout(5s) | issue=null | `SUBMITTED_DEGRADED` |
+| **issue 预算耗尽** | **不发起 GitHub 调用** | `SUBMITTED_DEGRADED` |
+
+**issue 预算闸(DoS 设计的核心)**:D1 写入便宜,issue 创建昂贵(耗 PAT 配额、生成邮件、刷屏)。`ISSUE_BUDGET_PER_HOUR`(默认 500,环境变量可调)——超预算的反馈**只进 D1**(存底不丢),由对账端点在预算内匀速补建。效果:无论入口被打多少,issue 洪水物理不可能;灾情日 4000 条积压 ≈ 8 小时追平,反馈延迟但永不丢。
+
+**PAT 失效的报警路径**(注意 meta-issue 也开不了时的兜底):连续 issue 失败 ≥10 → 在 D1 写 `alert` 行,`/fb/list` 健康区红字暴露 `gh_broken: true`——开一次管理页就能看见,不依赖 GitHub 自身。
+
+### 6.6 安全设计与威胁清单
+
+**身份模型(诚实声明)**:桂桂零账号,反馈**没有鉴权身份**。`sender_uid` 是自报线索(可被伪造,代价=一条假反馈),`client_id` 是装机标识不是身份,**任何地方不得把学号当鉴权用**。接受此模型的原因:反馈是信息通道不是交易通道,最坏后果是 issue 污染,由限频+预算+人工分诊兜住。
+
+| 威胁 | 对策 |
+|---|---|
+| DoS 打 `/fb`(应用层刷请求) | §6.2 四层限频 + §6.5 预算闸;L3/L4 由 Cloudflare 原生吸收 |
+| issue 洪水(打穿限频后污染仓/耗配额) | 预算闸硬顶;标签服务端固定,payload 永不决定 label |
+| Markdown/HTML 注入(issue 正文里的链接、图片、反引号) | fb.js 渲染时用户字符串一律入代码字面量(反引号/角括号转义),诊断包整体入 fenced block;标题清洗(去控制字符/反引号,截 40 字) |
+| 学号/日志泄露 | **仓必须私有**(硬约束,见 §12);D1 仅 ADMIN_KEY 可读;学号在包内打码、仅 sender_uid 明文,且只进私有仓与 D1 |
+| 密钥泄露 | GH_PAT/ADMIN_KEY/CRON_KEY 全走 Cloudflare secret;ADMIN_KEY 高熵随机 + 可轮换;`/fb/list` 的 key 走查询串(单人使用可接受,浏览器历史残留为已知限制,后续可改 header 鉴权) |
+| 密码进诊断 | 不变量:登录 URL(含 `upass=`)永不入包;config 采集即打码;崩溃堆栈只含源码行不含实参 |
+| 中间人 | 全链 HTTPS;桌面端 Python 校验证书(urllib 默认),无降级 |
+| CORS 滥用 | 不开 CORS:桌面端是 Python 服务间直发(无浏览器源),网页表单同源 fetch——没有需要放松的源 |
+| 重放同 client_id | 即幂等设计本身(返回原 GG-xx),不是漏洞是特性 |
+| version.json 投毒 | 静态文件,仅仓维护者可改;诊断只读不执行 |
+
+### 6.7 容量账(4 万装机上限)
+
+| 场景 | 量 | 各层余量 |
+|---|---|---|
+| 常态 | ~4–40 条/天(0.01–0.1%/天) | 全层忽略不计 |
+| 灾情日(10% 用户当天反馈) | ~4000 条,集中于 1–2 小时 | `/fb` 请求 4k/h ≪ CF 免费层 10 万/天;D1 写 4k/天 ≪ 10 万/天;issue 预算 500/h → 积压 8h 内追平;邮件通知建议在 GitHub 设置改「按批次汇总」 |
+| 恶意定向 | 见 §6.5/6.6 | 限频四层 + 预算闸;打不掉的是免费额度,不是数据 |
+| 存储 | 峰值 ~84MB/灾情日(21KB×4000) | D1 库 500MB 级;**保留策略:90 天清理**,处理完的行可删(issue 已是持久投影),wrangler 脚本执行 |
 
 ### 6.3 对账端点 + 管道自监控(修正:不押注定时触发能力)
 
@@ -377,7 +429,7 @@ deletion test:删掉它,发送/重试/幂等/退避/队列复杂度会在 api.py
 | GitHub 挂 / PAT 过期 | issue_id NULL | 对账端点补建 + meta-issue 评论报警 | 完全无感 |
 | 双挂 | SINK_DOWN | 队列保留 | 「已存本地」 |
 | 重复提交 | client_id UNIQUE | 返回原 GG-xx | 不出重复 |
-| 挤兑(全校同炸) | 修正后限频 | 30/IP/h(桌面)+ 入队退避 | 稍后自动,不丢 |
+| 挤兑(全校同炸) | 四层限频 | 桌面 30/client_id/h + 300/IP/h;issue 预算闸顶住投影层 | 稍后自动,不丢 |
 | 诊断采集器失败 | in-band errors 字段 | 该区缺失其余照发 | 发送不受阻 |
 | 旧版网页表单 | v1 兼容路径 | 原逻辑照跑 | 无感 |
 
@@ -392,7 +444,9 @@ deletion test:删掉它,发送/重试/幂等/退避/队列复杂度会在 api.py
 - **AC-F7** PAT 失效后用户提交:仍 `SUBMITTED`(D1 成功),cron 报警 meta-issue,换 PAT 后积压自动补建 issue。
 - **AC-F8** `limit_users` 态(实测可稳定复现,见附录 A):日志文案为「已在别的设备登录」方向,**不**出现「密码可能改过了」;`data.rej="limit_users"`;cred_verified 不被置假。
 - **AC-F9** chkstatus 无会话(HTTP 400)被归类为 `no_session`,不产生异常日志。
-- **AC-F10** 桌面端 30 条/IP/时、网页端 8 条/IP/时,429 带 retry_after。
+- **AC-F10** 四层限频生效(30/client_id/h、桌面 300/IP/h、匿名 8/IP/h、64KB 早拒),429 带 retry_after。
+- **AC-F15** issue 预算闸:预算耗尽后提交仍 `SUBMITTED_DEGRADED` 入 D1,不丢;对账端点在预算内匀速补建。
+- **AC-F16** 注入防护:what/contact 含反引号、链接、HTML 时,issue 渲染为字面量(代码 span/fenced block),标签永远服务端固定。
 - **AC-F11** 后端全模块单测通过(测试走模块接口,不测内部);mock(?dev=1)覆盖全部响应 code 与样例诊断包 fixture;现有测试全绿。
 - **AC-F12** v1 网页表单提交照常入库(向后兼容)。
 - **AC-F13** GUI 与 ensure 双进程并发 `pump()`:服务端仅产生单条 D1 行与单条 issue(client_id 幂等吸收双发)。
@@ -411,7 +465,9 @@ deletion test:删掉它,发送/重试/幂等/退避/队列复杂度会在 api.py
 
 ## 12. 待定项
 
-- **GitHub 私有仓名**:建议新建 `ornman/guigui-feedback`(只放反馈 issue,干净;PAT 最小授权=仅此仓 issues 写)。
+- **仓的隐私硬约束(挂现有仓 = ornman/guigui-site 时)**:issue 正文含学号+日志+联系方式,**仓必须私有**。两个解法二选一:
+  - A(推荐):`guigui-site` 转私有,官网开源意愿搁置;PAT 仅此仓 Issues 写。
+  - B:仓保持公开,则 `sender_uid` 明文**只存 D1**(私有),issue 正文里学号永远打码——回访链路改走 D1 查询。
 - 官网表单加分类胶囊/接 v2:后续独立任务(site 发布仓),本轮不碰。
 - 是否在设置页给用户一个「查看账号在服务器上的状态」只读入口(server 区能力的产品化露出):待定。
 
