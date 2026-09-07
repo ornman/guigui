@@ -170,9 +170,16 @@ class GuiGuiApi:
         self._emit("login:progress", {"phase": "probe"})
         net = detect.probe(cfg)
         if net["state"] == detect.LOGGED_IN:
-            ensure.settle_from_gui(cfg, uid, 0)
-            return _ok({"result": "already", "uid": drcom.mask_uid(uid), "attempts": 0,
-                        "verified": bool(ensure.load_state().get("cred_verified"))})
+            # 全屋共享会话:在线的可能是室友账号 — 核对线上学号,
+            # 别人的成功不冒领(chkstatus 不可得则不阻塞,维持 already)
+            online = drcom.chkstatus_uid(cfg["url"])
+            if not online or online == uid:
+                ensure.settle_from_gui(cfg, uid, 0)
+                return _ok({"result": "already", "uid": drcom.mask_uid(uid),
+                            "attempts": 0,
+                            "verified": bool(ensure.load_state().get("cred_verified"))})
+            log.info("api: 线上是他人学号(%s),不报 already,改走真登录",
+                     drcom.mask_uid(online))
         if net["state"] in (detect.UNREACHABLE, detect.WAITING):
             return _err(NET_UNREACHABLE, "现在够不着校园网")
 

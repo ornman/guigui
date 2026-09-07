@@ -5,7 +5,8 @@
 (连续 48h 不可达 → 每天只探 1 次不通知,silent 级日志)、
 收工幂等(last_settle_date,后续拍秒退)、last_result(recentResult 数据源)。
 2026-09-06 重梳理:开门锚点 06:50(锚前失败三不管)、被拒当拍即弹、
-凭证可信度仅 error2 置假、线上他人学号如实记录、日志 >90 天清理。
+凭证可信度仅 error2 置假、线上他人学号如实记录并换回自己的(QA P0-2:
+别人的成功不冒领)、日志 >90 天清理。
 """
 
 from __future__ import annotations
@@ -132,7 +133,18 @@ def _ensure_online(cfg: dict, uid: str, password: str, allow_fallback: bool = Tr
     """
     net = _probe_with_gate(cfg)
     if net["state"] == detect.LOGGED_IN:
-        return "settled", 0, "", None
+        # 全屋共享会话:在线的可能是室友账号 — 收工前核对线上学号,
+        # 别人的成功不冒领;不一致如实记一笔并把会话换成自己的
+        # (chkstatus 不可得 → 不阻塞,照常收工)
+        online = drcom.chkstatus_uid(cfg["url"])
+        if online and online != uid:
+            logstore.append(
+                "note",
+                f"线上是 {drcom.mask_uid(online)}(不是配置的学号),换回自己的",
+                when=_now())
+            net = {"state": detect.NOT_LOGGED_IN, "detail": "session-takeover"}
+        else:
+            return "settled", 0, "", None
     if net["state"] == detect.NOT_LOGGED_IN:
         result, tries, msg, verdict = _attempt_login(cfg, uid, password)
         if result == drcom.SUCCESS:
@@ -155,7 +167,8 @@ def _settle_rows(cfg: dict, uid: str, tries: int) -> None:
     logstore.append("ok", "网络可达", when=_now())
     shown_uid = uid
     if tries == 0:
-        # 桂桂没动手就在线:查线上真实学号(只读 chkstatus),他人会话只记日志不打扰(4.6)
+        # 桂桂没动手就在线:查线上真实学号(只读 chkstatus);正常路径线上
+        # 已核对是本人(_ensure_online),此处兜底展示/竞态时如实记录(4.6)
         online = drcom.chkstatus_uid(cfg["url"])
         if online:
             shown_uid = online

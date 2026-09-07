@@ -157,6 +157,32 @@ def test_login_already(ctx):
     assert out["data"]["verified"] is False           # 已存凭据未经今次真验证
 
 
+# ── P0-2:「已经在线」核对在线者身份(共享会话不冒领)─────
+
+
+def test_login_already_checks_online_identity(ctx):
+    """线上是别人的学号 → 不报 already,用自己凭据真登(把会话换过来)。"""
+    ctx.chk_uid = "2025090270999"                    # 探测 logged_in + 他人学号
+    ctx.login_seq = [("success", "")]
+    out = ctx.api.login({})
+    assert out["data"]["result"] == "success" and out["data"]["attempts"] == 1
+    assert ctx.login_calls                           # 真登发生了
+
+
+def test_login_already_matching_uid_stays_already(ctx):
+    ctx.chk_uid = "2025000000001"                    # 线上就是本人
+    out = ctx.api.login({})
+    assert out["data"]["result"] == "already" and out["data"]["attempts"] == 0
+    assert ctx.login_calls == []
+
+
+def test_login_already_identity_unknown_stays_already(ctx):
+    ctx.chk_uid = None                              # chkstatus 不可得 → 不阻塞
+    out = ctx.api.login({})
+    assert out["data"]["result"] == "already"
+    assert ctx.login_calls == []
+
+
 def test_login_rejected_maps_auth_rejected(ctx):
     ctx.probe_state = {"state": "not_logged_in", "ssid": "x", "detail": ""}
     ctx.login_seq = [("rejected", "密码错误")]

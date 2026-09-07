@@ -323,14 +323,38 @@ def test_cred_verified_default_false_when_already_online(monkeypatch):
 
 
 def test_settle_other_uid_recorded_not_disturbing(monkeypatch):
-    """4.6:线上是别人的学号 → 日志如实记一行,照常收工,不横幅不通知。"""
-    h = Harness(monkeypatch, online_uid="2025090270999")
+    """QA P0-2:线上是别人的学号 → 不冒领收工;记一笔并把会话换回自己的。"""
+    h = Harness(monkeypatch, online_uid="2025090270999",
+                login_seq=[("success", "")])
     h.run()
     texts = [e["text"] for e in h.today_entries()]
-    assert "已登录 · 2025…0999" in texts                   # 记线上真实学号
-    assert any(t.startswith("线上的是 2025…0999") for t in texts)
-    assert h.sent == []
-    assert ensure.load_state()["last_result"]["outcome"] == "ok"
+    assert any(t.startswith("线上是 2025…0999") for t in texts)   # 如实记一笔
+    assert h.login_calls == 1                       # 真登录换会话,不是白收工
+    assert "已登录 · 2025…0001" in texts            # 收工行是本人学号
+    state = ensure.load_state()
+    assert state["last_result"]["outcome"] == "ok"
+    assert state["last_result"]["tries"] == 1
+    assert state["cred_verified"] is True           # 换回自己的 = 真验证过
+    assert h.sent == []                             # 换成功,不打扰
+
+
+def test_settle_other_uid_rejected_reports_honestly(monkeypatch):
+    """换会话被拒(如密码改过)→ 按被拒语义走全链(日志+当拍即弹),不假装成功。"""
+    h = Harness(monkeypatch, online_uid="2025090270999",
+                login_seq=[("rejected", "userid error2")])
+    h.run()
+    state = ensure.load_state()
+    assert state["last_result"]["outcome"] == "fail"
+    assert len(h.sent) == 1 and h.sent[0][1] == "guigui://creds"
+    assert ensure.load_state()["cred_verified"] is False
+
+
+def test_online_identity_unknown_settles_without_blocking(monkeypatch):
+    """chkstatus 不可得 → 不阻塞,照常收工(可用性优先)。"""
+    h = Harness(monkeypatch, online_uid=None)
+    h.run()
+    assert h.login_calls == 0
+    assert "已登录 · 2025…0001" in [e["text"] for e in h.today_entries()]
 
 
 # ── 拒绝现场入日志 data(S3,AC-F8/§4.1 logs 区)────────────
