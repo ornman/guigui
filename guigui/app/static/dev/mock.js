@@ -152,19 +152,43 @@ window.GGMock={
     return OK({ok:true,changed:true});
   },
   async feedback(){
+    /* 1.3.0 废弃路径(保留一个版本周期):复制文本的旧入口 */
     await delay(400);
-    const lines=[
-      '桂桂 v2.0.0 诊断信息',
-      '时间:2026-08-31 07:00',
-      '系统:Windows 11 · WebView2',
-      '网络:Campus-WiFi · 已登录 · 2025…0001',
-      '配置:07:00 触发 · 巡逻 30 分钟 · 通知开',
-      '凭据:已存(密码不出后端)',
-      '任务:GuiGui(每日)与 GuiGui-Patrol(巡逻)已注册',
-      '—— 最近 3 天 ——',
-      '07:00 [OK] 已登录 · 2025…0001'
-    ];
-    return OK({text:lines.join('\n')});
+    return OK({text:[
+      '桂桂 v2.1.0 诊断信息(预览)',
+      '系统:Windows 11 26200 x64 · Python 3.12.8',
+      '网络:WiFi Campus-WiFi · HTTP 200 · 340ms',
+      '—— 最近 7 天 ——','09-01 ✓ · 09-02 ✓ · 09-03 ✗'
+    ].join('\n')});
+  },
+  /* ── 1.3.0 真通道:提交三态 / 诊断预览 / 队列状态 ── */
+  async feedbackSend(a){
+    await delay(700);
+    const kind=(a&&Array.isArray(a.kind)&&a.kind.length)?a.kind:['problem'];
+    if(!a||!String(a.what||'').trim())return ERR('FB_VALIDATION','说说具体情况(必填)');
+    if(SCENE==='down'){                          /* 断网 → 入队(QA:AC-F3) */
+      const q=JSON.parse(localStorage.getItem('gg-mock-fbq')||'[]');
+      q.push({kind,what:a.what,contact:a.contact||''});
+      localStorage.setItem('gg-mock-fbq',JSON.stringify(q));
+      return OK({result:'queued',next_attempt_at:'07:32'});
+    }
+    return OK({result:'submitted',id:'GG-'+(33+Math.floor(Math.random()*6))});
+  },
+  async feedbackDiag(a){
+    await delay(350);
+    const thin=a&&Array.isArray(a.kind)&&a.kind.length===1&&a.kind[0]==='suggestion';
+    return OK({text:thin?
+      '桂桂 v2.1.0 诊断信息(建议瘦身包)\n系统:Windows 11 26200 x64\n(听建议不需要网络现场)':
+      '桂桂 v2.1.0 诊断信息\n系统:Windows 11 26200 x64 · Python 3.12.8 · WebView2 120.0.2210.61\n网卡 WLAN(wifi)· Campus-WiFi · 10.20.30.40\n── 网络(实时)── HTTP 200 · 340ms · 出口网卡:以太网\n── 最近七天 ──\n09-01 ✓ · 09-02 ✓ · 09-03 ✗ · 09-04 ✗\n[09-04]\n  06:52:11 FAIL 登录被拒:这个学号已在别的设备上登录…',
+      uid_masked:'2025…0001'});
+  },
+  async feedbackPendingStatus(){
+    await delay(80);
+    let q=JSON.parse(localStorage.getItem('gg-mock-fbq')||'[]');
+    if(q.length&&SCENE!=='down'){                /* 联网即自动补发 */
+      q=[];localStorage.setItem('gg-mock-fbq','[]');
+    }
+    return OK({pending:q.length,oldest_age_s:q.length?1800:null});
   },
   async winMinimize(){},
   async winClose(){},

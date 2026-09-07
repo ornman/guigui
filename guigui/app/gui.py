@@ -296,6 +296,18 @@ def _reconcile_on_start() -> None:
         notify_mod.task_blocked()
 
 
+def _pump_feedback() -> None:
+    """GUI 打开即补发到期反馈(PRD §7.1 pump 触发点之一;at-least-once)。"""
+    time.sleep(2.5)   # 让首屏先起来,再碰网络
+    try:
+        from guigui.core import feedback
+        sent = feedback.pump()
+        if sent:
+            log.info("gui: 反馈补发 %d 条", len(sent))
+    except Exception:
+        log.exception("gui: 反馈补发失败")
+
+
 def run(view: str | None = None) -> int:
     """启动 GUI;返回进程退出码。重复启动直接退出(单实例)。"""
     import webview
@@ -349,6 +361,9 @@ def run(view: str | None = None) -> int:
     watcher = FileWatcher(api)
     watcher.start()
     threading.Thread(target=_reconcile_on_start, daemon=True).start()
+    # 反馈队列补发:GUI 打开即 pump 一次(失败安静走退避,不打扰)
+    threading.Thread(target=_pump_feedback, daemon=True,
+                     name="guigui-fb-pump").start()
     try:
         webview.start()
     finally:

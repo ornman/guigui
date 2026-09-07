@@ -291,24 +291,75 @@ def test_recent_result_when_labels(ctx):
 # ── 窗口控制 ──────────────────────────────────────────────
 
 
-def test_feedback_returns_masked_text(ctx, monkeypatch):
+def test_feedback_deprecated_path_still_renders(ctx, monkeypatch):
     from guigui.core import diagnostics as diag_mod
 
-    def fake_build():
-        return "桂桂 v2.0.0 诊断信息\n学号:2025…0001"
-    monkeypatch.setattr(diag_mod, "build_text", fake_build)
+    monkeypatch.setattr(diag_mod, "collect", lambda kind: {"env": {"os": "x"}})
+    monkeypatch.setattr(diag_mod, "render", lambda bundle: "预览文本(已打码)")
     out = ctx.api.feedback()
-    assert out["ok"] is True and "诊断信息" in out["data"]["text"]
+    assert out["ok"] is True and out["data"]["text"].startswith("预览文本")
 
 
 def test_feedback_internal_on_failure(ctx, monkeypatch):
     from guigui.core import diagnostics as diag_mod
 
-    def boom():
+    def boom(kind):
         raise RuntimeError("diag down")
-    monkeypatch.setattr(api_mod.diagnostics, "build_text", boom)
+    monkeypatch.setattr(api_mod.diagnostics, "collect", boom)
     out = ctx.api.feedback()
     assert out["ok"] is False and out["code"] == "INTERNAL"
+
+
+# ── 2.15–2.17 feedback*(1.3.0 真通道)─────────────────────
+
+
+def test_feedback_send_three_states(ctx, monkeypatch):
+    monkeypatch.setattr(api_mod.feedback, "submit",
+                        lambda kind, what, contact: api_mod.feedback.Submitted("GG-33"))
+    out = ctx.api.feedbackSend({"kind": ["problem"], "what": "没登上"})
+    assert out == {"ok": True, "data": {"result": "submitted", "id": "GG-33"}}
+
+    monkeypatch.setattr(api_mod.feedback, "submit",
+                        lambda kind, what, contact: api_mod.feedback.SubmittedDegraded("GG-34"))
+    out = ctx.api.feedbackSend({"kind": ["problem"], "what": "x"})
+    assert out["data"] == {"result": "submitted_degraded", "id": "GG-34"}
+
+    monkeypatch.setattr(api_mod.feedback, "submit",
+                        lambda kind, what, contact: api_mod.feedback.Queued("E_NET_OFFLINE", "07:32"))
+    out = ctx.api.feedbackSend({"kind": ["problem"], "what": "x"})
+    assert out["data"] == {"result": "queued", "next_attempt_at": "07:32"}
+
+    monkeypatch.setattr(api_mod.feedback, "submit",
+                        lambda kind, what, contact: api_mod.feedback.Rejected("说说具体情况(必填)"))
+    out = ctx.api.feedbackSend({"kind": ["problem"], "what": "x"})
+    assert out["ok"] is False and out["code"] == "FB_VALIDATION"
+
+
+def test_feedback_send_local_validation_no_roundtrip(ctx, monkeypatch):
+    def bomb(*a, **k):
+        raise AssertionError("校验失败不该碰网络")
+    monkeypatch.setattr(api_mod.feedback, "submit", bomb)
+    for bad in ({"kind": [], "what": "x"}, {"kind": "problem", "what": "x"},
+                {"kind": ["problem"], "what": ""}):
+        out = ctx.api.feedbackSend(bad)
+        assert out["ok"] is False and out["code"] == "FB_VALIDATION"
+
+
+def test_feedback_diag_preview_and_masked_uid(ctx, monkeypatch):
+    from guigui.core import diagnostics as diag_mod
+
+    monkeypatch.setattr(diag_mod, "collect", lambda kind: {"env": {"os": "x"}})
+    monkeypatch.setattr(diag_mod, "render", lambda bundle: "七区预览")
+    out = ctx.api.feedbackDiag({"kind": ["problem"]})
+    assert out["ok"] is True and out["data"]["text"] == "七区预览"
+    assert out["data"]["uid_masked"] == "2025…0001"     # 折叠区打码披露行
+
+
+def test_feedback_pending_status(ctx, monkeypatch):
+    monkeypatch.setattr(api_mod.feedback, "status",
+                        lambda: {"pending": 1, "oldest_age_s": 3600})
+    out = ctx.api.feedbackPendingStatus()
+    assert out == {"ok": True, "data": {"pending": 1, "oldest_age_s": 3600}}
 
 
 def test_window_controls(ctx):

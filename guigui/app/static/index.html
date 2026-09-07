@@ -220,6 +220,17 @@ input{width:100%;padding:11px 14px;border:1px solid oklch(60% 0.01 295 / 0.35);
   border-radius:12px;background:oklch(100% 0 0 / 0.6);font:15px/1.5 inherit;font-family:inherit;
   color:var(--ink);transition:border-color .18s,box-shadow .18s}
 input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+/* 反馈页(1.3.0):多行输入 + 诊断折叠区 */
+textarea{width:100%;padding:11px 14px;border:1px solid oklch(60% 0.01 295 / 0.35);
+  border-radius:12px;background:oklch(100% 0 0 / 0.6);font:15px/1.5 inherit;font-family:inherit;
+  color:var(--ink);resize:none;transition:border-color .18s,box-shadow .18s}
+textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+#v-feedback details{margin:2px 0 6px}
+#v-feedback summary{cursor:pointer;font:500 13px/1.6 inherit;color:var(--ink-2);
+  list-style:none;display:flex;align-items:center;gap:6px;user-select:none}
+#v-feedback summary::before{content:"▸";font-size:11px;color:var(--ink-3);transition:transform .15s}
+#v-feedback details[open] summary::before{transform:rotate(90deg)}
+#v-feedback details[open] summary{margin-bottom:8px}
 /* 密码框小眼睛:明文/隐藏切换(类名避开 bot 的 .eye 眼睛路径)。
    WebView2/Chromium 对 type=password 另有原生密码揭示按钮(::-ms-reveal),
    输入时自动出现,会和自绘眼睛叠成两个 — 一并禁掉 */
@@ -663,18 +674,35 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div class="row" id="task-row" style="display:none"><div><div class="t">定时任务</div><div class="d" id="task-status-d"></div></div>
         <button class="link" id="task-rebuild" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="rebuildTask()">点此重建</button></div>
 
-      <div class="row"><div><div class="t">遇见问题?</div><div class="d">一键复制打码诊断信息,发给谁都不泄密</div></div>
+      <div class="row"><div><div class="t">反馈</div><div class="d">问题或建议都说给桂桂听,一键直达开发者</div></div>
         <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openDetail('v-feedback')">反馈</button></div>
       <div style="height:8px"></div>
     </div>
 
-    <!-- 问题反馈:打码诊断展示 + 一键复制(契约 §2.12,1.1.0) -->
+    <!-- 反馈:真通道(契约 §2.15–2.17,1.3.0)— 分类多选 + 一句话;诊断包自动采集;
+         断网自动入队补发;复制文本降级为链路级次动作 -->
     <div class="v" id="v-feedback">
       <button class="back" onclick="backFrom('v-feedback')">‹ 返回</button>
-      <h1 style="font-size:22px">诊断信息。</h1>
-      <p class="lede">已自动打码:学号只留头尾,密码永远不会出现。复制发给开发者即可:</p>
-      <div class="log" id="feedback-text" style="max-height:300px;white-space:pre-wrap">正在生成…</div>
-      <button class="btn" id="feedback-copy" onclick="copyFeedback(this)">复制诊断信息</button>
+      <h1 style="font-size:22px">说给桂桂听。</h1>
+      <div class="presets" id="fb-kinds" style="margin:0 0 16px">
+        <button type="button" class="preset on" data-kind="problem" onclick="fbToggleKind('problem')">问题</button>
+        <button type="button" class="preset" data-kind="suggestion" onclick="fbToggleKind('suggestion')">建议</button>
+      </div>
+      <div class="f"><label>说说具体情况(必填)</label>
+        <textarea id="fb-what" rows="3" maxlength="120" placeholder="说说当时的情况,比如:今早七点没登上,日志说登录被拒"></textarea>
+        <div class="micro-line" id="fb-note" style="display:none;margin-top:6px"></div>
+      </div>
+      <div class="f"><label>想被回访就留个联系(可选)</label>
+        <input id="fb-contact" maxlength="80" placeholder="QQ 或邮箱">
+      </div>
+      <details id="fb-diag">
+        <summary>诊断信息(已打码,点开可查)</summary>
+        <div class="micro-line" id="fb-uid-line" style="margin:0 0 8px"></div>
+        <div class="log" id="feedback-text" style="margin-top:0;max-height:240px;white-space:pre-wrap">正在生成…</div>
+      </details>
+      <button class="btn" id="fb-send" onclick="sendFeedback(this)">发送反馈</button>
+      <button class="link" id="fb-copy" style="margin-top:10px;font-size:12.5px" onclick="copyFeedback(this)">复制文本</button>
+      <div class="micro-line" id="fb-pending" style="display:none;margin-top:10px"></div>
     </div>
 
   </div>
@@ -1269,21 +1297,63 @@ async function loadSettings(){
   GG.api.taskStatus().then(t=>{if(t.ok)renderTaskRow(t.data.ok)});
 }
 function toggleCfg(el){el.classList.toggle('on');GG.api.saveConfig({[el.dataset.cfg]:el.classList.contains('on')})}
-/* 问题反馈(契约 §2.12):拉取打码诊断文本,展示 + 一键复制(复制动作在前端) */
+/* 反馈:真通道(契约 §2.15–2.17,1.3.0)— 分类多选 → 发送;诊断自动采集;
+   断网入队自动补发(status 行只报状态,零操作);复制文本 = 链路级次动作 */
+let fbKinds=new Set(['problem']);
+const FB_PH={problem:'说说当时的情况,比如:今早七点没登上,日志说登录被拒',
+  suggestion:'想建议什么?比如:希望能导出登录记录'};
+function fbToggleKind(k){
+  fbKinds.has(k)?fbKinds.delete(k):fbKinds.add(k);
+  if(!fbKinds.size)fbKinds.add(k);   /* 至少一枚:最后一枚不可取消 */
+  fbSyncKinds();
+}
+function fbSyncKinds(){
+  document.querySelectorAll('#fb-kinds .preset').forEach(b=>b.classList.toggle('on',fbKinds.has(b.dataset.kind)));
+  const withProblem=fbKinds.has('problem'),withSug=fbKinds.has('suggestion');
+  $('fb-diag').style.display=withProblem?'block':'none';   /* 纯建议无诊断区 */
+  $('fb-what').placeholder=(!withProblem&&withSug)?FB_PH.suggestion:FB_PH.problem;
+  if(withProblem&&!$('fb-diag').dataset.loaded)loadFbDiag();
+}
 async function loadFeedback(){
-  const box=$('feedback-text'),btn=$('feedback-copy');
-  box.textContent='正在生成…';box.dataset.raw='';btn.disabled=true;
-  const r=await GG.api.feedback();
-  btn.disabled=false;
-  if(!r.ok){box.textContent='生成失败:'+r.message;return}
+  fbSyncKinds();renderFbPending();
+  const n=$('fb-note');n.style.display='none';
+}
+async function loadFbDiag(){
+  const diag=$('fb-diag'),box=$('feedback-text');
+  diag.dataset.loaded='1';box.textContent='正在生成…';
+  const r=await GG.api.feedbackDiag({kind:[...fbKinds]});
+  if(!r.ok){box.textContent='生成失败:'+r.message;diag.dataset.loaded='';return}
   box.textContent=r.data.text;box.dataset.raw=r.data.text;
+  $('fb-uid-line').textContent=r.data.uid_masked?('随附:学号 '+r.data.uid_masked+'(便于找到你)'):'';
+}
+async function sendFeedback(btn){
+  const what=$('fb-what').value.trim(),contact=$('fb-contact').value.trim(),note=$('fb-note');
+  const show=(t,warm)=>{note.textContent=t;note.style.color=warm?'var(--warm)':'var(--ink-2)';note.style.display='block'};
+  if(!what)return show('说说具体情况(必填)',true);
+  btn.classList.add('busy');btn.disabled=true;
+  const r=await GG.api.feedbackSend({kind:[...fbKinds],what,contact});
+  btn.classList.remove('busy');btn.disabled=false;
+  if(!r.ok)return show(r.message,true);          /* FB_VALIDATION:表单内提示,不入队 */
+  if(r.data.result==='queued')
+    return show('没发出去,已存本地 — 联网后自动补发,不用再点',false);
+  btn.textContent='已收到 ✓ '+r.data.id;setTimeout(()=>{btn.textContent='发送反馈'},2400);
+  $('fb-what').value='';$('fb-contact').value='';note.style.display='none';
+  renderFbPending();
+}
+async function renderFbPending(){
+  const el=$('fb-pending');
+  const r=await GG.api.feedbackPendingStatus();
+  if(!r.ok)return;
+  if(r.data.pending>0){el.textContent='有 '+r.data.pending+' 条没发出去的反馈,联网自动补发';el.style.display='block'}
+  else el.style.display='none';
 }
 async function copyFeedback(btn){
-  const t=$('feedback-text').dataset.raw||'';
+  let t=$('feedback-text').dataset.raw||'';
+  if(!t){const r=await GG.api.feedbackDiag({kind:[...fbKinds]});if(r.ok)t=r.data.text}
   if(!t)return;
   try{await navigator.clipboard.writeText(t)}
   catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}
-  btn.textContent='已复制 ✓';setTimeout(()=>{btn.textContent='复制诊断信息'},1800);
+  btn.textContent='已复制 ✓';setTimeout(()=>{btn.textContent='复制文本'},1800);
 }
 /* 日志追加事件:主页内嵌(只保最近几条,防止把「历史日志 →」顶飞) + 历史页今天组同步追加
    + 静默拍落盘后重拉 recentResult(横幅随「今早没登上」出现/消失) */

@@ -1,97 +1,607 @@
-"""问题反馈 — 打码诊断文本(契约 §2.12 feedback() 的内容源)。
+"""反馈诊断包 — collect(kind) 七区采集 + render(bundle) 预览文本(PRD §7.1)。
 
-纪律:密码永不出现;学号打码(drcom.mask_uid);只聚合既有状态 + 一次实时探测,
-不发起新登录、不写任何文件。
+两渲染器分工:预览渲染数据(本模块 render),issue 渲染版式(边缘端 fb.js)。
+
+红线(§7.3,任何改动不得违反):
+- 绝不发起真实登录/注销(全屋共享会话);只做只读/被动探测;
+- 登录 URL(含 upass=)永不入包;data 只存服务器响应字段;
+- 打码在采集时完成(scrub_uids 对任何 ≥10 位数字串生效),出机器即净数据;
+- 所见即所发:预览与发送渲染自同一份 bundle;sender_uid 由 feedback 模块
+  在信封直附,不进本模块产物。
+
+瘦身规则住在这里(调用方不过滤):仅纯建议不带 net/server/logs/summary/crashes。
+7 个采集器是内部 seam:各自 try/except,失败写该区 errors 字段(in-band),不传染。
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import email.utils
+import json
 import platform
+import re
+import socket
+import subprocess
+import time
+from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
 
 import guigui
-from . import config, detect, drcom, logstore, scheduler, vault
+from . import config, detect, logstore, paths, scheduler, wifictl
+from .drcom import UA, mask_uid
 
-LOG_DAYS = 3
+LOG_DAYS = 7            # logs 区回看天数(PRD §4.1)
+LOG_DAY_CAP = 80        # 单日条数上限:超了保头保尾(决策记录 8)
+LOG_HEAD, LOG_TAIL = 20, 40
+SUBPROC_TIMEOUT = 8     # 单个采集子进程超时
+PROBE_TIMEOUT = 4       # 单个探测超时
+VERSION_URL = "https://guigui-guat.pages.dev/version.json"
 
-_STATE_ZH = {
-    "logged_in": "已登录",
-    "not_logged_in": "未登录",
-    "unreachable": "不可达",
-    "waiting": "网络未就绪",
+# 进程起点(供 self.proc_uptime_s;import 即记,gui/ensure 启动即 import 链上)
+_PROC_STARTED = time.monotonic()
+
+_state_zh = {"logged_in": "已登录", "not_logged_in": "未登录",
+             "unreachable": "不可达", "waiting": "网络未就绪"}
+
+# 学号形数字串(≥10 位)→ 打码;对任何采集到的文本生效
+_UID_RUN = re.compile(r"\d{10,14}")
+
+
+def scrub_uids(text: str) -> str:
+    return _UID_RUN.sub(lambda m: mask_uid(m.group(0)), str(text or ""))
+
+
+def _scrub(value):
+    """递归打码:字符串/列表/字典全走一遍(防御性,采集源头已尽量净)。"""
+    if isinstance(value, str):
+        return scrub_uids(value)
+    if isinstance(value, list):
+        return [_scrub(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _scrub(v) for k, v in value.items()}
+    return value
+
+
+def _run(cmd: list[str]) -> str:
+    """采集子进程:GBK 解码(中文 Windows 控制台),失败抛给采集器 in-band。"""
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="gbk",
+                       errors="replace", timeout=SUBPROC_TIMEOUT,
+                       creationflags=subprocess.CREATE_NO_WINDOW)
+    return r.stdout or ""
+
+
+def _region(errors: list, name: str, fn, *args):
+    """单采集器 seam:异常 → 该区 errors 一行,其余照发(AC-F5)。"""
+    try:
+        return fn(*args)
+    except Exception as e:
+        errors.append(f"{name}: {type(e).__name__}")
+        return None
+
+
+# ── env 区采集器 ────────────────────────────────
+
+def _env_os() -> str:
+    build = 0
+    try:
+        build = sys_build()
+    except Exception:
+        build = int(re.search(r"\d+", platform.version() or "0").group(0))
+    major = "11" if build >= 22000 else "10"
+    return f"Windows {major} {build} {platform.machine()}"
+
+
+def sys_build() -> int:
+    import sys as _sys
+    v = _sys.getwindowsversion()
+    return int(getattr(v, "build", 0) or 0)
+
+
+def _env_clock_skew(cfg: dict) -> float | None:
+    """用户时钟 vs 认证服务器时钟(秒)— 定时全乱的元凶。只读探测。"""
+    base = cfg.get("url") or "http://10.1.2.3"
+    req = Request(base + "/", headers={"User-Agent": UA})
+    with urlopen(req, timeout=PROBE_TIMEOUT) as resp:
+        date_hdr = resp.headers.get("Date")
+    if not date_hdr:
+        return None
+    server = email.utils.parsedate_to_datetime(date_hdr)
+    return round((server - dt.datetime.now(dt.timezone.utc)).total_seconds(), 1)
+
+
+_ADAPTER_TITLE = re.compile(
+    r"^(.*?)(?:适配器|adapter)\s+(.+?)\s*[:.:]?\s*$", re.IGNORECASE)
+_IPV4 = re.compile(r"\b(\d{1,3}(?:\.\d{1,3}){3})\b")
+# kind 分类关键词(描述行/标题行命中即归类;顺序:先专后泛)
+_KIND_RULES = [
+    (("tun",), ("tap", "tun", "clash", "wireguard", "openvpn", "vpn", "tailscale", "sing-box", "v2ray")),
+    (("vm",), ("virtualbox", "vmware", "hyper-v", "vethernet", "loopback", "bluetooth")),
+    (("wifi",), ("wireless", "wi-fi", "wifi", "wlan", "802.11", "无线")),
+]
+
+
+def _env_adapters() -> list[dict]:
+    """全部网卡(含虚拟):ipconfig /all 解析;kind ∈ wifi/ethernet/tun/vm。"""
+    out = _run(["ipconfig", "/all"])
+    ssid = None
+    try:
+        ssid = wifictl.current_ssid()
+    except Exception:
+        pass
+    adapters: list[dict] = []
+    cur_name = cur_desc = None
+    cur_ip = None
+    cur_down = False
+
+    def _flush():
+        if cur_name is None:
+            return
+        hay = f"{cur_name} {cur_desc or ''}".lower()
+        kind = "ethernet"
+        for want, kws in _KIND_RULES:
+            if any(k in hay for k in kws):
+                kind = want[0]
+                break
+        up = (not cur_down) and cur_ip is not None
+        entry = {"name": cur_name, "kind": kind, "ip": cur_ip, "up": up}
+        if kind == "wifi" and up and ssid:
+            entry["ssid"] = ssid
+        adapters.append(entry)
+
+    for raw in out.splitlines():
+        line = raw.strip()
+        m = _ADAPTER_TITLE.match(line)
+        if m:
+            _flush()
+            cur_name, cur_desc, cur_ip, cur_down = m.group(2).strip(), None, None, False
+            continue
+        if cur_name is None:
+            continue
+        low = line.lower()
+        if "description" in low or "描述" in low:
+            cur_desc = line.split(":", 1)[-1].split("。", 1)[-1].strip() or cur_desc
+        elif "media disconnected" in low or "媒体已断开" in low:
+            cur_down = True
+        elif "ipv4" in low:
+            ipm = _IPV4.search(line)
+            if ipm:
+                cur_ip = ipm.group(1)
+    _flush()
+    return adapters
+
+
+def _env_dns() -> list[str]:
+    out = _run(["ipconfig", "/all"])
+    servers: list[str] = []
+    in_dns = False
+    for raw in out.splitlines():
+        s = raw.strip()
+        if not s:
+            in_dns = False
+            continue
+        low = s.lower()
+        if "dns" in low:
+            in_dns = True
+            for ip in _IPV4.findall(s):
+                if ip not in servers and not ip.startswith("127."):
+                    servers.append(ip)
+            continue
+        # DNS 续行(单独一个 IP,无标签);别的行一旦有内容即结束续行
+        if in_dns and _IPV4.fullmatch(s):
+            if s not in servers and not s.startswith("127."):
+                servers.append(s)
+        else:
+            in_dns = False
+    return servers
+
+
+def _env_proxy() -> dict:
+    system = False
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"Software\Microsoft\Windows\CurrentVersion\Internet Settings") as k:
+            enable, _ = winreg.QueryValueEx(k, "ProxyEnable")
+            server = ""
+            try:
+                server, _ = winreg.QueryValueEx(k, "ProxyServer")
+            except OSError:
+                pass
+            system = bool(enable) and bool(str(server or "").strip())
+    except Exception:
+        pass
+    import os
+    env_flag = any(os.environ.get(k) for k in
+                   ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+                    "http_proxy", "https_proxy", "all_proxy"))
+    return {"system": system, "env": env_flag}
+
+
+_AV_SIGNATURES = {          # 只报布尔,不列进程清单(PRD §4.1)
+    "huorong": ("hipsdaemon", "hipsmain", "usysdiag"),
+    "qihoo360": ("360tray", "360safe", "zhudongfangyu", "360safeplus"),
+    "defender": ("msmpeng", "msascuil"),
 }
 
 
-def _on_off(flag: bool) -> str:
-    return "开" if flag else "关"
+def _env_av() -> dict:
+    out = _run(["tasklist", "/fo", "csv", "/nh"]).lower()
+    names = {row.split('","')[0].strip('"') for row in out.splitlines() if row.strip()}
+    found = {}
+    for av, sigs in _AV_SIGNATURES.items():
+        found[av] = any(any(sig in n for n in names) for sig in sigs)
+    return found
 
 
-def _net_line(cfg: dict) -> str:
-    net = detect.probe(cfg)
-    state = _STATE_ZH.get(net.get("state"), str(net.get("state")))
-    ssid = net.get("ssid") or "未连接"
-    return f"WiFi:{ssid} · 认证服务器:{cfg.get('server_name', '')}({state})"
+_WEBVIEW2_KEY = (r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients"
+                 r"\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}")
 
 
-def _config_line(cfg: dict) -> str:
-    return (
-        f"登录时间 {cfg['trigger_time']} · 心跳 {cfg['heartbeat_minutes']} 分钟"
-        f" · 开机补登 {_on_off(cfg['boot_login'])} · 唤醒补登 {_on_off(cfg['wake_login'])}"
-        f" · 巡逻 {_on_off(cfg['patrol_enabled'])}"
-        f" · WiFi兜底 {_on_off(cfg['wifi_fallback_enabled'])}"
-        f" · 假期静默 {_on_off(cfg['vacation_silence'])}"
-        f" · 通知 {_on_off(cfg['notifications'])} · 总开关 {_on_off(cfg['master'])}"
-    )
+def _env_webview2() -> str | None:
+    try:
+        import winreg
+        for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+            try:
+                with winreg.OpenKey(root, _WEBVIEW2_KEY) as k:
+                    pv, _ = winreg.QueryValueEx(k, "pv")
+                    if pv:
+                        return str(pv)
+            except OSError:
+                continue
+    except Exception:
+        pass
+    return None
 
 
-def _task_line(task_name: str) -> str:
-    xml = scheduler.query_xml(task_name)
-    if xml is None:
-        return f"{task_name}:未注册"
-    rev = scheduler.parse_rev(xml)
-    return f"{task_name}:已注册(rev={rev})" if rev is not None else f"{task_name}:已注册(rev 未知)"
+def _collect_env(cfg: dict) -> dict:
+    errors: list[str] = []
+    out: dict = {"errors": errors}
+    out["os"] = _region(errors, "os", _env_os) or ""
+    out["clock_skew_s"] = _region(errors, "clock_skew", _env_clock_skew, cfg)
+    out["adapters"] = _region(errors, "adapters", _env_adapters) or []
+    out["dns"] = _region(errors, "dns", _env_dns) or []
+    out["proxy"] = _region(errors, "proxy", _env_proxy) or {"system": False, "env": False}
+    out["av"] = _region(errors, "av", _env_av) or {}
+    out["webview2"] = _region(errors, "webview2", _env_webview2)
+    out["python"] = platform.python_version()
+    return out
 
 
-def _credential_line(cfg: dict) -> str:
-    uid = cfg.get("uid") or ""
-    if not uid:
-        return "学号:未配置"
-    saved = "凭据已保存" if vault.has_password(uid) else "凭据未保存"
-    return f"学号:{drcom.mask_uid(uid)}({saved})"
+# ── self 区采集器 ───────────────────────────────
+
+def _self_installed_at() -> str | None:
+    try:
+        d = paths.data_dir()
+        if not d.exists():
+            return None
+        ts = d.stat().st_ctime
+        return dt.datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
+    except Exception:
+        return None
 
 
-def _logs_block() -> list[str]:
-    lines = []
-    for day in logstore.query(LOG_DAYS):
-        for e in day["entries"]:
-            lines.append(
-                f"[{day['label']} {e.get('ts', '')} {str(e.get('level', '')).upper()}] "
-                f"{e.get('text', '')}")
-    return lines
+def _self_config(cfg: dict) -> dict:
+    """配置摘要(敏感项不入:uid 由信封 sender_uid 承担,密码从不进 config)。"""
+    return {
+        "trigger_time": cfg.get("trigger_time"),
+        "operator": cfg.get("operator"),
+        "heartbeat_minutes": cfg.get("heartbeat_minutes"),
+        "boot_login": cfg.get("boot_login"),
+        "wake_login": cfg.get("wake_login"),
+        "patrol_enabled": cfg.get("patrol_enabled"),
+        "patrol_interval_minutes": cfg.get("patrol_minutes"),
+        "wifi_fallback_enabled": cfg.get("wifi_fallback_enabled"),
+        "wifi_fallback_ssid": cfg.get("wifi_fallback_ssid"),
+        "vacation_silence": cfg.get("vacation_silence"),
+        "notifications": cfg.get("notifications"),
+        "master": cfg.get("master"),
+    }
 
 
-def build_text() -> str:
-    """生成多行纯文本诊断信息(可直接复制粘贴给开发者/AI 排查)。"""
+def _self_state() -> dict:
+    from . import ensure
+    st = ensure.load_state()
+    lr = st.get("last_result") or {}
+    return {
+        "cred_verified": bool(st.get("cred_verified")),
+        "unreachable_streak": st.get("unreachable_streak", 0),
+        "maintenance_streak": st.get("maintenance_streak", 0),
+        "last_result": lr.get("outcome"),
+        "last_settle_date": _mmdd(st.get("last_settle_date")),
+    }
+
+
+def _mmdd(iso_date: str | None) -> str | None:
+    if not iso_date:
+        return None
+    try:
+        d = dt.date.fromisoformat(str(iso_date))
+        return f"{d.month:02d}-{d.day:02d}"
+    except ValueError:
+        return str(iso_date)
+
+
+_TASK_PS = (
+    "Get-ScheduledTaskInfo -TaskName 'GuiGui','GuiGui-Patrol' "
+    "-ErrorAction SilentlyContinue | Select-Object TaskName,LastRunTime,"
+    "LastTaskResult | ConvertTo-Json -Compress"
+)
+
+
+def _self_tasks() -> list[dict]:
+    """schtasks 实查:registered 走 scheduler.query_xml;last_run/last_result
+    走 PowerShell(GitHub JSON 输出,免本地化表头解析)。"""
+    tasks: list[dict] = []
+    info: dict[str, dict] = {}
+    try:
+        raw = _run(["powershell", "-NoProfile", "-Command", _TASK_PS])
+        data = json.loads(raw or "null")
+        for row in (data if isinstance(data, list) else [data] if data else []):
+            info[str(row.get("TaskName"))] = row
+    except Exception:
+        pass
+    for name in (scheduler.TASK_MAIN, scheduler.TASK_PATROL):
+        row = info.get(name, {})
+        last_result = row.get("LastTaskResult")
+        tasks.append({
+            "name": name,
+            "registered": scheduler.query_xml(name) is not None,
+            "last_run": _fmt_ps_time(row.get("LastRunTime")),
+            "last_result": (f"0x{int(last_result) & 0xFFFFFFFF:X}"
+                            if last_result is not None else None),
+        })
+    return tasks
+
+
+def _fmt_ps_time(v) -> str | None:
+    """PowerShell 时间(/Date(ts)/ 或 ISO)→ 'MM-DD HH:MM:SS'。"""
+    if not v:
+        return None
+    try:
+        if isinstance(v, str) and v.startswith("/Date("):
+            ts = int(v[6:v.index(")")])
+            when = dt.datetime.fromtimestamp(ts / 1000)
+        else:
+            when = dt.datetime.fromisoformat(str(v).replace("Z", "+00:00")).replace(tzinfo=None)
+        return when.strftime("%m-%d %H:%M:%S")
+    except Exception:
+        return None
+
+
+def _collect_self(cfg: dict) -> dict:
+    errors: list[str] = []
+    out: dict = {"errors": errors}
+    out["installed_at"] = _region(errors, "installed_at", _self_installed_at)
+    out["config"] = _region(errors, "config", _self_config, cfg) or {}
+    out["state"] = _region(errors, "state", _self_state) or {}
+    out["tasks"] = _region(errors, "tasks", _self_tasks) or []
+    out["proc_uptime_s"] = int(time.monotonic() - _PROC_STARTED)
+    return out
+
+
+# ── net 区采集器(problem scope)────────────────
+
+def _net_host_port(cfg: dict) -> tuple[str, int]:
+    u = urlsplit(cfg.get("url") or "http://10.1.2.3")
+    return u.hostname or "10.1.2.3", u.port or 80
+
+
+def _collect_net(cfg: dict) -> dict:
+    errors: list[str] = []
+    host, port = _net_host_port(cfg)
+
+    def dns_resolved():
+        infos = socket.getaddrinfo(host, None, proto=socket.IPPROTO_TCP)
+        return str(infos[0][4][0])
+
+    def tcp():
+        with socket.create_connection((host, port), timeout=3):
+            return True
+
+    def http():
+        base = cfg.get("url") or "http://10.1.2.3"
+        t0 = time.monotonic()
+        try:
+            req = Request(base + "/", headers={"User-Agent": UA})
+            with urlopen(req, timeout=PROBE_TIMEOUT) as resp:
+                status = resp.status
+                resp.read(256)
+        except HTTPError as e:
+            status = e.code
+        latency = round((time.monotonic() - t0) * 1000)
+        return status, latency
+
+    out: dict = {"errors": errors}
+    out["dns_resolved"] = _region(errors, "dns", dns_resolved)
+    out["tcp"] = _region(errors, "tcp", tcp)
+    status_latency = _region(errors, "http", http)
+    out["http"], out["latency_ms"] = status_latency if status_latency else (None, None)
+    out["route_iface"] = _region(errors, "route", lambda: _route_iface(host, cfg))
+    return out
+
+
+def _route_iface(host: str, cfg: dict) -> str | None:
+    """最精确匹配路由的本地出口 IP → 反查网卡名(route print)。"""
+    try:
+        ip = socket.inet_aton(host)
+    except OSError:
+        return None
+    target = int.from_bytes(ip, "big")
+    best_prefix, best_iface = -1, None
+    for line in _run(["route", "print", "-4"]).splitlines():
+        tok = line.split()
+        if len(tok) < 5 or not tok[0][0].isdigit():
+            continue
+        try:
+            dest = int.from_bytes(socket.inet_aton(tok[0]), "big")
+            mask = int.from_bytes(socket.inet_aton(tok[1]), "big")
+            iface_ip = tok[3]
+        except OSError:
+            continue
+        prefix = bin(mask).count("1")
+        if mask and (dest & mask) == (target & mask) and prefix > best_prefix:
+            best_prefix, best_iface = prefix, iface_ip
+    if best_iface is None:
+        return None
+    for a in _env_adapters():
+        if a.get("ip") == best_iface:
+            return a["name"]
+    return best_iface
+
+
+# ── logs / summary 区(problem scope)────────────
+
+def _trim_entries(entries: list[dict]) -> list[dict]:
+    if len(entries) <= LOG_DAY_CAP:
+        return entries
+    head, tail = entries[:LOG_HEAD], entries[-LOG_TAIL:]
+    omitted = len(entries) - LOG_HEAD - LOG_TAIL
+    return head + [{"ts": "", "level": "note",
+                    "text": f"(中间略去 {omitted} 条)"}] + tail
+
+
+def _collect_logs() -> tuple[list[dict], str | None]:
+    today = dt.date.today()
+    days: list[dict] = []
+    marks: list[str] = []
+    for i in range(LOG_DAYS):
+        date = today - dt.timedelta(days=i)
+        entries = _trim_entries(logstore.read_day(date))
+        if not entries:
+            continue
+        out_entries = []
+        for e in entries:
+            row = {"ts": e.get("ts", ""), "level": e.get("level", ""),
+                   "text": e.get("text", "")}
+            if e.get("data"):
+                row["data"] = e["data"]
+            out_entries.append(row)
+        days.append({"date": f"{date.month:02d}-{date.day:02d}", "entries": out_entries})
+        mark = "–"                                  # silent/纯备注天
+        for e in entries:                           # 最后一个信号定当天成色
+            if e.get("level") == "fail":
+                mark = "✗"
+            elif e.get("level") == "ok" and str(e.get("text", "")).startswith("已登录"):
+                mark = "✓"
+        marks.insert(0, f"{date.month:02d}-{date.day:02d} {mark}")
+    return days, (" · ".join(marks) if marks else None)
+
+
+def last_fail_when() -> str:
+    """用户输入层 when:最近一条失败日志时间('MM-DD HH:MM');无失败 → 空串。"""
+    today = dt.date.today()
+    for i in range(LOG_DAYS):
+        date = today - dt.timedelta(days=i)
+        for e in reversed(logstore.read_day(date)):
+            if e.get("level") == "fail":
+                ts = str(e.get("ts", ""))
+                return f"{date.month:02d}-{date.day:02d} {ts[:5]}".strip()
+    return ""
+
+
+# ── latest_ver(两 scope 都带)──────────────────
+
+def _latest_ver() -> str | None:
+    try:
+        req = Request(VERSION_URL, headers={"User-Agent": UA})
+        with urlopen(req, timeout=PROBE_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        ver = data.get("latest")
+        return str(ver)[:20] if ver else None
+    except Exception:
+        return None
+
+
+# ── 对外接口 ────────────────────────────────────
+
+def collect(kind: list[str]) -> dict:
+    """采集诊断包(打码已在采集时完成)。kind 含 problem → 全量;纯建议 → 瘦身。"""
     cfg = config.load()
+    full = "problem" in (kind or [])
+    errors: list[str] = []
+    bundle: dict = {"env": _collect_env(cfg)}
+    try:
+        bundle["self"] = _collect_self(cfg)
+    except Exception as e:
+        bundle["self"] = {"errors": [f"self: {type(e).__name__}"]}
+    if full:
+        try:
+            bundle["net"] = _collect_net(cfg)
+        except Exception as e:
+            bundle["net"] = {"errors": [f"net: {type(e).__name__}"]}
+        try:
+            logs, summary = _collect_logs()
+            bundle["logs"] = logs
+            if summary:
+                bundle["summary"] = summary
+        except Exception as e:
+            bundle["logs"] = []
+            errors.append(f"logs: {type(e).__name__}")
+    bundle["latest_ver"] = _latest_ver()
+    if errors:
+        bundle["self"]["errors"] = [*bundle["self"].get("errors", []), *errors]
+    return _scrub(bundle)
+
+
+def render(bundle: dict) -> str:
+    """预览文本(折叠区展示/复制动作共用;issue 排版权在边缘端,两渲染器不重叠)。"""
     now = dt.datetime.now()
-    parts = [
-        f"桂桂 v{guigui.__version__} 诊断信息",
-        f"生成时间:{now:%Y-%m-%d %H:%M:%S}",
-        f"系统:{platform.system()} {platform.release()}({platform.version()}) {platform.machine()}",
-        "",
-        "── 网络 ──",
-        _net_line(cfg),
-        "",
-        "── 配置 ──",
-        _config_line(cfg),
-        _credential_line(cfg),
-        "",
-        "── 自动化任务 ──",
-        _task_line(scheduler.TASK_MAIN),
-        _task_line(scheduler.TASK_PATROL),
-        "",
-        f"── 最近日志({LOG_DAYS} 天)──",
-    ]
-    logs = _logs_block()
-    parts.extend(logs if logs else ["(暂无日志)"])
+    parts = [f"桂桂 v{guigui.__version__} 诊断信息",
+             f"生成时间:{now:%Y-%m-%d %H:%M:%S}(已打码,密码永不包含)", ""]
+
+    env = bundle.get("env") or {}
+    parts += ["── 环境 ──",
+              f"系统:{env.get('os') or '?'} · Python {env.get('python') or '?'}"
+              f" · WebView2 {env.get('webview2') or '?'}",
+              f"时钟偏差:{env.get('clock_skew_s')}s · 代理:系统 {bool((env.get('proxy') or {}).get('system'))}"
+              f" / 环境变量 {bool((env.get('proxy') or {}).get('env'))}",
+              f"杀软:{', '.join(f'{k}={v}' for k, v in (env.get('av') or {}).items()) or '—'}"]
+    for a in env.get("adapters") or []:
+        line = f"网卡 {a.get('name')}({a.get('kind')}){' · ' + a['ssid'] if a.get('ssid') else ''}"
+        line += f" · {a.get('ip') or '无IP'} · {'在用' if a.get('up') else '未连接'}"
+        parts.append(line)
+    if env.get("dns"):
+        parts.append(f"DNS:{' / '.join(env['dns'])}")
+    if env.get("errors"):
+        parts.append(f"采集失败:{'; '.join(env['errors'])}")
+
+    self_ = bundle.get("self") or {}
+    parts += ["", "── 自身 ──", f"安装于:{self_.get('installed_at') or '?'}"
+              f" · 进程已运行 {self_.get('proc_uptime_s', 0)}s"]
+    cfg = self_.get("config") or {}
+    if cfg:
+        parts.append(f"配置:{cfg.get('trigger_time')} 触发 · {cfg.get('operator')}"
+                     f" · 心跳 {cfg.get('heartbeat_minutes')} 分钟 · 巡逻 {'开' if cfg.get('patrol_enabled') else '关'}"
+                     f" · WiFi兜底 {'开' if cfg.get('wifi_fallback_enabled') else '关'}"
+                     f" · 总开关 {'开' if cfg.get('master') else '关'}")
+    st = self_.get("state") or {}
+    if st:
+        parts.append(f"状态:凭据{'已验证' if st.get('cred_verified') else '未验证'}"
+                     f" · 最近结果 {st.get('last_result') or '—'}"
+                     f" · 最后成功 {st.get('last_settle_date') or '—'}")
+    for t in self_.get("tasks") or []:
+        parts.append(f"任务 {t.get('name')}:{'已注册' if t.get('registered') else '未注册'}"
+                     f" · 上次 {t.get('last_run') or '—'}({t.get('last_result') or '—'})")
+    if self_.get("errors"):
+        parts.append(f"采集失败:{'; '.join(self_['errors'])}")
+
+    net = bundle.get("net")
+    if net is not None:
+        parts += ["", "── 网络(实时)──",
+                  f"解析:{net.get('dns_resolved') or '失败'} · TCP:{'通' if net.get('tcp') else '不通'}"
+                  f" · HTTP:{net.get('http') or '失败'} · 延迟 {net.get('latency_ms')}ms"
+                  f" · 出口网卡:{net.get('route_iface') or '—'}"]
+        if net.get("errors"):
+            parts.append(f"采集失败:{'; '.join(net['errors'])}")
+
+    if bundle.get("summary"):
+        parts += ["", "── 最近七天 ──", bundle["summary"]]
+    for day in bundle.get("logs") or []:
+        parts.append(f"[{day.get('date')}]")
+        for e in day.get("entries") or []:
+            parts.append(f"  {e.get('ts', '')} {str(e.get('level', '')).upper():<5} {e.get('text', '')}")
+
+    parts += ["", f"── 版本对照 ──\n本机 {guigui.__version__} · 最新 {bundle.get('latest_ver') or '?'}"]
     return "\n".join(parts)

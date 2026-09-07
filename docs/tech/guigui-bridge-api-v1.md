@@ -1,4 +1,4 @@
-# 桂桂 v2 · JS↔Python 桥接契约 v1.2.0
+# 桂桂 v2 · JS↔Python 桥接契约 v1.3.0
 
 > **地位**:前后端通信协议的**唯一权威**(《guigui-work-split.md》§一.2)。后端 bridge 实现以此为准;`static/dev/mock.js` 是它的可执行规范(仅开发)。
 > **绑定**:命名空间 `window.guigui.*`。pywebview 经 `js_api` 暴露,实现侧自行决定 camelCase 方法名或 snake_case+映射(契约只锁 JS 侧名字)。
@@ -28,6 +28,7 @@
 | `WIFI_CONNECT_TIMEOUT` | 连接超时(90s) | 同上 |
 | `NOT_CONFIGURED` | 未完成首装就触发动作 | 引导回首装页 |
 | `SAVE_FAILED` | 配置落盘失败 | 设置项回滚 + 提示 |
+| `FB_VALIDATION` | 反馈表单字段不合法(1.3.0,§2.15) | 表单内提示,不入队 |
 | `BRIDGE_MISSING` | 后端未绑定/方法缺失(生产无回落) | 停在开机页,明示重启/重装 |
 | `INTERNAL` | 兜底 | 内联提示,不弹窗 |
 
@@ -159,7 +160,9 @@
 - 最小化=真最小化;关闭=退出 GUI(自动化不受影响,胶囊悬案以后端方案 §三.10 为准)。
 - 拖拽不走方法:titlebar 挂 `pywebview-drag` 类,由壳处理。
 
-### 2.12 feedback() — 问题反馈:打码诊断信息(1.1.0 新增)
+### 2.12 feedback() — 【1.3.0 起废弃,保留一个版本周期】
+
+> 反馈已重构为真通道(PRD `docs/prd/guigui-feedback-system.md`):复制诊断只是链路级次动作,主通道见 §2.15–2.17。本方法不再被前端调用;实现侧由新 diagnostics 的 `render(collect())` 派生,返回形状不变。
 
 时延承诺:≤6s(含一次实时网络探测;设置页入口「遇见问题?点击反馈」)。
 
@@ -169,6 +172,50 @@
 // 段落:版本/时间/系统 · 网络(实时探测)· 配置摘要(全部开关)· 凭据状态
 //       · 自动化任务注册状态 · 最近 3 天日志。
 // 前端负责展示 + 一键复制到剪贴板(复制动作在前端,后端只产文本)。
+```
+
+### 2.15 feedbackSend({kind, what, contact}) — 发送反馈(1.3.0 新增,真通道主入口)
+
+时延承诺:≤10s(诊断采集 + 一次 POST 尝试 8s 超时;失败即入本地队列,绝不原地重试)。
+
+```jsonc
+// 入参(用户输入层;诊断包后端自动采集,kind 决定 scope)
+{ "kind": ["problem"],       // ⊆ {problem, suggestion},非空,多选(胶囊)
+  "what": "今早七点没登上,日志说登录被拒",   // 必填,1–120 字,唯一必填项
+  "contact": "" }            // QQ/邮箱,可选,≤80 字;学号不在这里(后端直附 sender_uid)
+
+// data(result 三态;前端按 result 走 UX,零解析猜测)
+{ "result": "submitted", "id": "GG-3X" }          // 送达(D1✓+issue✓)→「已收到 ✓ GG-3X」
+{ "result": "submitted_degraded", "id": "GG-3X" } // D1✓,issue 延后补建 → 同上,用户无感
+{ "result": "queued", "next_attempt_at": "07:32" } // 已存本地,联网自动补发(离线队列)
+```
+
+失败信封:`FB_VALIDATION`(kind 空 / what 空 / 超长)——表单内提示,**不入队**。
+顺序约束:一次点击只调一次(按钮禁用);双发=两条独立反馈,服务端不做用户级去重
+(幂等只管「同一条的补发」,按 client_id)。
+
+**诊断包七区字段以 PRD §4.1(附录 B)为唯一正本**,本契约不复制;
+env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携带(纯建议瘦身)。
+
+### 2.16 feedbackDiag({kind}) — 诊断预览(1.3.0 新增)
+
+时延承诺:≤8s(采集器各自带超时,失败 in-band 进 errors 字段,永不阻塞)。
+
+```jsonc
+{ "text": "桂桂 v2.x 诊断信息\n…(七区预览,已打码)",
+  "uid_masked": "2025…0001" }   // 未配置学号 → null
+// text 渲染自与发送同一份 bundle(所见即所发,数据层承诺);
+// 折叠区披露行用 uid_masked:「随附:学号 2025…0001(便于找到你)」——前端不显示明文。
+// 「复制文本」链路级次动作复制同一 text。
+// kind 同 §2.15:纯建议 → 瘦身包(env/self.app_ver);含 problem → 全七区。
+```
+
+### 2.17 feedbackPendingStatus() — 离线队列状态(1.3.0 新增)
+
+```jsonc
+{ "pending": 1, "oldest_age_s": 3600 }   // pending=0 → { "pending": 0, "oldest_age_s": null }
+// UI:pending>0 时反馈页出现一行「有 1 条没发出去的反馈,联网自动补发」;正常态零存在感。
+// 补发由后端自驱(GUI 打开/网络恢复/ensure 拍都会 pump),前端零操作。
 ```
 
 ### 2.13 taskStatus() — 定时任务在岗状态(1.2.0 新增,AC-17)
@@ -211,6 +258,7 @@
 | 1.1.0 | 2026-08-31 | 新增 `feedback()`(§2.12):返回打码诊断文本(用户拍板:反馈动作=复制诊断信息);方法 11→12 | 后端已实现(diagnostics+api.feedback,120 测);前端已接(反馈视图+设置入口,commit 1bb4083)— **生效** |
 | 1.1.1 | 2026-08-31 | §2.6 getConfig/saveConfig 新增 `operator` 枚举(校园用户/校园电信/校园联通/校园其他,注销页 carrier 实测抓全);§2.3 login payload 新增可选 `operator`;login 响应新增 `verified` | 后端已落地(提交密码先验证后入库 + verified 随信封下行);前端已接(三胶囊)|
 | 1.2.0 | 2026-09-06 | PRD 重梳理(af19e1b)落地:§2.3 失败信封可带 `reason`(拒绝三态 AC-19)+ 成功新增 `result:"stored"`(06:50 前提交存未验证);§2.10 recentResult 新增 `verified`(横幅①数据源);新增 §2.13 `taskStatus()` / §2.14 `rebuildTask()`(AC-17,仅点击重建);事件 `login:progress` 新增 `logging_out` 相位(+`online_uid`)、`schedule:changed` 扩 `task_ok`(兑现 §6 增强票);方法 12→14 | 后端已实现(5a018c8);前端已接(等待态/三态文案/横幅两态/主按钮三态修复/改密闭环/任务行,mock 场景 bind/other/unverified)— **生效** |
+| 1.3.0 | 2026-09-07 | 反馈系统重构(PRD `docs/prd/guigui-feedback-system.md` 全案):新增 §2.15 `feedbackSend`(真通道主入口,POST /fb v2,三态 result)/ §2.16 `feedbackDiag`(七区预览+uid 打码披露)/ §2.17 `feedbackPendingStatus`(离线队列状态行);§2.12 `feedback()` 废弃(保留一个版本周期,实现改由 render(collect()) 派生);错误码 +1(`FB_VALIDATION`);方法 14→17 | 后端实现中(本切片) |
 
 ## 6. 集成待办(联调问题记这里)
 

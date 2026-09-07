@@ -16,7 +16,7 @@ import logging
 import threading
 import time
 
-from guigui.core import config, detect, diagnostics, drcom, ensure, logstore, notify, scheduler, selfheal, vault, wifictl
+from guigui.core import config, detect, diagnostics, drcom, ensure, feedback, logstore, notify, scheduler, selfheal, vault, wifictl
 from guigui.core.config import ConfigError
 from guigui.core.vault import VaultError
 from guigui.core.wifictl import WifiConnectError, WifiScanError
@@ -31,6 +31,7 @@ WIFI_CONNECT_FAILED = "WIFI_CONNECT_FAILED"
 WIFI_CONNECT_TIMEOUT = "WIFI_CONNECT_TIMEOUT"
 NOT_CONFIGURED = "NOT_CONFIGURED"
 SAVE_FAILED = "SAVE_FAILED"
+FB_VALIDATION = "FB_VALIDATION"
 INTERNAL = "INTERNAL"
 
 # 学校自助服务平台(改密码 / 查流量 / 解绑设备)— openSelfService 交默认浏览器打开
@@ -542,14 +543,60 @@ class GuiGuiApi:
             log.exception("api.recentResult")
             return _err(INTERNAL, "昨晚的记录读不出来")
 
-    # ── 2.12 feedback(1.1.0 新增)─────────────────
+    # ── 2.12 feedback(1.1.0;1.3.0 起废弃,保留一个版本周期)──
 
     def feedback(self) -> dict:
+        """复印机时代的复制文本;实现由 render(collect()) 派生,形状不变。"""
         try:
-            return _ok({"text": diagnostics.build_text()})
+            return _ok({"text": diagnostics.render(diagnostics.collect(["problem"]))})
         except Exception:
             log.exception("api.feedback")
             return _err(INTERNAL, "诊断信息没生成出来,再试一次")
+
+    # ── 2.15–2.17 feedback*(1.3.0 新增:真通道)──
+
+    def feedbackSend(self, payload=None) -> dict:
+        """发送反馈(契约 §2.15):三态 result;FB_VALIDATION 表单内提示不入队。"""
+        payload = payload if isinstance(payload, dict) else {}
+        kind = payload.get("kind")
+        what = str(payload.get("what") or "")
+        contact = str(payload.get("contact") or "")
+        invalid = feedback.validate_input(kind, what, contact)
+        if invalid:
+            return _err(FB_VALIDATION, invalid)
+        try:
+            out = feedback.submit(kind, what, contact)
+        except Exception:
+            log.exception("api.feedbackSend")
+            return _err(INTERNAL, "反馈没发出去,再试一次")
+        if isinstance(out, feedback.Submitted):
+            return _ok({"result": "submitted", "id": out.id})
+        if isinstance(out, feedback.SubmittedDegraded):
+            return _ok({"result": "submitted_degraded", "id": out.id})
+        if isinstance(out, feedback.Queued):
+            return _ok({"result": "queued", "next_attempt_at": out.next_attempt_at})
+        return _err(FB_VALIDATION, out.detail)
+
+    def feedbackDiag(self, payload=None) -> dict:
+        """诊断预览(契约 §2.16):与发送渲染自同一份 bundle;uid 打码披露。"""
+        payload = payload if isinstance(payload, dict) else {}
+        kind = payload.get("kind") if isinstance(payload.get("kind"), list) else ["problem"]
+        try:
+            bundle = diagnostics.collect(kind)
+            uid = config.load().get("uid") or ""
+            return _ok({"text": diagnostics.render(bundle),
+                        "uid_masked": drcom.mask_uid(uid) if uid else None})
+        except Exception:
+            log.exception("api.feedbackDiag")
+            return _err(INTERNAL, "诊断信息没生成出来,再试一次")
+
+    def feedbackPendingStatus(self) -> dict:
+        """离线队列状态(契约 §2.17);补发后端自驱,前端零操作。"""
+        try:
+            return _ok(feedback.status())
+        except Exception:
+            log.exception("api.feedbackPendingStatus")
+            return _err(INTERNAL, "队列状态读不出来")
 
     # ── 2.11 winMinimize / winClose ───────────────
 
