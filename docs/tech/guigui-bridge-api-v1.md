@@ -1,4 +1,4 @@
-# 桂桂 v2 · JS↔Python 桥接契约 v1.4.0
+# 桂桂 v2 · JS↔Python 桥接契约 v1.4.1
 
 > **地位**:前后端通信协议的**唯一权威**(《guigui-work-split.md》§一.2)。后端 bridge 实现以此为准;`static/dev/mock.js` 是它的可执行规范(仅开发)。
 > **绑定**:命名空间 `window.guigui.*`。pywebview 经 `js_api` 暴露,实现侧自行决定 camelCase 方法名或 snake_case+映射(契约只锁 JS 侧名字)。
@@ -54,7 +54,13 @@
 ### 2.2 identify() — 学号识别(chkstatus 抓取)
 
 ```jsonc
-{ "uid": "2025000000001", "source": "chkstatus" }   // source: chkstatus | config | none
+{ "uid": "2025000000001", "source": "chkstatus" }
+// source: chkstatus = 检测自当前网络会话(1.4.1 起语义明确)——全屋共享会话
+//          下在线的可能是室友账号,回填值不保证是用户本人学号;前端首装
+//          表单识别结果旁必须给一句确认提示(方向:「检测自当前网络会话,
+//          确认是你自己的学号」),让用户看一眼再提交,防误抓入库
+//         config  = 来自本机已存配置,可信,无需提示
+//         none    = 没认出来(uid 为 null)
 ```
 
 ### 2.3 login({sid?, password?, operator?}) — 登录(首装开启/立即登录/重新登录共用)
@@ -270,6 +276,7 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
 | 1.2.0 | 2026-09-06 | PRD 重梳理(af19e1b)落地:§2.3 失败信封可带 `reason`(拒绝三态 AC-19)+ 成功新增 `result:"stored"`(06:50 前提交存未验证);§2.10 recentResult 新增 `verified`(横幅①数据源);新增 §2.13 `taskStatus()` / §2.14 `rebuildTask()`(AC-17,仅点击重建);事件 `login:progress` 新增 `logging_out` 相位(+`online_uid`)、`schedule:changed` 扩 `task_ok`(兑现 §6 增强票);方法 12→14 | 后端已实现(5a018c8);前端已接(等待态/三态文案/横幅两态/主按钮三态修复/改密闭环/任务行,mock 场景 bind/other/unverified)— **生效** |
 | 1.3.0 | 2026-09-07 | 反馈系统重构(PRD `docs/prd/guigui-feedback-system.md` 全案):新增 §2.15 `feedbackSend`(真通道主入口,POST /fb v2,三态 result)/ §2.16 `feedbackDiag`(七区预览+uid 打码披露)/ §2.17 `feedbackPendingStatus`(离线队列状态行);§2.12 `feedback()` 废弃(保留一个版本周期,实现改由 render(collect()) 派生);§2.3 `reason` 增第四态 `limit_users`(实测,拒绝四态);错误码 +1(`FB_VALIDATION`);方法 14→17 | 后端已实现(见 S1-S3 提交链);前端已接(v-feedback 重构 + mock 三方法/limit 场景) |
 | 1.4.0 | 2026-09-07 | QA 验收审计 P0(`docs/plans/qa-fix-plan-2026-09-07.md` §P0-1/2):①§2.3 提交密码路径成功信封(success/stored/already)新增 `task_ok: bool` — login 存完凭据改为**同步**对齐任务计划(masterToggle 同款,PS 调用秒级),被安全软件拦时信封与指引通知同时如实,成功页不许空头承诺「已开启每日自动登录」;②§2.3 `already` 语义收紧 — 探测在线先核对线上学号(chkstatus),他人会话不冒领、改走真登换回自己的(GUI 已存凭据路径与 ensure 静默路径同款);chkstatus 不可得不阻塞 | 后端已实现(qa-fix P0 提交链);前端待接(成功页 task_ok 文案 + 重建入口;already 无形状变化无需改) |
+| 1.4.1 | 2026-09-07 | QA 审计 P2-9:§2.2 `identify` 的 `source` 语义明确(零形状变化,字段 1.0.1 起即有)— `chkstatus` = 检测自当前网络共享会话,回填值可能是室友学号,前端首装表单识别结果旁必须给确认提示(「检测自当前网络会话,确认是你自己的学号」方向);`config` 可信免提示;`none` 无回填 | 后端无需改(信封一直如实);前端待接(首装表单 chkstatus 旁注一句;mock 的 `other` 场景可验) |
 
 ## 6. 集成待办(联调问题记这里)
 
