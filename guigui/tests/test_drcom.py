@@ -4,8 +4,9 @@ from guigui.core import drcom
 
 
 class FakeResp:
-    def __init__(self, body: str):
+    def __init__(self, body: str, status: int = 200):
         self._b = body.encode("gbk", errors="replace")
+        self.status = status
 
     def read(self, size=None):
         return self._b[:size]
@@ -199,6 +200,64 @@ def test_rejection_text_three_states_and_fallback():
     assert drcom.rejection_text(drcom.REJ_WRONG_PASSWORD, "兜底") == "密码不对,改一下再试"
     assert "自助服务平台" in drcom.rejection_text(drcom.REJ_BOUND, "兜底")
     assert drcom.rejection_text(None, "原文照显") == "原文照显"
+
+
+# ── 拒绝第四态 limit_users + login_ex(AC-F8,2026-09-07 测试床实测,附录 A)──
+
+# 实测 JSONP 全文(已在别处登录态;密码不在响应中,uid 在 → data 采集时打码)
+LIMIT_USERS_JSONP = (
+    'dr1003({"result":0,"wopt":0,"msg":1,"uid":"2025000000001","hidm":0,'
+    '"ss5":"172.16.0.1","ss6":"10.1.2.3","ss1":"00aa00bb00cc",'
+    '"ss4":"00dd00ee00ff","aolno":9999,'
+    '"ubind":"mac1=\u0027\u0027,ty1=0,mac2=\u0027\u0027,ty2=0",'
+    '"msga":"Oppp error: Limit Users Err"})'
+)
+
+
+def test_classify_rejection_limit_users():
+    assert drcom.classify_rejection("Oppp error: Limit Users Err") == drcom.REJ_LIMIT_USERS
+    assert drcom.classify_rejection("oppp error: limit users err") == drcom.REJ_LIMIT_USERS
+
+
+def test_rejection_text_limit_users_never_blames_password():
+    """AC-F8:文案走「已在别的设备登录」方向,不出现改密提示。"""
+    text = drcom.rejection_text(drcom.REJ_LIMIT_USERS, "兜底")
+    assert "别的设备" in text
+    assert "密码" not in text
+
+
+def test_rej_code_map_for_diag_data():
+    """诊断包 data.rej 用服务器码(§5),与契约 reason 枚举不同源。"""
+    assert drcom.REJ_CODE[drcom.REJ_WRONG_ACCOUNT] == "error1"
+    assert drcom.REJ_CODE[drcom.REJ_WRONG_PASSWORD] == "error2"
+    assert drcom.REJ_CODE[drcom.REJ_BOUND] == "bind"
+    assert drcom.REJ_CODE[drcom.REJ_LIMIT_USERS] == "limit_users"
+
+
+def test_login_ex_limit_users_carries_payload(monkeypatch):
+    _stub_urlopen(monkeypatch, body=LIMIT_USERS_JSONP)
+    r = drcom.login_ex("http://10.1.2.3", "u", "p")
+    assert r.result == drcom.REJECTED and r.http == 200
+    assert r.msg == "Oppp error: Limit Users Err"
+    assert r.payload["ss5"] == "172.16.0.1"
+    assert r.payload["ss1"] == "00aa00bb00cc" and r.payload["ss4"] == "00dd00ee00ff"
+    assert r.payload["aolno"] == 6152 and "mac1=" in r.payload["ubind"]
+
+
+def test_login_ex_success_and_unreachable_shapes(monkeypatch):
+    import urllib.error
+    _stub_urlopen(monkeypatch, body='dr1003({"result":1})')
+    r = drcom.login_ex("http://10.1.2.3", "u", "p")
+    assert r.result == drcom.SUCCESS and r.payload["result"] == 1 and r.http == 200
+    _stub_urlopen(monkeypatch, exc=urllib.error.URLError("refused"))
+    r = drcom.login_ex("http://10.1.2.3", "u", "p")
+    assert r.result == drcom.UNREACHABLE and r.payload is None and r.http is None
+
+
+def test_scrub_uids():
+    assert drcom.scrub_uids("uid=2025000000001 端口80") == "uid=2025…0001 端口80"
+    assert drcom.scrub_uids("无数字串") == "无数字串"
+    assert drcom.scrub_uids(None) == ""
 
 
 # ── 展示别名(移动/广电 → 校园其他,2026-09-06 用户拍板)────

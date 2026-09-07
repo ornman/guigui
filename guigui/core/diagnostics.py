@@ -29,8 +29,8 @@ from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 import guigui
-from . import config, detect, logstore, paths, scheduler, wifictl
-from .drcom import UA, mask_uid
+from . import config, crashlog, detect, logstore, paths, scheduler, wifictl
+from .drcom import UA, mask_uid, scrub_uids
 
 LOG_DAYS = 7            # logs 区回看天数(PRD §4.1)
 LOG_DAY_CAP = 80        # 单日条数上限:超了保头保尾(决策记录 8)
@@ -44,13 +44,6 @@ _PROC_STARTED = time.monotonic()
 
 _state_zh = {"logged_in": "已登录", "not_logged_in": "未登录",
              "unreachable": "不可达", "waiting": "网络未就绪"}
-
-# 学号形数字串(≥10 位)→ 打码;对任何采集到的文本生效
-_UID_RUN = re.compile(r"\d{10,14}")
-
-
-def scrub_uids(text: str) -> str:
-    return _UID_RUN.sub(lambda m: mask_uid(m.group(0)), str(text or ""))
 
 
 def _scrub(value):
@@ -451,6 +444,78 @@ def _route_iface(host: str, cfg: dict) -> str | None:
     return best_iface
 
 
+# ── server 区(problem scope)──────────────────
+
+def _server_chkstatus(cfg: dict) -> dict:
+    """只读探测,三形态(§8,实测 2026-09-07):uid_online / no_session(HTTP 400)
+    / unreachable。AC-F9:HTTP 400 是正常形态,不产生异常日志。"""
+    from .drcom import CHKSTATUS_PATH
+    base = cfg.get("url") or "http://10.1.2.3"
+    url = f"{base}{CHKSTATUS_PATH}?callback=dr1003"
+    req = Request(url, headers={"User-Agent": UA, "Referer": f"{base}/"})
+    try:
+        with urlopen(req, timeout=PROBE_TIMEOUT) as resp:
+            body = resp.read(1024).decode("gbk", errors="replace")
+            status = resp.status
+    except HTTPError as e:
+        if e.code == 400:
+            head = ""
+            try:
+                head = e.read(1024).decode("gbk", errors="replace")
+            except Exception:
+                pass
+            return {"state": "no_session", "raw_head": scrub_uids(head[:120])}
+        return {"state": "unreachable", "raw_head": ""}
+    except Exception:
+        return {"state": "unreachable", "raw_head": ""}
+    data = _parse_jsonp(body)
+    uid = (data or {}).get("uid") or (data or {}).get("DDDDD")
+    state = "uid_online" if str(uid or "").strip() else "no_session"
+    return {"state": state, "raw_head": scrub_uids(body[:120])}
+
+
+def _parse_jsonp(body: str) -> dict | None:
+    m = re.search(r"\((\{.*\})\)", body)
+    if not m:
+        return None
+    try:
+        data = json.loads(m.group(1))
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _server_last_verdict() -> dict | None:
+    """最近一次真实登录尝试的服务器判定 — 取自日志 data(§7.3 红线:
+    绝不诊断重放登录),七天窗口内最新的带 rej 的失败行。"""
+    today = dt.date.today()
+    for i in range(LOG_DAYS):
+        date = today - dt.timedelta(days=i)
+        for e in reversed(logstore.read_day(date)):
+            d = e.get("data") or {}
+            if d.get("rej"):
+                out = {
+                    "ts": f"{date.month:02d}-{date.day:02d} {e.get('ts', '')}",
+                    "rej": d["rej"],
+                    "msga": d.get("body_head"),
+                    "server_view_ip": d.get("server_view_ip"),
+                    "mac_hint": d.get("mac_hint"),
+                    "aolno": d.get("aolno"),
+                    "ubind": d.get("ubind"),
+                }
+                return {k: v for k, v in out.items() if v is not None}
+    return None
+
+
+def _collect_server(cfg: dict) -> dict:
+    errors: list[str] = []
+    out: dict = {"errors": errors}
+    out["chkstatus"] = _region(errors, "chkstatus", _server_chkstatus, cfg) \
+        or {"state": "unreachable", "raw_head": ""}
+    out["last_verdict"] = _region(errors, "last_verdict", _server_last_verdict)
+    return out
+
+
 # ── logs / summary 区(problem scope)────────────
 
 def _trim_entries(entries: list[dict]) -> list[dict]:
@@ -532,6 +597,15 @@ def collect(kind: list[str]) -> dict:
         except Exception as e:
             bundle["net"] = {"errors": [f"net: {type(e).__name__}"]}
         try:
+            bundle["server"] = _collect_server(cfg)
+        except Exception as e:
+            bundle["server"] = {"errors": [f"server: {type(e).__name__}"]}
+        try:
+            bundle["crashes"] = crashlog.recent(crashlog.RECENT_FOR_DIAG)
+        except Exception as e:
+            bundle["crashes"] = []
+            errors.append(f"crashes: {type(e).__name__}")
+        try:
             logs, summary = _collect_logs()
             bundle["logs"] = logs
             if summary:
@@ -596,12 +670,33 @@ def render(bundle: dict) -> str:
         if net.get("errors"):
             parts.append(f"采集失败:{'; '.join(net['errors'])}")
 
+    server = bundle.get("server")
+    if server is not None:
+        parts += ["", "── 服务器(怎么看待这台机器)──"]
+        chk = server.get("chkstatus") or {}
+        parts.append(f"会话探测:{chk.get('state') or '?'}"
+                     + (f"({chk.get('raw_head')})" if chk.get('raw_head') else ""))
+        verdict = server.get("last_verdict")
+        if verdict:
+            parts.append(f"最近判定:{verdict.get('ts')} {verdict.get('rej')}"
+                         f" · {verdict.get('msga') or ''}")
+            if verdict.get("server_view_ip"):
+                parts.append(f"服务器视角 IP:{verdict['server_view_ip']}")
+        if server.get("errors"):
+            parts.append(f"采集失败:{'; '.join(server['errors'])}")
+
     if bundle.get("summary"):
         parts += ["", "── 最近七天 ──", bundle["summary"]]
     for day in bundle.get("logs") or []:
         parts.append(f"[{day.get('date')}]")
         for e in day.get("entries") or []:
             parts.append(f"  {e.get('ts', '')} {str(e.get('level', '')).upper():<5} {e.get('text', '')}")
+
+    if bundle.get("crashes"):
+        parts += ["", "── 崩溃(最近)──"]
+        for c in bundle["crashes"]:
+            parts.append(f"[{c.get('ts')} {c.get('proc')}]")
+            parts.append(str(c.get("trace", "")).strip())
 
     parts += ["", f"── 版本对照 ──\n本机 {guigui.__version__} · 最新 {bundle.get('latest_ver') or '?'}"]
     return "\n".join(parts)

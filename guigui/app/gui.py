@@ -329,8 +329,10 @@ def run(view: str | None = None) -> int:
     """启动 GUI;返回进程退出码。重复启动直接退出(单实例)。"""
     import webview
 
+    from guigui.core import crashlog
     from . import instance
 
+    crashlog.install("gui")      # 崩溃捕获先于一切(只落盘,随反馈出门)
     lock = instance.SingleInstance()
     if not lock.acquire():
         log.info("gui: 已有实例在跑,本次启动退出")

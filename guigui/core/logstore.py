@@ -25,12 +25,20 @@ def _day_path(date: dt.date):
     return paths.logs_dir() / f"{date:%Y-%m-%d}.jsonl"
 
 
-def append(level: str, text: str, when: dt.datetime | None = None) -> dict:
-    """追加一行(就地返回该 entry,供事件推送复用)。"""
+def append(level: str, text: str, when: dt.datetime | None = None,
+           data: dict | None = None) -> dict:
+    """追加一行(就地返回该 entry,供事件推送复用)。
+
+    data = 机器现场(只随反馈出门,日常界面不可见,PRD §4.1 logs 区):
+    失败行带 {ssid, stage, tries, http, rej, body_head, …};红线——
+    只存服务器响应字段,请求 URL(含 upass=)永不入 data。
+    """
     if level not in LEVELS:
         raise ValueError(f"unknown level: {level}")
     when = when or _now()
     entry = {"ts": when.strftime("%H:%M:%S"), "level": level, "text": text}
+    if data:
+        entry["data"] = data
     p = _day_path(when.date())
     p.parent.mkdir(parents=True, exist_ok=True)
     with open(p, "a", encoding="utf-8") as f:

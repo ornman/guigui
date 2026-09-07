@@ -23,7 +23,8 @@ def main(argv: list[str] | None = None) -> int:
     logsetup.setup()
 
     if "--ensure" in argv:
-        from guigui.core import ensure
+        from guigui.core import crashlog, ensure
+        crashlog.install("ensure")
         rc = ensure.run()
         _pump_feedback_queue()   # GUI 关着时 ensure 拍也能补发(PRD §7.1)
         return rc

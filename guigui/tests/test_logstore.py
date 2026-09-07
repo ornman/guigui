@@ -96,3 +96,18 @@ def test_cleanup_old_survives_garbage_names():
     (logs / "not-a-date.jsonl").write_text("x", encoding="utf-8")
     assert logstore.cleanup_old(keep_days=90, today=dt.date(2026, 9, 6)) == 0
     assert (logs / "not-a-date.jsonl").exists()
+
+
+def test_append_with_data_roundtrip():
+    import datetime as dt
+    logstore.append("fail", "登录被拒",
+                    data={"rej": "limit_users", "tries": 2, "http": 200})
+    e = logstore.read_day(dt.date.today())[-1]
+    assert e["data"] == {"rej": "limit_users", "tries": 2, "http": 200}
+
+
+def test_append_without_data_keeps_old_shape():
+    import datetime as dt
+    logstore.append("ok", "网络可达")
+    e = logstore.read_day(dt.date.today())[-1]
+    assert set(e) == {"ts", "level", "text"}      # 日常界面形状不变

@@ -88,24 +88,27 @@ def _is_early(cfg: dict, when: dt.datetime | None = None) -> bool:
     return (when.hour, when.minute) < (h, m)
 
 
-def _attempt_login(cfg: dict, uid: str, password: str) -> tuple[str, int, str]:
-    """单轮登录:retries 次 × retry_seconds 间隔。返回 (最终分类, 尝试次数, msg)。
+def _attempt_login(cfg: dict, uid: str, password: str):
+    """单轮登录:retries 次 × retry_seconds 间隔。返回 (最终分类, 尝试次数, msg, verdict)。
 
+    verdict = 最后一次 login_ex 完整结果(拒绝现场入日志 data 用,PRD §4.1)。
     锚前(06:50 前)被拒直接收手 — 门都没开,重试只是对着墙敲门(绝不暴力尝试)。
     """
     result, msg = drcom.UNREACHABLE, ""
     tries = 0
+    verdict = None
     for i in range(max(1, cfg["login_retries"])):
         tries += 1
-        result, msg = drcom.login(cfg["url"], uid, password,
-                                  cfg.get("operator", "校园用户"))
+        verdict = drcom.login_ex(cfg["url"], uid, password,
+                                 cfg.get("operator", "校园用户"))
+        result, msg = verdict.result, verdict.msg
         if result == drcom.SUCCESS:
             break
         if result == drcom.REJECTED and before_anchor():
             break
         if i < cfg["login_retries"] - 1:
             time.sleep(cfg["retry_seconds"])
-    return result, tries, msg
+    return result, tries, msg, verdict
 
 
 def _probe_with_gate(cfg: dict) -> dict:
@@ -120,30 +123,31 @@ def _probe_with_gate(cfg: dict) -> dict:
     return net
 
 
-def _ensure_online(cfg: dict, uid: str, password: str, allow_fallback: bool = True) -> tuple[str, int, str]:
-    """把网络推到「已登录」。返回 ("settled", tries, "") | ("rejected", tries, msg)
-    | ("unexpected", tries, msg) | ("unreachable", 0, "")。
+def _ensure_online(cfg: dict, uid: str, password: str, allow_fallback: bool = True):
+    """把网络推到「已登录」。返回 ("settled", tries, "", None)
+    | ("rejected", tries, msg, verdict) | ("unexpected", tries, msg, verdict)
+    | ("unreachable", 0, "", None)。
 
     unreachable 时按 L4 策略切兜底 WiFi 后重试一轮(仅一次,防循环)。
     """
     net = _probe_with_gate(cfg)
     if net["state"] == detect.LOGGED_IN:
-        return "settled", 0, ""
+        return "settled", 0, "", None
     if net["state"] == detect.NOT_LOGGED_IN:
-        result, tries, msg = _attempt_login(cfg, uid, password)
+        result, tries, msg, verdict = _attempt_login(cfg, uid, password)
         if result == drcom.SUCCESS:
-            return "settled", tries, ""
+            return "settled", tries, "", None
         if result == drcom.REJECTED:
-            return "rejected", tries, msg
+            return "rejected", tries, msg, verdict
         if result == drcom.UNEXPECTED:
-            return "unexpected", tries, msg
+            return "unexpected", tries, msg, verdict
         # 登录请求整体不可达 → 落到 L4
     if allow_fallback and cfg.get("wifi_fallback_enabled") and cfg.get("wifi_fallback_ssid"):
         ssid = cfg["wifi_fallback_ssid"]
         logstore.append("note", f"服务器不可达,切到兜底网络 {ssid}", when=_now())
         if wifictl.connect(ssid):
             return _ensure_online(cfg, uid, password, allow_fallback=False)
-    return "unreachable", 0, ""
+    return "unreachable", 0, "", None
 
 
 def _settle_rows(cfg: dict, uid: str, tries: int) -> None:
@@ -221,6 +225,37 @@ def settle_from_gui(cfg: dict, uid: str, tries: int) -> None:
     save_state(state)
 
 
+def _fail_data(kind: str | None, verdict, tries: int) -> dict | None:
+    """拒绝现场(PRD §4.1 logs 区 data / §8 server.last_verdict 的数据源)。
+
+    红线:只存服务器响应字段,请求 URL(含 upass=)永不入 data;
+    limit_users 现场四件(ss5/ss1/ss4/aolno/ubind)有才带。"""
+    if verdict is None:
+        return None
+    p = verdict.payload if isinstance(verdict.payload, dict) else {}
+    data: dict = {
+        "stage": "login",
+        "tries": tries,
+        "http": verdict.http,
+        "rej": drcom.REJ_CODE.get(kind),
+        "body_head": drcom.scrub_uids(str(verdict.msg or "")[:80]) or None,
+    }
+    try:
+        data["ssid"] = wifictl.current_ssid()
+    except Exception:
+        pass
+    if p.get("ss5"):
+        data["server_view_ip"] = p["ss5"]
+    mac = [p[k] for k in ("ss1", "ss4") if p.get(k)]
+    if mac:
+        data["mac_hint"] = mac
+    if p.get("aolno") is not None:
+        data["aolno"] = p["aolno"]
+    if p.get("ubind"):
+        data["ubind"] = drcom.scrub_uids(p["ubind"])
+    return {k: v for k, v in data.items() if v is not None}
+
+
 def run() -> int:
     """静默主流程;任何分支结束前统一落 state(原子写)。"""
     cfg = config.load()
@@ -242,7 +277,7 @@ def run() -> int:
     # 日志卫生:每拍顺带清一次 >90 天的日志文件(AC-18,只动桂桂自己目录)
     logstore.cleanup_old()
 
-    outcome, tries, msg = _ensure_online(cfg, uid, password)
+    outcome, tries, msg, verdict = _ensure_online(cfg, uid, password)
 
     if outcome == "settled":
         if state.get("last_settle_date") == today:
@@ -268,7 +303,8 @@ def run() -> int:
         else:
             text = "认证服务器返回了不认识的格式"
             state["maintenance_streak"] = state.get("maintenance_streak", 0) + 1
-        logstore.append("fail", text, when=_now())
+        logstore.append("fail", text, when=_now(),
+                        data=_fail_data(kind, verdict, tries))
         # 凭证可信度(§7.3):置假仅一条路 — 服务器明确说密码不对(error2);
         # error1/bind/维护页都不冤枉密码
         if outcome == "rejected" and kind == drcom.REJ_WRONG_PASSWORD:

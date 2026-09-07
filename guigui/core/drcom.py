@@ -11,6 +11,7 @@ import json
 import logging
 import re
 import time
+from typing import NamedTuple
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -30,15 +31,33 @@ REJECTED = "rejected"      # 服务器应答 result!=1(密码被拒等)
 UNEXPECTED = "unexpected"  # 响应不是 JSONP(维护页/劫持页)
 UNREACHABLE = "unreachable"
 
-# 拒绝三态(PRD 4.1.2 实测表,2026-09-06 隔离测试床):
-# error1=账号+运营商组合不存在;error2=密码不对;bind=密码正确但绑定/接入区域被拦。
+# 拒绝四态(PRD §5 实测表:三态 2026-09-06 + limit_users 2026-09-07 测试床):
+# error1=账号+运营商组合不存在;error2=密码不对(唯一置 cred_verified 假的态);
+# bind=密码正确但绑定/接入区域被拦;limit_users=已在别处登录(不冤枉密码)。
 REJ_WRONG_PASSWORD = "wrong_password"
 REJ_WRONG_ACCOUNT = "wrong_account"
 REJ_BOUND = "bound"
+REJ_LIMIT_USERS = "limit_users"
+
+# 诊断包/日志 data.rej 用的服务器码(§4.1/§5;与契约 §2.3 reason 枚举不同源)
+REJ_CODE = {
+    REJ_WRONG_ACCOUNT: "error1",
+    REJ_WRONG_PASSWORD: "error2",
+    REJ_BOUND: "bind",
+    REJ_LIMIT_USERS: "limit_users",
+}
+
+# 学号形数字串(≥10 位)→ 打码;诊断红线「打码在采集时完成」的工具面
+_UID_RUN = re.compile(r"\d{10,14}")
+
+
+def scrub_uids(text: str) -> str:
+    """任何含学号的字符串出机器前过一遍(崩溃堆栈/服务器响应原文等)。"""
+    return _UID_RUN.sub(lambda m: mask_uid(m.group(0)), str(text or ""))
 
 
 def classify_rejection(msg: str | None) -> str | None:
-    """把服务器拒绝文案归类为三态之一;不认识返回 None(原文展示,不猜)。"""
+    """把服务器拒绝文案归类为四态之一;不认识返回 None(原文展示,不猜)。"""
     msg = str(msg or "")
     if "bind userid error" in msg:
         return REJ_BOUND
@@ -46,17 +65,22 @@ def classify_rejection(msg: str | None) -> str | None:
         return REJ_WRONG_PASSWORD
     if "userid error1" in msg:
         return REJ_WRONG_ACCOUNT
+    if "limit users err" in msg.lower():
+        return REJ_LIMIT_USERS
     return None
 
 
 def rejection_text(kind: str | None, fallback: str) -> str:
-    """三态人话文案单一来源(信封 message 直显用)。None → fallback 原样。"""
+    """四态人话文案单一来源(信封 message 直显用)。None → fallback 原样。"""
     if kind == REJ_WRONG_ACCOUNT:
         return "学号或运营商选错了,核对一下再试"
     if kind == REJ_WRONG_PASSWORD:
         return "密码不对,改一下再试"
     if kind == REJ_BOUND:
         return "密码是对的,但这个账号被绑在别处/受限 — 去自助服务平台看看绑定"
+    if kind == REJ_LIMIT_USERS:
+        return ("这个学号已在别的设备上登录(比如在别处登过没下线),"
+                "那边下线后桂桂会自动登好")
     return fallback
 
 # 门户后缀表(2026-08-31 从注销页 carrier 配置实测抓全,共 4 项;
@@ -118,34 +142,61 @@ def build_login_url(base: str, uid: str, password: str,
     return f"{base}{LOGIN_PATH}?{params}"
 
 
+class LoginResult(NamedTuple):
+    """login_ex 的返回:result 同 login();payload=拒绝响应的 JSONP 原文
+    (limit_users 现场四件 ss5/ss1/ss4/aolno/ubind 从这取,§5);
+    http=HTTP 状态码(不可达 None)。请求 URL(含 upass=)永不进这里。"""
+
+    result: str
+    msg: str
+    payload: dict | None
+    http: int | None
+
+
+def _parse_jsonp(body: str) -> dict | None:
+    m = re.search(r"\((\{.*\})\)", body)
+    if not m:
+        return None
+    try:
+        data = json.loads(m.group(1))
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def login(base: str, uid: str, password: str,
           operator: str = DEFAULT_OPERATOR, timeout: int = LOGIN_TIMEOUT) -> tuple[str, str]:
-    """执行一次登录请求。
+    """执行一次登录请求(两元组兼容壳)。
 
     Returns:
         (result, msg):result ∈ success | rejected | unexpected | unreachable。
         网络异常归为 unreachable(不抛出,调用方据此映射 NET_UNREACHABLE)。
     """
+    r = login_ex(base, uid, password, operator, timeout)
+    return r.result, r.msg
+
+
+def login_ex(base: str, uid: str, password: str,
+             operator: str = DEFAULT_OPERATOR,
+             timeout: int = LOGIN_TIMEOUT) -> LoginResult:
+    """登录的完整结果形态(拒绝现场入日志 data 用,PRD §4.1/§5)。"""
     url = build_login_url(base, uid, password, operator)
     req = Request(url, headers={"User-Agent": UA, "Referer": f"{base}/"})
     try:
         with urlopen(req, timeout=timeout) as resp:
             body = resp.read().decode("gbk", errors="replace")
+            status = resp.status
     except Exception as e:
         log.info("drcom: 登录请求失败(%s)", type(e).__name__)
-        return UNREACHABLE, "够不着认证服务器"
-    m = re.search(r"\((\{.*\})\)", body)
-    if not m:
+        return LoginResult(UNREACHABLE, "够不着认证服务器", None, None)
+    data = _parse_jsonp(body)
+    if data is None:
         log.warning("drcom: 非 JSONP 响应: %r", body[:80])
-        return UNEXPECTED, "认证服务器返回了不认识的格式"
-    try:
-        data = json.loads(m.group(1))
-    except json.JSONDecodeError:
-        return UNEXPECTED, "认证服务器返回了不认识的格式"
+        return LoginResult(UNEXPECTED, "认证服务器返回了不认识的格式", None, status)
     if data.get("result") == 1:
-        return SUCCESS, ""
+        return LoginResult(SUCCESS, "", data, status)
     msg = str(data.get("msga") or "").strip()
-    return REJECTED, msg or "密码可能改过了"
+    return LoginResult(REJECTED, msg or "密码可能改过了", data, status)
 
 
 def chkstatus_uid(base: str, timeout: int = CHKSTATUS_TIMEOUT) -> str | None:
@@ -160,12 +211,8 @@ def chkstatus_uid(base: str, timeout: int = CHKSTATUS_TIMEOUT) -> str | None:
             body = resp.read().decode("gbk", errors="replace")
     except Exception:
         return None
-    m = re.search(r"\((\{.*\})\)", body)
-    if not m:
-        return None
-    try:
-        data = json.loads(m.group(1))
-    except json.JSONDecodeError:
+    data = _parse_jsonp(body)
+    if data is None:
         return None
     uid = data.get("uid")
     if uid is None:  # 某些固件把账号放 DDDDD

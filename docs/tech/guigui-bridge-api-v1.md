@@ -73,9 +73,11 @@
 
 失败:`AUTH_REJECTED` / `NET_UNREACHABLE`(信封),`result` 不出现在失败信封里。
 
-`AUTH_REJECTED` 失败信封可带 `reason`(1.2.0,拒绝三态 AC-19):
+`AUTH_REJECTED` 失败信封可带 `reason`(1.2.0,拒绝四态 AC-19/F8):
 `wrong_password`(密码不对)| `wrong_account`(学号或运营商选错)| `bound`(密码正确但账号绑定被拦)
-| `before_open`(已存密码、明早自动验证 — 仅限已存凭据路径)。message 已按三态拼好人话,前端直显即可;
+| `limit_users`(已在别的设备登录 — 四态,1.3.0 实测新增:不冤枉密码,文案按「那边下线后桂桂会自动登好」方向,
+cred_verified 不置假,拒绝现场四件入日志 data 与诊断包 server 区)
+| `before_open`(已存密码、明早自动验证 — 仅限已存凭据路径)。message 已按四态拼好人话,前端直显即可;
 `reason` 缺省 = 服务器原文透传,前端不猜。
 
 ### 2.4 scanWifi() — 扫描可用网络(v-guide 列表 / 设置 WiFi 兜底选择)
@@ -258,7 +260,7 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
 | 1.1.0 | 2026-08-31 | 新增 `feedback()`(§2.12):返回打码诊断文本(用户拍板:反馈动作=复制诊断信息);方法 11→12 | 后端已实现(diagnostics+api.feedback,120 测);前端已接(反馈视图+设置入口,commit 1bb4083)— **生效** |
 | 1.1.1 | 2026-08-31 | §2.6 getConfig/saveConfig 新增 `operator` 枚举(校园用户/校园电信/校园联通/校园其他,注销页 carrier 实测抓全);§2.3 login payload 新增可选 `operator`;login 响应新增 `verified` | 后端已落地(提交密码先验证后入库 + verified 随信封下行);前端已接(三胶囊)|
 | 1.2.0 | 2026-09-06 | PRD 重梳理(af19e1b)落地:§2.3 失败信封可带 `reason`(拒绝三态 AC-19)+ 成功新增 `result:"stored"`(06:50 前提交存未验证);§2.10 recentResult 新增 `verified`(横幅①数据源);新增 §2.13 `taskStatus()` / §2.14 `rebuildTask()`(AC-17,仅点击重建);事件 `login:progress` 新增 `logging_out` 相位(+`online_uid`)、`schedule:changed` 扩 `task_ok`(兑现 §6 增强票);方法 12→14 | 后端已实现(5a018c8);前端已接(等待态/三态文案/横幅两态/主按钮三态修复/改密闭环/任务行,mock 场景 bind/other/unverified)— **生效** |
-| 1.3.0 | 2026-09-07 | 反馈系统重构(PRD `docs/prd/guigui-feedback-system.md` 全案):新增 §2.15 `feedbackSend`(真通道主入口,POST /fb v2,三态 result)/ §2.16 `feedbackDiag`(七区预览+uid 打码披露)/ §2.17 `feedbackPendingStatus`(离线队列状态行);§2.12 `feedback()` 废弃(保留一个版本周期,实现改由 render(collect()) 派生);错误码 +1(`FB_VALIDATION`);方法 14→17 | 后端实现中(本切片) |
+| 1.3.0 | 2026-09-07 | 反馈系统重构(PRD `docs/prd/guigui-feedback-system.md` 全案):新增 §2.15 `feedbackSend`(真通道主入口,POST /fb v2,三态 result)/ §2.16 `feedbackDiag`(七区预览+uid 打码披露)/ §2.17 `feedbackPendingStatus`(离线队列状态行);§2.12 `feedback()` 废弃(保留一个版本周期,实现改由 render(collect()) 派生);§2.3 `reason` 增第四态 `limit_users`(实测,拒绝四态);错误码 +1(`FB_VALIDATION`);方法 14→17 | 后端已实现(见 S1-S3 提交链);前端已接(v-feedback 重构 + mock 三方法/limit 场景) |
 
 ## 6. 集成待办(联调问题记这里)
 

@@ -199,3 +199,84 @@ def test_last_fail_when(canned):
     later = now + dt.timedelta(minutes=1)
     logstore.append("fail", "又失败了", when=later)
     assert diagnostics.last_fail_when() == f"{later:%m-%d} {later:%H:%M}"
+
+
+# ── server / crashes 区(S3)─────────────────────
+
+class _Resp:
+    def __init__(self, body, status=200):
+        self._b = body.encode("gbk", errors="replace")
+        self.status = status
+
+    def read(self, size=None):
+        return self._b[:size]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _stub_dhttp(monkeypatch, *, body="", status=200, err=None):
+    def fake(req, timeout=None):
+        if err is not None:
+            raise err
+        return _Resp(body, status)
+    monkeypatch.setattr(diagnostics, "urlopen", fake)
+
+
+def test_server_chkstatus_three_states(canned, monkeypatch):
+    import io
+    import urllib.error
+
+    # uid_online(登录态,返回 uid → 学号在 raw_head 里也必须打码)
+    _stub_dhttp(monkeypatch, body='dr1003({"uid":"2025000000001","AC":"x"})')
+    got = diagnostics._server_chkstatus({"url": "http://10.1.2.3"})
+    assert got["state"] == "uid_online"
+    assert "2025000000001" not in got["raw_head"]
+
+    # no_session = HTTP 400(AC-F9:正常形态,不是异常)
+    err = urllib.error.HTTPError("u", 400, "Bad Request", None,
+                                 io.BytesIO("({})".encode("gbk")))
+    _stub_dhttp(monkeypatch, err=err)
+    assert diagnostics._server_chkstatus({"url": "http://10.1.2.3"})["state"] == "no_session"
+
+    # unreachable = 够不着(超时/拒绝都归此)
+    _stub_dhttp(monkeypatch, err=TimeoutError())
+    assert diagnostics._server_chkstatus({"url": "http://10.1.2.3"})["state"] == "unreachable"
+
+
+def test_server_last_verdict_from_log_data(canned, monkeypatch):
+    _stub_dhttp(monkeypatch, body='dr1003({"uid":"2025000000001"})')
+    logstore.append("fail", "登录被拒:这个学号已在别的设备上登录",
+                    data={"rej": "limit_users", "body_head": "Oppp error: Limit Users Err",
+                          "server_view_ip": "172.16.0.1",
+                          "mac_hint": ["00aa00bb00cc", "00dd00ee00ff"],
+                          "aolno": 6152, "ubind": "mac1='',ty1=0", "tries": 2, "http": 200})
+    bundle = diagnostics.collect(["problem"])
+    verdict = bundle["server"]["last_verdict"]
+    assert verdict["rej"] == "limit_users"
+    assert verdict["server_view_ip"] == "172.16.0.1"
+    assert verdict["mac_hint"] == ["00aa00bb00cc", "00dd00ee00ff"]
+    assert verdict["msga"] == "Oppp error: Limit Users Err"
+    assert verdict["ts"].startswith(diagnostics.dt.date.today().strftime("%m-%d"))
+    # 日志区 fail 行带 data 现场
+    today = bundle["logs"][0]
+    fail_row = [e for e in today["entries"] if e["level"] == "fail"][0]
+    assert fail_row["data"]["rej"] == "limit_users"
+
+
+def test_crashes_region_from_crashlog(canned, monkeypatch):
+    from guigui.core import crashlog
+    monkeypatch.setattr(crashlog.sys, "__excepthook__", lambda *a: None)
+    crashlog.install("gui")
+    try:
+        raise ValueError("gui 崩了 2025000000001")
+    except ValueError:
+        crashlog._sys_hook(*crashlog.sys.exc_info())
+    bundle = diagnostics.collect(["problem"])
+    assert bundle["crashes"] and bundle["crashes"][0]["proc"] == "gui"
+    assert "gui 崩了" in bundle["crashes"][0]["trace"]
+    assert "2025000000001" not in json.dumps(bundle, ensure_ascii=False)
+    assert "── 崩溃(最近)──" in diagnostics.render(bundle)

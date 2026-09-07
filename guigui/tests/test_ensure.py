@@ -8,6 +8,11 @@ FIXED = dt.datetime(2026, 8, 31, 7, 0, 1)      # 锚后(>06:50)
 BEFORE_OPEN = dt.datetime(2026, 8, 31, 6, 30)  # 锚前(<06:50,窗口期)
 
 
+def _pair(r):
+    """login_ex → login 两元组兼容壳(防真实网络的安全网)。"""
+    return r.result, r.msg
+
+
 class Harness:
     """按场景组装 mock:probe 序列 / login 序列 / chkstatus / wifi / 通知。"""
 
@@ -34,8 +39,12 @@ class Harness:
                             lambda cfg=None: self._probe())
         monkeypatch.setattr(ensure.detect, "wait_for_gate",
                             lambda *a, **k: self.gate_calls.append(1) or True)
-        monkeypatch.setattr(ensure.drcom, "login",
+        # login_seq 条目:2 元组 (result, msg) → payload=None/http=200;
+        # 4 元组 (result, msg, payload, http) → 完整 login_ex 形态(拒绝现场 data 用)
+        monkeypatch.setattr(ensure.drcom, "login_ex",
                             lambda *a, **k: self._login())
+        monkeypatch.setattr(ensure.drcom, "login",
+                            lambda *a, **k: _pair(self._login()))
         # 收工时线上真实学号(只读 chkstatus,PRD 4.6 他人会话如实记录)
         monkeypatch.setattr(ensure.drcom, "chkstatus_uid",
                             lambda base, timeout=5: self.online_uid)
@@ -52,7 +61,10 @@ class Harness:
 
     def _login(self):
         self.login_calls += 1
-        return self._pop(self.logins)
+        entry = self._pop(self.logins)
+        if len(entry) == 2:
+            entry = (entry[0], entry[1], None, 200)
+        return ensure.drcom.LoginResult(*entry)
 
     @staticmethod
     def _pop(seq):
@@ -279,10 +291,11 @@ def test_operator_forwarded_to_login(monkeypatch):
     h = Harness(monkeypatch, cfg_over={"operator": "校园电信"},
                 probe_seq=[{"state": "not_logged_in"}], login_seq=[("success", "")])
     calls = []
-    monkeypatch.setattr(ensure.drcom, "login",
-                        lambda *a, **k: calls.append(a) or ("success", ""))
+    monkeypatch.setattr(ensure.drcom, "login_ex",
+                        lambda *a, **k: calls.append(a)
+                        or ensure.drcom.LoginResult("success", "", None, 200))
     h.run()
-    assert calls, "drcom.login 应被调用"
+    assert calls, "drcom.login_ex 应被调用"
     args = calls[0]
     assert args[0] == "http://10.1.2.3" and args[1] == "2025000000001" and args[2] == "pw123"
     assert args[3] == "校园电信"                 # 第 4 参 = 配置里的运营商
@@ -318,3 +331,48 @@ def test_settle_other_uid_recorded_not_disturbing(monkeypatch):
     assert any(t.startswith("线上的是 2025…0999") for t in texts)
     assert h.sent == []
     assert ensure.load_state()["last_result"]["outcome"] == "ok"
+
+
+# ── 拒绝现场入日志 data(S3,AC-F8/§4.1 logs 区)────────────
+
+_LIMIT_PAYLOAD = {
+    "result": 0, "uid": "2025000000001",
+    "ss5": "172.16.0.1", "ss1": "00aa00bb00cc", "ss4": "00dd00ee00ff",
+    "aolno": 6152, "ubind": "mac1='',ty1=0",
+    "msga": "Oppp error: Limit Users Err",
+}
+
+
+def test_limit_users_full_chain(monkeypatch):
+    """AC-F8:文案「已在别的设备登录」方向;cred_verified 不置假;
+    data.rej=limit_users;服务器视角现场四件齐;URL(upass)永不入 data。"""
+    st = ensure.load_state(); st["cred_verified"] = True; ensure.save_state(st)
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("rejected", "Oppp error: Limit Users Err",
+                            _LIMIT_PAYLOAD, 200)])
+    h.run()
+    assert ensure.load_state()["cred_verified"] is True      # 不冤枉密码
+    fails = [e for e in h.today_entries() if e["level"] == "fail"]
+    assert len(fails) == 1
+    text = fails[0]["text"]
+    assert "别的设备" in text and "密码可能改过了" not in text
+    d = fails[0]["data"]
+    assert d["rej"] == "limit_users" and d["stage"] == "login"
+    assert d["body_head"] == "Oppp error: Limit Users Err"
+    assert d["server_view_ip"] == "172.16.0.1"
+    assert d["mac_hint"] == ["00aa00bb00cc", "00dd00ee00ff"]
+    assert d["aolno"] == 6152 and "mac1=" in d["ubind"]
+    assert d["http"] == 200 and d["tries"] >= 1
+    assert "upass" not in str(d) and "2025000000001" not in str(d)  # 红线
+
+
+def test_error2_rejection_still_resets_cred_verified(monkeypatch):
+    """对照:error2 仍是唯一置假路径,data.rej=error2。"""
+    st = ensure.load_state(); st["cred_verified"] = True; ensure.save_state(st)
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("rejected", "userid error2", {"msga": "userid error2"}, 200)])
+    h.run()
+    assert ensure.load_state()["cred_verified"] is False
+    d = [e for e in h.today_entries() if e["level"] == "fail"][0]["data"]
+    assert d["rej"] == "error2"
+    assert "server_view_ip" not in d                        # 普通拒绝无现场四件
