@@ -918,6 +918,8 @@ GG.on('login:progress',e=>{
       :'验证时会先注销当前会话,网络会断几秒'}
   else if(e.phase==='requesting'){note.style.display='flex';note.textContent='正在登录…'}
   else if(e.phase==='retrying'){note.style.display='flex';note.textContent='被节流了,稍等再试一次…'}
+  else if(e.phase==='throttled'){note.style.display='flex';
+    note.textContent=e.waitsec?('被节流了,服务器让等 '+e.waitsec+' 秒,桂桂等一下接着试…'):'被节流了,桂桂等一下接着试…'}
 });
 /* 运营商下拉:菜单开合/勾选走通用 .dd 布线(无 data-cfg-key 即不落盘,仅表单状态);
    这里只负责读写当前选中项(登录用户名 = 学号+后缀) */
@@ -988,7 +990,11 @@ async function enableDaily(){
   const r=await GG.api.login({sid:$('f-sid').value.trim()||undefined,password:pwd,operator:pickedOperator('#op-dd')});
   setBusy(btn,false);hideSubmitNotes();
   if(r.ok){configured=true;hasPwd=true;showSuccess(r.data.verified===true,r.data.reason);return}
-  if(r.code==='AUTH_REJECTED'){rejectionText(warnTxt,r.message||'密码被服务器拒绝了,核对一下再试',r.reason);warn.style.display='block';return}
+  if(r.code==='AUTH_REJECTED'){
+    if(r.reason==='throttled'){
+      /* 节流≠密码错(P1-6):中性提示「稍后再试」,不进密码警告框不吓人 */
+      const n=$('ok-note');n.textContent=r.message||'登录太频繁,稍后再试';n.style.display='flex';return}
+    rejectionText(warnTxt,r.message||'密码被服务器拒绝了,核对一下再试',r.reason);warn.style.display='block';return}
   if(r.code==='NET_UNREACHABLE'){goDaily();return}
 }
 let loginLandingUid=null,uidChangeArmed=false;
@@ -1012,7 +1018,10 @@ async function loginNow(){
   if(r.ok){configured=true;hasPwd=true;
     if(sidVal)loginLandingUid=sidVal;
     showSuccess(r.data.verified===true,r.data.reason);renderBannersRefresh();return}
-  if(r.code==='AUTH_REJECTED'){showLoginErr(r.message||'登录被拒',r.reason);return}
+  if(r.code==='AUTH_REJECTED'){
+    if(r.reason==='throttled'){
+      const n=$('login-note');n.textContent=r.message||'登录太频繁,稍后再试';n.style.display='flex';return}
+    showLoginErr(r.message||'登录被拒',r.reason);return}
   if(r.code==='NET_UNREACHABLE'){openDetail('v-guide');return}
 }
 /* 登录被拒提示:文案来自后端信封(契约 1.2.0,与 mock 逐字一致);
