@@ -16,7 +16,14 @@
      blocked   首装·提交密码成功但定时任务被拦 task_ok=false(契约 1.4.0 P0-1:成功页如实文案+重建入口;rebuildTask 一次即修好)
      fbdg      反馈提交走 SUBMITTED_DEGRADED(D1 成功、issue 延后;用户应无感照常「已收到」)
      other     日常·线上是别人的学号(提交走阶梯:logging_out 带 online_uid → 真登成功)
-     unverified 日常·密码未验证+今早失败(主页两横幅 QA) */
+     unverified 日常·密码未验证+今早失败(主页两横幅 QA)
+     ladder_fail  阶梯翻车·首装(2026-09-07 场景 4):线上他人 → 注销 → 真登 wrong_password
+                  拒 → 无旧凭据可恢复 → 信封带「;网先断着,输对马上通」;net 翻为
+                  not_logged_in,输对再点即走正常成功路(第二幕自然衔接)
+     ladder_back  阶梯回滚·日常(2026-09-07 场景 4 变体):configured 且线上他人 → 注销 →
+                  真登被拒 → 旧凭据把网接回 → 信封带「;已用旧密码把网接回来了,改对再点一次」
+     beforeopen   锚前存入(2026-09-07 场景 7):06:50 前提交 → stored/reason=before_open/
+                  verified=false/task_ok=true;主页重登(已存凭据)同样返 stored */
 (function(){
 'use strict';
 const LS_SCENE='gg-mock-scene',LS_CFG='gg-mock-cfg';
@@ -62,6 +69,8 @@ if(SCENE==='limit'){S.net.state='not_logged_in'}
 if(SCENE==='throttled'){S.net.state='not_logged_in'}
 if(SCENE==='blocked'){S.net.state='not_logged_in';S.taskOk=false}
 if(SCENE==='other'){S.configured=true;S.verified=true}
+if(SCENE==='ladder_back'){S.configured=true;S.verified=true}
+if(SCENE==='beforeopen'){S.net.state='not_logged_in';S.configured=true;S.verified=false;S.pwd='secret'}
 if(SCENE==='unverified'){S.configured=true;S.verified=false;
   S.last={when:'今早',time:'07:00',tries:3,outcome:'fail'};
   S.logs[0].entries=[{ts:'07:00:01',level:'fail',text:'登录被拒:密码不对,改一下再试'}]}
@@ -77,7 +86,8 @@ window.GGMock={
   },
   async identify(){
     await delay(250);
-    if(SCENE==='other')return OK({uid:OTHER_UID,source:'chkstatus'});   /* 线上是别人的号 */
+    if(SCENE==='other'||SCENE==='ladder_fail'||SCENE==='ladder_back')
+      return OK({uid:OTHER_UID,source:'chkstatus'});   /* 线上是别人的号 */
     if(S.net.state==='logged_in')return OK({uid:UID,source:'chkstatus'});
     if(S.configured)return OK({uid:UID,source:'config'});
     return OK({uid:null,source:'none'});
@@ -101,11 +111,36 @@ window.GGMock={
       netEmit();
       return OK({result:'success',uid:UID_MASK,attempts:1,verified:true,task_ok:S.taskOk});
     }
+    if(S.net.state==='logged_in'&&SCENE==='ladder_fail'&&(a&&a.password)){
+      /* 场景 4 首装变体:注销他人会话 → 真登被拒 → 无旧凭据可恢复,网断着;
+         第二幕:用户输对密码再点 → 上面 not_logged_in 正常流程,自然衔接 */
+      emit('login:progress',{phase:'logging_out',online_uid:'6503…6503'});
+      await delay(1400);
+      S.net.state='not_logged_in';netEmit();
+      emit('login:progress',{phase:'requesting',attempt:1,attempts:1});
+      await delay(900);
+      return ERR('AUTH_REJECTED','密码不对,改一下再试;网先断着,输对马上通','wrong_password');
+    }
+    if(S.net.state==='logged_in'&&SCENE==='ladder_back'&&(a&&a.password)){
+      /* 场景 4 日常变体:注销 → 真登被拒 → 旧凭据把网接回来了(信封如实说明) */
+      emit('login:progress',{phase:'logging_out',online_uid:'6503…6503'});
+      await delay(1400);
+      S.net.state='not_logged_in';netEmit();
+      emit('login:progress',{phase:'requesting',attempt:1,attempts:1});
+      await delay(900);
+      S.net.state='logged_in';netEmit();
+      return ERR('AUTH_REJECTED','密码不对,改一下再试;已用旧密码把网接回来了,改对再点一次','wrong_password');
+    }
     if(S.net.state==='logged_in')return OK({result:'already',uid:UID_MASK,attempts:0,verified:S.verified});
     const pwd=(a&&a.password)!=null&&a.password!==''?a.password:S.pwd;
     if(!pwd)return ERR('NOT_CONFIGURED','还没存密码,先填一次');
     emit('login:progress',{phase:'requesting',attempt:1,attempts:S.cfg.login_retries});
     await delay(900);
+    if(SCENE==='beforeopen'){
+      /* 场景 7:06:50 前提交 → 不判密码错,存未验证,明早首试真验证(契约 stored) */
+      S.pwd=pwd;
+      return OK({result:'stored',uid:UID_MASK,attempts:1,verified:false,reason:'before_open',task_ok:S.taskOk});
+    }
     if(SCENE==='rejected')return ERR('AUTH_REJECTED','密码不对,改一下再试','wrong_password');
     if(SCENE==='bind')return ERR('AUTH_REJECTED','密码是对的,但这个账号被绑在别处/受限 — 去自助服务平台看看绑定','bound');
     if(SCENE==='limit')return ERR('AUTH_REJECTED','这个学号已在别的设备上登录(比如在别处登过没下线),那边下线后桂桂会自动登好','limit_users');

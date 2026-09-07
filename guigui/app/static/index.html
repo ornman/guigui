@@ -948,10 +948,21 @@ async function quickLogin(){
   setBusy($('main-btn'),true,'登录中…');
   const r=await GG.api.login({});
   setBusy($('main-btn'),false);
-  if(r.ok){mood(gb,'happy');$('main-lede').textContent='刚刚把网帮你接回来啦 ✓';renderBannersRefresh();return}
+  if(r.ok){
+    if(r.data&&r.data.result==='stored'){
+      /* 锚前存入(门没开):密码存了但没登上,不是成功,如实说 */
+      mood(gb,'idle');
+      $('main-lede').textContent='还没开门,密码先存着,开门自动登';
+      renderBannersRefresh();return}
+    /* 真成功:状态归位再叠成功反馈,否则标题还挂着「刚才掉线了」配成功文案的混搭 */
+    mainState='ok';renderMain();renderMainData();
+    mood(gb,'happy');
+    $('main-lede').textContent='刚刚把网帮你接回来啦 ✓';
+    renderBannersRefresh();return}
   if(r.code==='AUTH_REJECTED'){$('main-lede').textContent=(r.message||'密码好像不对')+',去改一下再试'}
   else if(r.code==='NOT_CONFIGURED'){openDetail('v-login')}
   else if(r.code==='NET_UNREACHABLE'){openDetail('v-guide')}
+  else{$('main-lede').textContent=r.message||'出了点问题,再试一次'}
 }
 /* 流程动作 */
 /* 庆祝页入场:重新给 stage 加 .in class 触发 CSS animation(display:none→block 不会自动重启动画)
@@ -1019,7 +1030,12 @@ async function enableDaily(){
       /* 节流≠密码错(P1-6):中性提示「稍后再试」,不进密码警告框不吓人 */
       const n=$('ok-note');n.textContent=r.message||'登录太频繁,稍后再试';n.style.display='flex';return}
     rejectionText(warnTxt,r.message||'密码被服务器拒绝了,核对一下再试',r.reason);warn.style.display='block';return}
-  if(r.code==='NET_UNREACHABLE'){goDaily();return}
+  if(r.code==='NET_UNREACHABLE'){
+    /* 提交密码中途断网:后端已把密码存了(未验证)+任务就位,首装事实上完成 —
+       主页如实 down 态引导排查,「密码还没验证过」横幅引导连上后补验 */
+    configured=true;hasPwd=true;mainState='down';goDaily();return}
+  /* INTERNAL / BRIDGE_MISSING 等:就地报后端原话,不静默(按钮恢复却什么都不说=黑洞) */
+  warnTxt.textContent=r.message||'出了点问题,再试一次';warn.style.display='block';
 }
 let loginLandingUid=null,uidChangeArmed=false;
 /* 改密页提交(首装未登录/日常改凭据共用):换学号先内联确认(密码迁移,防手滑,AC-14) */
@@ -1046,7 +1062,12 @@ async function loginNow(){
     if(r.reason==='throttled'){
       const n=$('login-note');n.textContent=r.message||'登录太频繁,稍后再试';n.style.display='flex';return}
     showLoginErr(r.message||'登录被拒',r.reason);return}
-  if(r.code==='NET_UNREACHABLE'){openDetail('v-guide');return}
+  if(r.code==='NET_UNREACHABLE'){
+    /* 提交了密码的断网:后端已存(未验证)→ configured 同步,横幅口径生效 */
+    if(pwdVal){configured=true;hasPwd=true}
+    openDetail('v-guide');return}
+  /* INTERNAL / BRIDGE_MISSING 等:就地表后端原话,不静默 */
+  showLoginErr(r.message||'出了点问题,再试一次');
 }
 /* 登录被拒提示:文案来自后端信封(契约 1.2.0,与 mock 逐字一致),前端直显;
    bind 被拒时句中已有「…去自助服务平台看看绑定」— 把平台名这六个字本身
@@ -1188,15 +1209,27 @@ document.querySelectorAll('#time-presets .preset').forEach(b=>b.addEventListener
     GG.api.saveConfig({trigger_time:currentTriggerTime});
   });
 });
-/* 后端事件(契约 §3):开门/网态变化重渲;外部调度变更同步开关 */
+/* 后端事件(契约 §3):开门/网态变化重渲;外部调度变更同步开关。
+   每个视图都有归属(2026-09-07 状态矩阵补全):v-login/v-ok 停留时网络翻转,
+   状态行实时跟真(场景:登录页填一半用户切了网,「已连通」不能是写死的);
+   v-boot 开门≠已登录,按实际网态落主页,不预写 ok;v-guide 期间其他设备帮登好
+   (logged_in)也如实回主页 */
 GG.on('net:state',e=>{
   if(!e||!e.state)return;
   lastNet=Object.assign({},lastNet||{server:'10.1.2.3'},e);
-  if(currentView()==='v-boot'&&configured){$('boot-cap').textContent='门开了,桂桂进去了…';setTimeout(goDaily,900);return}
-  if(currentView()==='v-guide'&&e.state==='not_logged_in'){setTimeout(()=>{openDetail('v-login')},550);return}
-  if(currentView()==='v-main'){
+  const view=currentView();
+  if(view==='v-boot'&&configured){
+    mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
+    $('boot-cap').textContent='门开了,桂桂进去了…';setTimeout(goDaily,900);return}
+  if(view==='v-guide'){
+    if(e.state==='not_logged_in'){mainState='out';setTimeout(()=>{openDetail('v-login')},550);return}
+    if(e.state==='logged_in'){mainState='ok';setTimeout(goDaily,550);return}
+    mainState='down';return}   /* unreachable 重复推:排查页正是此态,记对状态即可 */
+  if(view==='v-main'){
     mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
     renderMain();renderMainData()}
+  else if(view==='v-login')syncLoginStatusLine();
+  else if(view==='v-ok')syncOkStatusLine();
 });
 GG.on('schedule:changed',e=>{
   if(e&&typeof e.master==='boolean')setAuto(e.master);
@@ -1271,14 +1304,30 @@ function renderWifiList(box,networks,opts){
 }
 /* 学号旁注(契约 1.4.1 引入)已于 1.4.3 撤销 — 用户拍板:这行文字没必要,
    误抓由登录被拒(wrong_account 文案)自纠;identify 回填行为本身不变 */
-async function fillLoginLanding(){
+/* 登录页状态行:只报连通性(登录状态归副标题说);说认证服务器而不说 SSID —
+   SSID 在热点场景是"iphone17 pro max"这类噪声,不帮用户判断。
+   独立成函数:net:state 事件在 v-login 停留期间实时刷新(场景:填一半切网) */
+function syncLoginStatusLine(){
   const net=lastNet||{};
-  /* 状态行只报连通性(登录状态归副标题说);说认证服务器而不说 SSID —
-     SSID 在热点场景是"iphone17 pro max"这类噪声,不帮用户判断 */
   const up=net.state!=='unreachable';
   const bar=$('login-status').parentElement;
   bar.className='status '+(up?'ok':'danger');
   $('login-status').textContent=(net.server||'10.1.2.3')+(up?' · 已连通':' · 连不上');
+}
+/* 首装页状态行:掉线(不可达)转 danger 如实说;恢复时回基线文案
+   (学号识别 ✓ 由 fillLanding 异步补,这里不抢) */
+function syncOkStatusLine(){
+  const net=lastNet||{};
+  const bar=$('ok-status').parentElement;
+  if(net.state==='unreachable'){
+    bar.className='status danger';
+    $('ok-status').textContent=(net.server||'10.1.2.3')+' · 连不上'}
+  else if(bar.classList.contains('danger')){
+    bar.className='status ok';
+    $('ok-status').textContent=(net.ssid||'校园网')+' · 已连上'}
+}
+async function fillLoginLanding(){
+  syncLoginStatusLine();
   $('login-confirm').style.display='none';uidChangeArmed=false;
   const id=await GG.api.identify();
   if(id.ok&&id.data.uid&&!$('f-sid-login').value){$('f-sid-login').value=id.data.uid;loginLandingUid=id.data.uid}
