@@ -1,4 +1,4 @@
-# 桂桂 v2 · JS↔Python 桥接契约 v1.4.1
+# 桂桂 v2 · JS↔Python 桥接契约 v1.4.2
 
 > **地位**:前后端通信协议的**唯一权威**(《guigui-work-split.md》§一.2)。后端 bridge 实现以此为准;`static/dev/mock.js` 是它的可执行规范(仅开发)。
 > **绑定**:命名空间 `window.guigui.*`。pywebview 经 `js_api` 暴露,实现侧自行决定 camelCase 方法名或 snake_case+映射(契约只锁 JS 侧名字)。
@@ -91,7 +91,9 @@
 `wrong_password`(密码不对)| `wrong_account`(学号或运营商选错)| `bound`(密码正确但账号绑定被拦)
 | `limit_users`(已在别的设备登录 — 四态,1.3.0 实测新增:不冤枉密码,文案按「那边下线后桂桂会自动登好」方向,
 cred_verified 不置假,拒绝现场四件入日志 data 与诊断包 server 区)
-| `before_open`(已存密码、明早自动验证 — 仅限已存凭据路径)。message 已按四态拼好人话,前端直显即可;
+| `throttled`(登录太频繁,服务器让等 N 秒 — 1.4.0 随 QA P1-6 实装、1.4.2 补登记:不是密码错,
+前端按「稍后再试」中性展示不进密码警告框;期间推 `login:progress` `phase:"throttled"` 带 `waitsec`)
+| `before_open`(已存密码、明早自动验证 — 仅限已存凭据路径)。message 已按各态拼好人话,前端直显即可;
 `reason` 缺省 = 服务器原文透传,前端不猜。
 
 ### 2.4 scanWifi() — 扫描可用网络(v-guide 列表 / 设置 WiFi 兜底选择)
@@ -253,7 +255,7 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
 | type | payload | 触发 |
 |---|---|---|
 | `net:state` | `{state, ssid}`(同 probe.net 子集) | GUI 打开期间网络状态变化(含 connectWifi 之后、等待开门开门后) |
-| `login:progress` | `{phase, attempt?, attempts?, online_uid?}`;phase ∈ probe\|connecting_wifi\|logging_out\|requesting\|retrying | login/connectWifi 执行中;`logging_out` = 验证阶梯正在注销当前会话(断几秒),线上是别人的学号时带 `online_uid`(打码)如实注明(1.2.0,PRD 4.1.2) |
+| `login:progress` | `{phase, attempt?, attempts?, online_uid?, waitsec?}`;phase ∈ probe\|connecting_wifi\|logging_out\|requesting\|retrying\|throttled | login/connectWifi 执行中;`logging_out` = 验证阶梯正在注销当前会话(断几秒),线上是别人的学号时带 `online_uid`(打码)如实注明(1.2.0,PRD 4.1.2);`throttled` = 服务器节流、后端按 `waitsec` 秒等待后接着试(1.4.0 实装、1.4.2 补登记) |
 | `log:appended` | `{day_label, entry}`(entry 同 2.9) | 静默 ensure 落日志(GUI 开着时主页内嵌日志追加) |
 | `schedule:changed` | `{master, trigger_time, task_ok}` | selfheal 对齐/外部变更后,前端同步两处开关与 desc;`task_ok`=任务在岗(1.2.0,设置页「定时任务」行) |
 
@@ -275,8 +277,9 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
 | 1.1.1 | 2026-08-31 | §2.6 getConfig/saveConfig 新增 `operator` 枚举(校园用户/校园电信/校园联通/校园其他,注销页 carrier 实测抓全);§2.3 login payload 新增可选 `operator`;login 响应新增 `verified` | 后端已落地(提交密码先验证后入库 + verified 随信封下行);前端已接(三胶囊)|
 | 1.2.0 | 2026-09-06 | PRD 重梳理(af19e1b)落地:§2.3 失败信封可带 `reason`(拒绝三态 AC-19)+ 成功新增 `result:"stored"`(06:50 前提交存未验证);§2.10 recentResult 新增 `verified`(横幅①数据源);新增 §2.13 `taskStatus()` / §2.14 `rebuildTask()`(AC-17,仅点击重建);事件 `login:progress` 新增 `logging_out` 相位(+`online_uid`)、`schedule:changed` 扩 `task_ok`(兑现 §6 增强票);方法 12→14 | 后端已实现(5a018c8);前端已接(等待态/三态文案/横幅两态/主按钮三态修复/改密闭环/任务行,mock 场景 bind/other/unverified)— **生效** |
 | 1.3.0 | 2026-09-07 | 反馈系统重构(PRD `docs/prd/guigui-feedback-system.md` 全案):新增 §2.15 `feedbackSend`(真通道主入口,POST /fb v2,三态 result)/ §2.16 `feedbackDiag`(七区预览+uid 打码披露)/ §2.17 `feedbackPendingStatus`(离线队列状态行);§2.12 `feedback()` 废弃(保留一个版本周期,实现改由 render(collect()) 派生);§2.3 `reason` 增第四态 `limit_users`(实测,拒绝四态);错误码 +1(`FB_VALIDATION`);方法 14→17 | 后端已实现(见 S1-S3 提交链);前端已接(v-feedback 重构 + mock 三方法/limit 场景) |
-| 1.4.0 | 2026-09-07 | QA 验收审计 P0(`docs/plans/qa-fix-plan-2026-09-07.md` §P0-1/2):①§2.3 提交密码路径成功信封(success/stored/already)新增 `task_ok: bool` — login 存完凭据改为**同步**对齐任务计划(masterToggle 同款,PS 调用秒级),被安全软件拦时信封与指引通知同时如实,成功页不许空头承诺「已开启每日自动登录」;②§2.3 `already` 语义收紧 — 探测在线先核对线上学号(chkstatus),他人会话不冒领、改走真登换回自己的(GUI 已存凭据路径与 ensure 静默路径同款);chkstatus 不可得不阻塞 | 后端已实现(qa-fix P0 提交链);前端待接(成功页 task_ok 文案 + 重建入口;already 无形状变化无需改) |
-| 1.4.1 | 2026-09-07 | QA 审计 P2-9:§2.2 `identify` 的 `source` 语义明确(零形状变化,字段 1.0.1 起即有)— `chkstatus` = 检测自当前网络共享会话,回填值可能是室友学号,前端首装表单识别结果旁必须给确认提示(「检测自当前网络会话,确认是你自己的学号」方向);`config` 可信免提示;`none` 无回填 | 后端无需改(信封一直如实);前端待接(首装表单 chkstatus 旁注一句;mock 的 `other` 场景可验) |
+| 1.4.0 | 2026-09-07 | QA 验收审计 P0(`docs/plans/qa-fix-plan-2026-09-07.md` §P0-1/2):①§2.3 提交密码路径成功信封(success/stored/already)新增 `task_ok: bool` — login 存完凭据改为**同步**对齐任务计划(masterToggle 同款,PS 调用秒级),被安全软件拦时信封与指引通知同时如实,成功页不许空头承诺「已开启每日自动登录」;②§2.3 `already` 语义收紧 — 探测在线先核对线上学号(chkstatus),他人会话不冒领、改走真登换回自己的(GUI 已存凭据路径与 ensure 静默路径同款);chkstatus 不可得不阻塞 | 后端已实现(qa-fix P0 提交链);前端已接(成功页被拦态文案+重建入口、mock 补 task_ok/blocked 场景,2026-09-07)— **生效** |
+| 1.4.1 | 2026-09-07 | QA 审计 P2-9:§2.2 `identify` 的 `source` 语义明确(零形状变化,字段 1.0.1 起即有)— `chkstatus` = 检测自当前网络共享会话,回填值可能是室友学号,前端首装表单识别结果旁必须给确认提示(「检测自当前网络会话,确认是你自己的学号」方向);`config` 可信免提示;`none` 无回填 | 后端无需改(信封一直如实);前端已接(首装/登录表单 chkstatus 旁注,mock `other` 场景验过,2026-09-07)— **生效** |
+| 1.4.2 | 2026-09-07 | 补登记票(零行为变化):§2.3 `reason` 枚举 + §3 `login:progress` 补登 `throttled`/`waitsec` — 1.4.0 随 QA P1-6 实装于后端与 mock,当时漏改本文;本次随前端适配(节流按「稍后再试」中性渲染)一并入册 | 前端已接(fb0723c;?dev=1&scene=throttled 可验)— **生效** |
 
 ## 6. 集成待办(联调问题记这里)
 
