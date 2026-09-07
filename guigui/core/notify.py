@@ -39,14 +39,21 @@ def _xml_escape(text: str) -> str:
 
 
 def send(title: str, message: str, launch: str = LAUNCH_MAIN) -> None:
-    """发 Toast;超时/失败只记日志,永不抛异常(v1 行为)。"""
+    """发 Toast;超时/失败只记日志,永不抛异常(v1 行为)。
+
+    guigui:// 未注册成时降级纯展示(QA P2-8):不设 activationType/launch,
+    不让 toast 承诺一个点了没反应的动作 — 用户仍可自己打开桂桂。"""
     t, m, lc = _xml_escape(title), _xml_escape(message), _xml_escape(launch)
+    if protocol_registered():
+        toast_open = f'<toast activationType="protocol" launch="{lc}" duration="long">'
+    else:
+        toast_open = '<toast duration="long">'
     ps = (
         "[Windows.UI.Notifications.ToastNotificationManager,"
         " Windows.UI.Notifications, ContentType=WindowsRuntime]|Out-Null;"
         "[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom,"
         " ContentType=WindowsRuntime]|Out-Null;"
-        f'$t=\'<toast activationType="protocol" launch="{lc}" duration="long">'
+        f"$t=\'{toast_open}"
         "<visual><binding template=\"ToastGeneric\">"
         f"<text>{t}</text><text>{m}</text>"
         '</binding></visual></toast>\';'
@@ -162,6 +169,22 @@ def decide_notify(prev_state: str | None, *, connected: bool,
 
 
 # ── guigui:// 协议注册(HKCU,免管理员)─────────────────
+
+
+def protocol_registered() -> bool:
+    """guigui:// 是否已注册到当前用户(读 HKCU command 子键)。
+
+    供 send() 降级判断用:查不到一律当未注册(winreg 缺失/键不存在/
+    读失败),宁降级展示也不让点击落空;永不抛异常。"""
+    try:
+        import winreg
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                             r"Software\Classes\guigui\shell\open\command")
+        with key:
+            winreg.QueryValueEx(key, None)
+        return True
+    except Exception:
+        return False
 
 
 def register_protocol() -> bool:

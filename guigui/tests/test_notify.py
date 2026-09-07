@@ -91,11 +91,54 @@ def test_send_embeds_protocol_launch(monkeypatch):
         return types.SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(notify.subprocess, "run", fake_run)
+    monkeypatch.setattr(notify, "protocol_registered", lambda: True)
     notify.send("已连上 ✓", "网络回来了", launch=notify.LAUNCH_CREDS)
     ps = captured["ps"]
     assert 'activationType="protocol"' in ps
     assert "launch=&#x67;uigui://" in ps or "guigui://" in ps
     assert "ToastGeneric" in ps
+
+
+def test_send_degrades_without_protocol(monkeypatch):
+    """P2-8:协议未注册成 → 降级纯展示,toast 不设 activationType/launch,
+    不承诺一个点了没反应的动作;文案原样可达。"""
+    captured = {}
+
+    def fake_run(args, **kw):
+        captured["ps"] = args[-1]
+        return types.SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(notify.subprocess, "run", fake_run)
+    monkeypatch.setattr(notify, "protocol_registered", lambda: False)
+    notify.send("桂桂", "定时任务不见了", launch=notify.LAUNCH_SETTINGS)
+    ps = captured["ps"]
+    assert "activationType" not in ps
+    assert "launch=" not in ps
+    assert "ToastGeneric" in ps
+
+
+def test_protocol_registered_reads_hkcu(monkeypatch):
+    fake_winreg = types.ModuleType("winreg")
+    fake_winreg.HKEY_CURRENT_USER = 1
+
+    class FakeKey:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    fake_winreg.OpenKey = lambda root, path: FakeKey()
+    fake_winreg.QueryValueEx = lambda key, name: ("cmd", None)
+    monkeypatch.setitem(sys.modules, "winreg", fake_winreg)
+    assert notify.protocol_registered() is True
+
+    def boom(root, path):
+        raise OSError("no key")
+
+    fake_winreg.OpenKey = boom
+    monkeypatch.setitem(sys.modules, "winreg", fake_winreg)
+    assert notify.protocol_registered() is False
 
 
 def test_task_linger_copy_is_honest(monkeypatch):
