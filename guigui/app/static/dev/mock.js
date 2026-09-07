@@ -12,6 +12,7 @@
      rejected  登录一律被拒 reason=wrong_password(QA 密码错误路径;网态同 out)
      bind      登录被 bind 拦 reason=bound(密码其实对;网态同 out)
      limit     登录被 limit_users 拒 reason=limit_users(已在别处登录,不冤枉密码;网态同 out)
+     throttled 登录被节流 reason=throttled(契约 1.4.0;QA P1-6:不是密码错,前端走节流展示+phase='throttled' 推送,实机 waitsec 由服务器给)
      fbdg      反馈提交走 SUBMITTED_DEGRADED(D1 成功、issue 延后;用户应无感照常「已收到」)
      other     日常·线上是别人的学号(提交走阶梯:logging_out 带 online_uid → 真登成功)
      unverified 日常·密码未验证+今早失败(主页两横幅 QA) */
@@ -57,6 +58,7 @@ if(SCENE==='daily'){S.configured=true;S.verified=true}
 if(SCENE==='rejected'){S.net.state='not_logged_in'}
 if(SCENE==='bind'){S.net.state='not_logged_in'}
 if(SCENE==='limit'){S.net.state='not_logged_in'}
+if(SCENE==='throttled'){S.net.state='not_logged_in'}
 if(SCENE==='other'){S.configured=true;S.verified=true}
 if(SCENE==='unverified'){S.configured=true;S.verified=false;
   S.last={when:'今早',time:'07:00',tries:3,outcome:'fail'};
@@ -105,6 +107,11 @@ window.GGMock={
     if(SCENE==='rejected')return ERR('AUTH_REJECTED','密码不对,改一下再试','wrong_password');
     if(SCENE==='bind')return ERR('AUTH_REJECTED','密码是对的,但这个账号被绑在别处/受限 — 去自助服务平台看看绑定','bound');
     if(SCENE==='limit')return ERR('AUTH_REJECTED','这个学号已在别的设备上登录(比如在别处登过没下线),那边下线后桂桂会自动登好','limit_users');
+    if(SCENE==='throttled'){
+      /* QA P1-6:节流≠密码错;推 phase='throttled' 给前端,然后返回 throttled 信封 */
+      emit('login:progress',{phase:'throttled',waitsec:10,attempts:1});
+      return ERR('AUTH_REJECTED','登录太频繁,请等 10 秒再试','throttled');
+    }
     S.pwd=pwd;S.net.state='logged_in';S.verified=true;
     const e={ts:nowTs(),level:'ok',text:'已登录 · '+UID_MASK};
     S.logs[0].entries.push(e);
