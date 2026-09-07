@@ -1,0 +1,376 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "桂桂后端系统架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1380,
+      840
+    ],
+    "views": [
+      {
+        "id": "auto-login",
+        "label": "每天自动登录",
+        "focus": [
+          "tasksched",
+          "entry",
+          "ensure",
+          "drcom",
+          "drcomsrv",
+          "vaultmod"
+        ],
+        "note": "任务计划触发 → --ensure 静默进程 → 探测登录 → Dr.COM 服务器,密码从凭据管理器取"
+      },
+      {
+        "id": "gui-config",
+        "label": "配置面",
+        "focus": [
+          "gui",
+          "api",
+          "schedmod",
+          "tasksched"
+        ],
+        "note": "改设置 → tasks_rev 对齐 → schtasks 幂等重建任务"
+      },
+      {
+        "id": "creds",
+        "label": "凭据安全",
+        "focus": [
+          "vaultmod",
+          "credman",
+          "api",
+          "ensure"
+        ],
+        "note": "密码只走 Windows 凭据管理器(DPAPI),永不落盘明文"
+      },
+      {
+        "id": "on-disk",
+        "label": "文件落盘",
+        "focus": [
+          "datadir",
+          "ensure",
+          "api"
+        ],
+        "note": "%LOCALAPPDATA%\\GuiGui\\ 下各文件谁写什么、密码不在其中"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "tasksched",
+      "type": "cloud",
+      "label": "Windows 任务计划",
+      "sublabel": "GuiGui · Patrol",
+      "tag": "schtasks",
+      "pos": [
+        70,
+        90
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "gui",
+      "type": "frontend",
+      "label": "app/gui.py + static/",
+      "sublabel": "pywebview · WebView2 壳",
+      "pos": [
+        1150,
+        90
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "entry",
+      "type": "backend",
+      "label": "__main__.py",
+      "sublabel": "--ensure 静默短进程",
+      "pos": [
+        70,
+        260
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "app/api.py",
+      "sublabel": "契约桥 · 统一信封",
+      "pos": [
+        1150,
+        260
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "ensure",
+      "type": "backend",
+      "label": "core/ensure.py",
+      "sublabel": "探测→登录→兜底→收工",
+      "pos": [
+        70,
+        430
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "drcom",
+      "type": "backend",
+      "label": "core/drcom.py",
+      "sublabel": "登录 · 注销 · 拒绝三态",
+      "pos": [
+        345,
+        430
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "schedmod",
+      "type": "backend",
+      "label": "scheduler + selfheal",
+      "sublabel": "任务 XML · 幂等对齐",
+      "pos": [
+        895,
+        430
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "vaultmod",
+      "type": "security",
+      "label": "core/vault.py",
+      "sublabel": "密码唯一出口",
+      "pos": [
+        895,
+        600
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "credman",
+      "type": "security",
+      "label": "Windows 凭据管理器",
+      "sublabel": "<学号>@GuiGui",
+      "tag": "DPAPI",
+      "pos": [
+        1170,
+        600
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "datadir",
+      "type": "database",
+      "label": "%LOCALAPPDATA%\\GuiGui\\",
+      "sublabel": "config · state · 日志",
+      "pos": [
+        70,
+        600
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "drcomsrv",
+      "type": "external",
+      "label": "Dr.COM 认证服务器",
+      "sublabel": "http://10.1.2.3",
+      "pos": [
+        345,
+        600
+      ],
+      "size": [
+        190,
+        76
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "guigui/app/ · 壳层",
+      "wraps": [
+        "gui",
+        "api"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "trigger",
+      "from": "tasksched",
+      "to": "entry",
+      "label": "07:00 · 开机 · 唤醒",
+      "variant": "emphasis",
+      "labelAt": [
+        165,
+        180
+      ]
+    },
+    {
+      "id": "run-silent",
+      "from": "entry",
+      "to": "ensure"
+    },
+    {
+      "id": "ensure-login",
+      "from": "ensure",
+      "to": "drcom",
+      "label": "探测 · 登录"
+    },
+    {
+      "id": "http-login",
+      "from": "drcom",
+      "to": "drcomsrv",
+      "label": "GET /drcom/login",
+      "variant": "emphasis",
+      "labelAt": [
+        440,
+        520
+      ]
+    },
+    {
+      "id": "bridge",
+      "from": "gui",
+      "to": "api",
+      "label": "16 方法 · 4 事件",
+      "labelAt": [
+        1245,
+        180
+      ]
+    },
+    {
+      "id": "rev-bump",
+      "from": "api",
+      "to": "schedmod",
+      "label": "tasks_rev+1"
+    },
+    {
+      "id": "task-align",
+      "from": "schedmod",
+      "to": "tasksched",
+      "label": "幂等建删",
+      "variant": "dashed"
+    },
+    {
+      "id": "store-cred",
+      "from": "api",
+      "to": "vaultmod",
+      "label": "存 · 验证",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "dpapi",
+      "from": "vaultmod",
+      "to": "credman",
+      "label": "keyring · DPAPI",
+      "variant": "security"
+    },
+    {
+      "id": "read-cred",
+      "from": "ensure",
+      "to": "vaultmod",
+      "label": "取密码",
+      "fromSide": "left",
+      "toSide": "bottom",
+      "via": [
+        [
+          40,
+          468
+        ],
+        [
+          40,
+          700
+        ],
+        [
+          990,
+          700
+        ]
+      ],
+      "labelAt": [
+        590,
+        715
+      ]
+    },
+    {
+      "id": "persist",
+      "from": "ensure",
+      "to": "datadir",
+      "label": "state · 日志",
+      "labelAt": [
+        165,
+        545
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "slate",
+      "title": "入口与壳 · guigui/app/",
+      "items": [
+        "__main__.py:--ensure 静默短进程、深链开 GUI、--clear-creds 卸载清理",
+        "gui.py:无边框壳 + FileWatcher 2s 轮询落盘翻译成契约事件;Win11 DWM / Win10 区域圆角",
+        "instance.py:命名互斥 Local\\GuiGui-GUI,GUI 只跑一份"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "核心执行 · guigui/core/",
+      "items": [
+        "drcom.py:协议本体——登录 / 注销 / chkstatus / 拒绝三态(密码错 · 账号错 · 已绑定)",
+        "ensure.py + detect.py:四态探测、等门 10min、重试节奏、假期静默(48h 不可达每天 1 探)、06:50 锚点",
+        "wifictl.py:netsh 扫描 / 连接,开放网自动建临时 profile",
+        "验证阶梯(api.py 内):探测在线→注销→等翻转→真登一次,拒绝三态给人话文案"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "调度与自愈",
+      "items": [
+        "真正的触发者是 Windows 任务计划:scheduler.py 只生成 XML 并调 schtasks",
+        "主任务 L1 每日(T−30min 起 6 拍)+ L2 开机 + L5 唤醒;巡逻任务全天每 N 分钟",
+        "selfheal.py 按 tasks_rev 幂等对齐,被拦则去 LogonTrigger 降级注册、日后自动升回"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "安全与落盘",
+      "items": [
+        "密码只存 Windows 凭据管理器(DPAPI),vault.py 永不回退明文,换学号 rekey",
+        "%LOCALAPPDATA%\\GuiGui\\:config_v2.json(无密码)、ensure_state.json、logs\\*.jsonl(留 90 天)",
+        "notify.py Toast + 去重决策;diagnostics.py 打码诊断文本——学号打码、密码永不出现"
+      ]
+    }
+  ]
+}
