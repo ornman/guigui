@@ -50,6 +50,17 @@
 
 ## P1 — 承诺弱化 / 边缘真实
 
+> 状态:2026-09-07 全 7 项执行完成(P1-4 / P1-5 在前一会话提交,P1-6 = 5a22225、
+> P1-7 = a4d9a48 本会话提交,mock 增 throttled 场景 = f911ea4),265 测全绿。
+> P1-6 waitsec 节流 msga 真实形状仍需校园网实测(文末 #1);P1-7 拍板=采纳
+> boot/wake 豁免建议(boot_login 默认
+> 开,wake_login 默认关,按 PRD §6.4)。
+
+### 4. 凭证库不可用:补降级 + 文案出路 ✅
+### 5. 任务在岗无周期自检(自愈盲窗数周)✅
+### 6. waitsec 节流三件套 `需实测` ✅ 5a22225
+### 7. 返校日「每天只探 1 次」全天压制 `需拍板口径` ✅ a4d9a48
+
 ### 4. 凭证库不可用:补降级 + 文案出路
 
 **问题**:`VaultError` → INTERNAL「系统凭据管理器不可用,存不下密码」(`api.py:221` 等 7 处),无降级、无出路。「不回退明文」是纪律(v1 教训)必须保持;但 vault.py 已直调 advapi32(`CredEnumerateW/CredDeleteW`,`vault.py` delete_all_service_entries)——同一个 DLL 有 `CredWriteW/CredReadW`,keyring 库异常而凭据管理器(系统服务)还活着时,直调 = 同一保险柜换钥匙,安全属性不变。
