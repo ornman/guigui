@@ -1063,8 +1063,10 @@ async function loginNow(){
       const n=$('login-note');n.textContent=r.message||'登录太频繁,稍后再试';n.style.display='flex';return}
     showLoginErr(r.message||'登录被拒',r.reason);return}
   if(r.code==='NET_UNREACHABLE'){
-    /* 提交了密码的断网:后端已存(未验证)→ configured 同步,横幅口径生效 */
+    /* 提交了密码的断网:后端已存(未验证)→ configured 同步,横幅口径生效;
+       mainState 一并记 down,返回主页不渲染旧网态 */
     if(pwdVal){configured=true;hasPwd=true}
+    mainState='down';
     openDetail('v-guide');return}
   /* INTERNAL / BRIDGE_MISSING 等:就地表后端原话,不静默 */
   showLoginErr(r.message||'出了点问题,再试一次');
@@ -1228,8 +1230,12 @@ GG.on('net:state',e=>{
   if(view==='v-main'){
     mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
     renderMain();renderMainData()}
-  else if(view==='v-login')syncLoginStatusLine();
-  else if(view==='v-ok')syncOkStatusLine();
+  else if(view==='v-login'||view==='v-ok'){
+    /* 表单页停留:状态行实时跟真;mainState 顺手记对 — 返回主页时 renderMain
+       才不会拿旧网态渲染(否则 out 标题配 down 数据的混搭) */
+    mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
+    if(view==='v-login')syncLoginStatusLine();
+    else syncOkStatusLine()}
 });
 GG.on('schedule:changed',e=>{
   if(e&&typeof e.master==='boolean')setAuto(e.master);

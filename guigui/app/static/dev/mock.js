@@ -244,6 +244,14 @@ window.GGMock={
   },
   async winMinimize(){},
   async winClose(){},
+  async _setNet(state,ssid){
+    /* dev 驱动钩子(state-gallery/联调用):真改 mock 数据源并推 net:state —
+       与 guiguiEmit 手推不同,后续 login()/probe() 的网态判定随动,全链真跑 */
+    S.net.state=state;
+    if(ssid!=null)S.net.ssid=ssid;
+    netEmit();
+    return OK({...S.net});
+  },
   async openSelfService(){window.open('https://bcs.guat.edu.cn/Cas/Login?appid=71999680','_blank')}
 };
 })();

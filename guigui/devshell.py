@@ -7,7 +7,9 @@
 js_api,app.js 会挂 html.in-app(CSS 卡片弧随之变 9px);曾停留在原型配方
 (裁剪 22px + 深墨紫底色)时,in-app 卡片弧 9px 远小于裁剪弧 22px,四角
 露出深底色月牙 = 黑角(2026-09-06 实码定位,db6947f 引入 9px 后失配)。
-用法:python guigui/devshell.py [scene]   scene ∈ ok|out|down|waiting|daily|rejected(默认 ok)
+用法:python guigui/devshell.py [scene]   scene 见 static/dev/mock.js 头部(默认 ok);
+      状态画廊(9 视图×全状态陈列+故事流程)走浏览器:
+      cd guigui/app/static && python -m http.server 8000 → /dev/state-gallery.html
 """
 import ctypes
 import functools
