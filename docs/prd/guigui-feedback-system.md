@@ -1,6 +1,6 @@
 # 桂桂反馈系统 PRD(系统设计)
 
-版本:v1.0 · 2026-09-07 · 状态:方案已拍板,待实施
+版本:v1.0 · 2026-09-07 · 状态:**已实施**(S1–S4 全切片,见文末「实施记录」;待人工部署步骤)
 讨论与拍板过程见本文末「决策记录」;实测依据见附录 A。
 
 ---
@@ -505,3 +505,19 @@ deletion test:删掉它,发送/重试/幂等/退避/队列复杂度会在 api.py
 8. 纯建议瘦身、诊断折叠、离线纯复制降级(不加 mailto)、标题「说给桂桂听。」、日志截断保头保尾——均按推荐通过。
 9. 设计规模上限 4 万装机;安全/容量成章(§6.5–6.7):issue 预算闸为 DoS 核心,身份模型=自报线索永不作鉴权。
 10. 仓=方案 A:guigui-site 转私有(2026-09-07 用户拍板)。
+
+## 实施记录(2026-09-07,S1–S4 完成)
+
+| 仓 | 切片 | 提交 | 验收 |
+|---|---|---|---|
+| auto-login(桌面) | S1 主链路(契约 1.3.0 三方法 + feedback 深模块 + diagnostics 七区 + 前端) | `3c8c760` | AC-F1/F2/F4/F12 桌面侧 |
+| auto-login | S2 容灾补全(ensure 拍/网络恢复两个 pump 触发点) | `dbe6b12` | AC-F3/F10 桌面侧 |
+| auto-login | S3 四态拒绝 + server/crashes 区 + crashlog + 拒绝现场入日志 | `92fedd8` | AC-F5/F8/F9 |
+| guigui-site(发布仓) | S1 服务端(/fb v2:双槽/幂等/限频/预算/注入/v1 兼容) | `4b011c0` | AC-F1/F2/F4/F10/F12/F15/F16 服务端 |
+| guigui-site | S4 对账(/fb/reconcile + meta-issue 报警 + list 健康) | `7aad228` | AC-F7/F14 |
+
+测试:桌面 227(pytest,含四态/红线/in-band/队列不变量)、服务端 24(node --test,`npm test`)。
+**实现注记**(对 §6.4 迁移的两处加法,已写进 `migrations/002-fb-v2.sql` 注释):
+外加列 `issue_at`(issue 实际创建时间——预算闸滚动窗口锚点,created_at 是入库时间不能替代)
+与表 `fb_ops`(gh_fail_streak / gh_broken_since / last_meta_alert_at 管道自状态)。
+**待人工**(部署闸):PAT / 仓标签 problem·suggestion·meta / D1 迁移执行 / secrets / deploy / cron。
