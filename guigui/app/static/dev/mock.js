@@ -13,6 +13,7 @@
      bind      登录被 bind 拦 reason=bound(密码其实对;网态同 out)
      limit     登录被 limit_users 拒 reason=limit_users(已在别处登录,不冤枉密码;网态同 out)
      throttled 登录被节流 reason=throttled(契约 1.4.0;QA P1-6:不是密码错,前端走节流展示+phase='throttled' 推送,实机 waitsec 由服务器给)
+     blocked   首装·提交密码成功但定时任务被拦 task_ok=false(契约 1.4.0 P0-1:成功页如实文案+重建入口;rebuildTask 一次即修好)
      fbdg      反馈提交走 SUBMITTED_DEGRADED(D1 成功、issue 延后;用户应无感照常「已收到」)
      other     日常·线上是别人的学号(提交走阶梯:logging_out 带 online_uid → 真登成功)
      unverified 日常·密码未验证+今早失败(主页两横幅 QA) */
@@ -59,6 +60,7 @@ if(SCENE==='rejected'){S.net.state='not_logged_in'}
 if(SCENE==='bind'){S.net.state='not_logged_in'}
 if(SCENE==='limit'){S.net.state='not_logged_in'}
 if(SCENE==='throttled'){S.net.state='not_logged_in'}
+if(SCENE==='blocked'){S.net.state='not_logged_in';S.taskOk=false}
 if(SCENE==='other'){S.configured=true;S.verified=true}
 if(SCENE==='unverified'){S.configured=true;S.verified=false;
   S.last={when:'今早',time:'07:00',tries:3,outcome:'fail'};
@@ -97,7 +99,7 @@ window.GGMock={
       S.logs[0].entries.push(e);
       emit('log:appended',{day_label:'今天',entry:e});
       netEmit();
-      return OK({result:'success',uid:UID_MASK,attempts:1,verified:true});
+      return OK({result:'success',uid:UID_MASK,attempts:1,verified:true,task_ok:S.taskOk});
     }
     if(S.net.state==='logged_in')return OK({result:'already',uid:UID_MASK,attempts:0,verified:S.verified});
     const pwd=(a&&a.password)!=null&&a.password!==''?a.password:S.pwd;
@@ -117,7 +119,10 @@ window.GGMock={
     S.logs[0].entries.push(e);
     emit('log:appended',{day_label:'今天',entry:e});
     netEmit();
-    return OK({result:'success',uid:UID_MASK,attempts:1,verified:true});
+    /* 契约 1.4.0:提交密码路径的成功信封携带 task_ok;已存凭据路径不带 */
+    const env={result:'success',uid:UID_MASK,attempts:1,verified:true};
+    if(a&&a.password)env.task_ok=S.taskOk;
+    return OK(env);
   },
   async scanWifi(){
     await delay(400);

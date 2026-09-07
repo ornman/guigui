@@ -568,9 +568,9 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
     <div class="v" id="v-success">
       <div class="v-success-stage">
         <div class="bot bot-success" data-state="complete" data-size="140"></div>
-        <h1 class="s-line s-1">以后每天都会自动帮你登好。</h1>
+        <h1 class="s-line s-1" id="success-title">以后每天都会自动帮你登好。</h1>
         <p class="lede s-line s-2" id="success-time">明早 07:00 开始。现在关掉就行。</p>
-        <div class="micro-line s-line s-3">到点就登，你不用管。</div>
+        <div class="micro-line s-line s-3" id="success-step">到点就登，你不用管。</div>
         <button class="btn s-line s-4" style="max-width:220px;margin:16px auto 0" onclick="backFrom('v-success')">完成,回主页</button>
         <button class="link s-line s-5" style="display:block;width:fit-content;margin:10px auto 0" onclick="openDetail('v-settings')">高级设置</button>
       </div>
@@ -957,18 +957,35 @@ async function quickLogin(){
 }
 /* 流程动作 */
 /* 庆祝页入场:重新给 stage 加 .in class 触发 CSS animation(display:none→block 不会自动重启动画)
-   庆祝只给真实成功(AC-11):verified!==true / 锚前存入都不撒彩带,文案如实 */
-function showSuccess(verifiedTrue,reason){
+   庆祝只给真实成功(AC-11):verified!==true / 锚前存入 / task_ok=false 都不撒彩带,文案如实 */
+let successState={verified:true,reason:null,taskOk:true};
+function showSuccess(verifiedTrue,reason,taskOk){
+  successState={verified:verifiedTrue===true,reason:reason||null,taskOk:taskOk!==false};
+  renderSuccess();
+}
+function renderSuccess(){
+  const st=successState;
   renderTriggerTime();   /* 同步最新触发时间,避免 lede 写死 07:00 */
+  /* task_ok=false(契约 1.4.0):密码已存但定时任务被拦,自动化不存在 ——
+     如实说并给重建入口,不许空头承诺「已开启每日自动登录」 */
+  const blocked=!st.taskOk;
+  const title=$('success-title');
+  if(title)title.textContent=blocked?'密码存好了,自动登录还差一步。':'以后每天都会自动帮你登好。';
   const lede=$('success-time');
   if(lede){
-    if(reason==='before_open')
+    if(blocked)
+      lede.textContent='定时任务被安全软件拦了,明早还不会自动登录。把桂桂加进杀毒软件信任区,再点下面的按钮。';
+    else if(st.reason==='before_open')
       lede.textContent='还没到开门时间(06:50),密码先存着,明早 '+currentTriggerTime+' 第一次自动登录会真验证,不对桂桂会提醒你。';
-    else if(verifiedTrue!==true)
+    else if(!st.verified)
       lede.textContent='现在已在线 ✓ 密码也存好了。明早 '+currentTriggerTime+' 第一次自动登录时会真验证一遍,万一不对会弹通知提醒你改。';
     else
       lede.textContent='明早 '+currentTriggerTime+' 开始。现在关掉就行。';
   }
+  const step=$('success-step');
+  if(step)step.innerHTML=blocked
+    ?'<button class="btn quiet" style="max-width:220px;margin:0 auto" onclick="rebuildFromSuccess(this)">重建定时任务</button>'
+    :'到点就登，你不用管。';
   show('v-success');
   const stage=document.querySelector('#v-success .v-success-stage');
   if(stage){
@@ -977,7 +994,16 @@ function showSuccess(verifiedTrue,reason){
     stage.classList.add('in');
   }
   greet();
-  if(verifiedTrue===true)party();
+  if(st.verified&&!blocked)party();
+}
+/* 成功页上的重建(契约 §2.14,仅用户点击触发):建成即承诺成立,重渲庆祝态 */
+async function rebuildFromSuccess(btn){
+  setBusy(btn,true,'重建中…');
+  const r=await GG.api.rebuildTask();
+  setBusy(btn,false);
+  if(r.ok&&r.data.ok){successState=Object.assign({},successState,{taskOk:true});renderSuccess();return}
+  btn.textContent='没建成,再试一次';
+  setTimeout(()=>{if(btn.isConnected&&!btn.classList.contains('busy'))btn.textContent='重建定时任务'},2600);
 }
 /* 交钥匙即开启:密码必填,为空只给一句温柔提醒;等待态防重复提交(AC-11) */
 async function enableDaily(){
@@ -989,7 +1015,7 @@ async function enableDaily(){
   await GG.api.saveConfig({trigger_time:currentTriggerTime});
   const r=await GG.api.login({sid:$('f-sid').value.trim()||undefined,password:pwd,operator:pickedOperator('#op-dd')});
   setBusy(btn,false);hideSubmitNotes();
-  if(r.ok){configured=true;hasPwd=true;showSuccess(r.data.verified===true,r.data.reason);return}
+  if(r.ok){configured=true;hasPwd=true;showSuccess(r.data.verified===true,r.data.reason,r.data.task_ok);return}
   if(r.code==='AUTH_REJECTED'){
     if(r.reason==='throttled'){
       /* 节流≠密码错(P1-6):中性提示「稍后再试」,不进密码警告框不吓人 */
@@ -1017,7 +1043,7 @@ async function loginNow(){
   setBusy(btn,false);hideSubmitNotes();
   if(r.ok){configured=true;hasPwd=true;
     if(sidVal)loginLandingUid=sidVal;
-    showSuccess(r.data.verified===true,r.data.reason);renderBannersRefresh();return}
+    showSuccess(r.data.verified===true,r.data.reason,r.data.task_ok);renderBannersRefresh();return}
   if(r.code==='AUTH_REJECTED'){
     if(r.reason==='throttled'){
       const n=$('login-note');n.textContent=r.message||'登录太频繁,稍后再试';n.style.display='flex';return}
