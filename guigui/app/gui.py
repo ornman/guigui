@@ -50,6 +50,7 @@ class FileWatcher(threading.Thread):
         self._stop = threading.Event()
         self._seen: dict[str, object] = {}
         self._today_lines = 0
+        self._last_fb_pump = 0.0
 
     def run(self) -> None:
         self._prime()
@@ -99,6 +100,20 @@ class FileWatcher(threading.Thread):
                 from guigui.core import wifictl
                 self.api._emit("net:state", {"state": net_state,
                                              "ssid": wifictl.current_ssid()})
+                if net_state == "logged_in":
+                    self._pump_feedback_maybe()
+
+    def _pump_feedback_maybe(self) -> None:
+        """网络恢复 → 补发到期反馈(PRD §7.1 触发点;节流 5 分钟,
+        ensure 拍都会改 state 文件,不节流会空转太频)。"""
+        import time as _time
+
+        now = _time.monotonic()
+        if now - self._last_fb_pump < 300:
+            return
+        self._last_fb_pump = now
+        threading.Thread(target=_pump_feedback, args=(0.5,), daemon=True,
+                         name="guigui-fb-pump").start()
 
     def _check_today_log(self) -> None:
         entries = logstore.read_day(dt.date.today())
@@ -296,9 +311,11 @@ def _reconcile_on_start() -> None:
         notify_mod.task_blocked()
 
 
-def _pump_feedback() -> None:
-    """GUI 打开即补发到期反馈(PRD §7.1 pump 触发点之一;at-least-once)。"""
-    time.sleep(2.5)   # 让首屏先起来,再碰网络
+def _pump_feedback(delay_s: float = 2.5) -> None:
+    """补发到期反馈(PRD §7.1 触发点:GUI 打开 / 网络恢复;at-least-once)。"""
+    import time as _time
+
+    _time.sleep(delay_s)   # 让首屏先起来,再碰网络
     try:
         from guigui.core import feedback
         sent = feedback.pump()

@@ -24,7 +24,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if "--ensure" in argv:
         from guigui.core import ensure
-        return ensure.run()
+        rc = ensure.run()
+        _pump_feedback_queue()   # GUI 关着时 ensure 拍也能补发(PRD §7.1)
+        return rc
 
     if "--clear-creds" in argv:
         # 卸载器「彻底清理」用:枚举凭据管理器中 <学号>@GuiGui 全部条目;
@@ -48,6 +50,17 @@ def main(argv: list[str] | None = None) -> int:
         view = None
     from guigui.app import gui  # 延迟导入:--ensure 路径不碰 GUI 依赖
     return gui.run(view)
+
+
+def _pump_feedback_queue() -> None:
+    """补发到期反馈;任何失败不影响本次 ensure 拍的结果。"""
+    import logging
+
+    try:
+        from guigui.core import feedback
+        feedback.pump()
+    except Exception:
+        logging.getLogger(__name__).exception("ensure: 反馈补发失败")
 
 
 if __name__ == "__main__":

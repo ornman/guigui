@@ -158,3 +158,24 @@ def test_validate_input_human_errors():
     assert feedback.validate_input(["problem"], "好" * 121, "") is not None
     assert feedback.validate_input(["problem"], "x", "c" * 81) is not None
     assert feedback.validate_input(["suggestion"], "x", "") is None
+
+
+# ── 触发点:ensure 拍也泵(S2;GUI 关着时的补发通道)──
+
+
+def test_ensure_entry_pumps_queue(monkeypatch):
+    from guigui import __main__ as gmain
+
+    called = []
+    monkeypatch.setattr("guigui.core.feedback.pump", lambda: called.append(1))
+    gmain._pump_feedback_queue()
+    assert called == [1]
+
+
+def test_ensure_pump_failure_never_breaks_the_run(monkeypatch):
+    from guigui import __main__ as gmain
+
+    def boom():
+        raise RuntimeError("queue 炸了")
+    monkeypatch.setattr("guigui.core.feedback.pump", boom)
+    gmain._pump_feedback_queue()      # 吞掉,不影响 ensure 拍结果
