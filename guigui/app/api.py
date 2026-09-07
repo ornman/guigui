@@ -72,7 +72,8 @@ class GuiGuiApi:
         「开启每日自动登录」那一步,由 login 存完凭据后首次对齐;
         master 关 → 删任务不受守卫影响。
         「已开启每日自动登录」是成功页的直接承诺,对齐同步做完才回话
-        (PS 调用秒级):被拦时立刻弹 task_blocked,信封带 task_ok 让成功页如实说。
+        (PS 调用秒级):未达成立刻弹通知(master 开没建成 → task_blocked;
+        master 关删不掉 → task_linger 幽灵任务),信封带 task_ok 让成功页如实说。
         返回任务是否在岗。"""
         misaligned = False
         try:
@@ -83,8 +84,13 @@ class GuiGuiApi:
         except Exception:
             log.exception("api: selfheal 对齐失败")
             misaligned = bool(saved.get("master", True))
-        if misaligned and saved.get("master", True):
-            notify.task_blocked()
+        if misaligned:
+            # 开着没建成 = 自动化不存在;关着删不掉 = 幽灵任务明早照常登录,
+            # 背着用户干活更伤信任 — 两种未达成都得如实告知
+            if saved.get("master", True):
+                notify.task_blocked()
+            else:
+                notify.task_linger()
         # task_ok:任务在岗状态(契约 1.2.0;设置页「定时任务」行的数据源)
         self._emit("schedule:changed",
                    {"master": saved["master"], "trigger_time": saved["trigger_time"],

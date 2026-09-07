@@ -56,6 +56,7 @@ class Ctx:
         self.reconciled = []
         self.reconcile_ret = (False, False)   # selfheal.reconcile 桩返回 (changed, misaligned)
         self.task_blocked_calls = []
+        self.task_linger_calls = []
         self.task_current = True   # scheduler.is_task_current 桩返回值
 
         monkeypatch.setattr(api_mod.detect, "probe",
@@ -85,6 +86,8 @@ class Ctx:
         monkeypatch.setattr(api_mod.selfheal, "reconcile", self._reconcile_stub)
         monkeypatch.setattr(api_mod.notify, "task_blocked",
                             lambda: self.task_blocked_calls.append(1))
+        monkeypatch.setattr(api_mod.notify, "task_linger",
+                            lambda: self.task_linger_calls.append(1))
         monkeypatch.setattr(api_mod.scheduler, "is_task_current",
                             lambda name, cfg, require_logon=False: self.task_current)
         monkeypatch.setattr(api_mod.time, "sleep", lambda s: None)
@@ -292,6 +295,28 @@ def test_master_toggle_off_sync(ctx):
 
 def test_master_toggle_accepts_payload_object(ctx):
     assert ctx.api.masterToggle({"on": True})["data"]["master"] is True
+
+
+# ── P0-3:关开关删任务失败 → 幽灵任务通知 ──────────────────
+
+
+def test_master_toggle_off_delete_fail_notifies_linger(ctx):
+    """关失败(删任务被拦)→ 弹 task_linger 如实说「明早还会登录」;
+    信封照常返回(开关状态已存,由 schedule:changed/taskStatus 暴露在岗)。"""
+    ctx.reconcile_ret = (False, True)                  # 删任务失败(misaligned)
+    out = ctx.api.masterToggle(False)
+    assert out == {"ok": True, "data": {"master": False}}
+    assert ctx.task_linger_calls                        # 幽灵任务通知弹出
+    assert ctx.task_blocked_calls == []                 # 不是「创建被拦」文案
+    events = [p for t, p in parse_emitted(ctx.window) if t == "schedule:changed"]
+    assert events and events[-1]["task_ok"] is False    # 在岗状态如实
+
+
+def test_master_toggle_on_create_fail_still_task_blocked(ctx):
+    """对照:开失败仍是创建被拦文案(task_linger 不掺和)。"""
+    ctx.reconcile_ret = (False, True)
+    assert ctx.api.masterToggle(True)["data"]["master"] is True
+    assert ctx.task_blocked_calls and ctx.task_linger_calls == []
 
 
 # ── 日志 / 昨晚 ───────────────────────────────────────────

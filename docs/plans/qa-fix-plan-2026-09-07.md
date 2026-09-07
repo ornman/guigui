@@ -123,4 +123,5 @@
 
 ## 新发现(执行时若遇到,记录于此,不顺手修)
 
-- (空)
+- (2026-09-07 P0 执行中)rebuildTask 在 master 关 + 删任务失败时弹的是 `task_blocked()`(创建被拦文案),语义错位 — 应弹 task_linger;P0-3 修的是 `_reconcile_and_report` 共用路径(masterToggle/login/saveConfig),rebuildTask 自带 reconcile 未走共用函数,待下一轮收口。
+- (2026-09-07 P0 执行中)master 开 + 首装未完成时,`schedule:changed` 仍推 `task_ok:true`(守卫跳过建任务,但事件声称在岗;taskStatus() 查询则如实 false)— 瞬态不一致,前端任务行下次刷新自愈;要修需引入第三态,涉及契约,暂记。

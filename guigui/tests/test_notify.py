@@ -98,6 +98,17 @@ def test_send_embeds_protocol_launch(monkeypatch):
     assert "ToastGeneric" in ps
 
 
+def test_task_linger_copy_is_honest(monkeypatch):
+    """P0-3:幽灵任务文案必须说清「任务还在、明早还会登录」并给动作(直达设置)。"""
+    sent = []
+    monkeypatch.setattr(notify, "send",
+                        lambda t, m, launch=None: sent.append((t, m, launch)))
+    notify.task_linger()
+    assert sent and "定时任务还在" in sent[0][1]
+    assert "明早还会自动登录" in sent[0][1]
+    assert sent[0][2] == notify.LAUNCH_SETTINGS
+
+
 def test_send_swallows_errors(monkeypatch):
     def boom(*a, **kw):
         raise RuntimeError("powershell gone")

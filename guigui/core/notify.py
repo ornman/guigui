@@ -84,6 +84,19 @@ def task_blocked() -> None:
     )
 
 
+def task_linger() -> None:
+    """关总开关但删任务失败(幽灵任务)时的如实通知(点开直达设置页)。
+
+    开着被拦是「没动静」;关着删不掉 = 任务还在、明早照常登录 —
+    背着用户干活更伤信任,必须告知;回设置页再关一次即重试删除。"""
+    send(
+        "桂桂",
+        "没关干净:定时任务还在,明早还会自动登录。"
+        "点开设置,把开关再关一次试试。",
+        launch=LAUNCH_SETTINGS,
+    )
+
+
 def decide_notify(prev_state: str | None, *, connected: bool,
                   outcome: str | None = None,
                   before_anchor: bool = False, maintenance_streak: int = 0,
