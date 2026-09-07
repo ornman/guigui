@@ -512,8 +512,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
             <button type="button" data-op="中国移动">中国移动 <span class="ck">✓</span></button>
             <button type="button" data-op="中国广电">中国广电 <span class="ck">✓</span></button>
             <button type="button" data-op="校园其他">校园其他 <span class="ck">✓</span></button>
-          </div></div></div>
-        <div class="submit-note" id="ok-sid-note" style="display:none">学号检测自当前网络会话,确认是你自己的再提交</div></div>
+          </div></div></div></div>
       <div class="f"><label>密码</label>
         <div class="pw-wrap"><input type="password" id="f-pwd" placeholder="请输入密码" autocomplete="new-password">
           <button type="button" class="pw-eye" onclick="togglePw('f-pwd',this)" title="显示 / 隐藏密码">
@@ -547,8 +546,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
             <button type="button" data-op="中国移动">中国移动 <span class="ck">✓</span></button>
             <button type="button" data-op="中国广电">中国广电 <span class="ck">✓</span></button>
             <button type="button" data-op="校园其他">校园其他 <span class="ck">✓</span></button>
-          </div></div></div>
-        <div class="submit-note" id="login-sid-note" style="display:none">学号检测自当前网络会话,确认是你自己的再提交</div></div>
+          </div></div></div></div>
       <div class="f"><label>密码</label>
         <div class="pw-wrap"><input type="password" id="f-pwd-login" value="" placeholder="请输入密码" autocomplete="new-password">
           <button type="button" class="pw-eye" onclick="togglePw('f-pwd-login',this)" title="显示 / 隐藏密码">
@@ -1250,13 +1248,8 @@ function renderWifiList(box,networks,opts){
       '><span class="n">'+esc(n.ssid)+'</span><span class="q"'+(opts.pick?' data-orig="'+sig+'"':'')+'>'+sig+(sel?' · 已选':'')+'</span></div>';
   }).join('');
 }
-/* 学号旁注(契约 1.4.1):identify 的 chkstatus 抓的是全屋共享会话,回填的可能是
-   室友学号 —— 识别结果旁给一句确认提示,让用户看一眼再提交,防误抓入库;
-   config=本机已存配置可信免提示;none=没认出来,无回填无提示 */
-function renderSidNote(noteId,id){
-  const n=$(noteId);if(!n)return;
-  n.style.display=(id&&id.ok&&id.data&&id.data.source==='chkstatus'&&id.data.uid)?'flex':'none';
-}
+/* 学号旁注(契约 1.4.1 引入)已于 1.4.3 撤销 — 用户拍板:这行文字没必要,
+   误抓由登录被拒(wrong_account 文案)自纠;identify 回填行为本身不变 */
 async function fillLoginLanding(){
   const net=lastNet||{};
   /* 状态行说认证服务器(SSID 在热点场景是"iphone17 pro max"这类噪声,不帮用户判断) */
@@ -1264,7 +1257,6 @@ async function fillLoginLanding(){
   $('login-confirm').style.display='none';uidChangeArmed=false;
   const id=await GG.api.identify();
   if(id.ok&&id.data.uid&&!$('f-sid-login').value){$('f-sid-login').value=id.data.uid;loginLandingUid=id.data.uid}
-  renderSidNote('login-sid-note',id);
   const c=await GG.api.getConfig();   /* 运营商下拉按已存选择回填 */
   if(c.ok&&c.data.operator)setOperatorPick('#op-dd-login',c.data.operator);
 }
@@ -1277,7 +1269,6 @@ async function fillLanding(){
       const f=$('f-sid');if(!f.value)f.value=id.data.uid;
       $('ok-status').textContent=(net.ssid||'校园网')+' · 已连上 · 学号已识别 ✓';
     }
-    renderSidNote('ok-sid-note',id);
   }else if(mainState==='out'){
     fillLoginLanding();
   }else if(mainState==='down'){
