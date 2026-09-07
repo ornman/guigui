@@ -679,14 +679,14 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div style="height:8px"></div>
     </div>
 
-    <!-- 反馈:真通道(契约 §2.15–2.17,1.3.0)— 分类多选 + 一句话;诊断包自动采集;
+    <!-- 反馈:真通道(契约 §2.15–2.17,1.3.0)— 分类单选 + 一句话;诊断包自动采集;
          断网自动入队补发;复制文本降级为链路级次动作 -->
     <div class="v" id="v-feedback">
       <button class="back" onclick="backFrom('v-feedback')">‹ 返回</button>
       <h1 style="font-size:22px">说给桂桂听。</h1>
-      <div class="presets" id="fb-kinds" style="margin:0 0 14px">
-        <button type="button" class="preset on" data-kind="problem" onclick="fbToggleKind('problem')">问题</button>
-        <button type="button" class="preset" data-kind="suggestion" onclick="fbToggleKind('suggestion')">建议</button>
+      <div class="presets" id="fb-kinds" style="margin:18px 0 14px">
+        <button type="button" class="preset on" data-kind="problem" onclick="fbPickKind('problem')">问题</button>
+        <button type="button" class="preset" data-kind="suggestion" onclick="fbPickKind('suggestion')">建议</button>
       </div>
       <div class="f"><label>说说具体情况(必填)</label>
         <textarea id="fb-what" rows="3" maxlength="120" placeholder="说说当时的情况,比如:今早七点没登上,日志说登录被拒"></textarea>
@@ -1200,7 +1200,7 @@ function taskBeatNames(){
 function renderTaskRow(okk){
   const r=$('task-row'),d=$('task-status-d'),b=$('task-rebuild');
   if(r)r.style.display=okk?'none':'flex';
-  if(d)d.innerHTML=okk?'':'被拦了,自动登录还没生效 — 杀毒软件放行桂桂后点「点此重建」<br>计划任务名:'+taskBeatNames();
+  if(d)d.innerHTML=okk?'':'被拦了,自动登录还没生效。杀毒软件放行桂桂后点「点此重建」<br>计划任务名:'+taskBeatNames();
   if(b)b.style.display=okk?'none':'inline-block';
 }
 async function rebuildTask(){
@@ -1232,9 +1232,9 @@ function renderBanners(rec){
   const box=$('main-banners');if(!box)return;
   let h='';
   if(configured&&rec&&rec.verified===false)
-    h+='<div class="banner" onclick="openDetail(\'v-login\')"><span>密码还没验证过 — 去改一下</span><span class="arr">›</span></div>';
+    h+='<div class="banner" onclick="openDetail(\'v-login\')"><span>密码还没验证过,去改一下</span><span class="arr">›</span></div>';
   if(configured&&rec&&rec.outcome==='fail'&&rec.when==='今早')
-    h+='<div class="banner" onclick="openDetail(\'v-login\')"><span>今早没登上 — 去改一下</span><span class="arr">›</span></div>';
+    h+='<div class="banner" onclick="openDetail(\'v-login\')"><span>今早没登上,去改一下</span><span class="arr">›</span></div>';
   box.innerHTML=h;
 }
 async function renderBannersRefresh(){const l=await GG.api.recentResult();if(l.ok)renderBanners(l.data)}
@@ -1345,22 +1345,22 @@ async function loadSettings(){
   GG.api.taskStatus().then(t=>{if(t.ok)renderTaskRow(t.data.ok)});
 }
 function toggleCfg(el){el.classList.toggle('on');GG.api.saveConfig({[el.dataset.cfg]:el.classList.contains('on')})}
-/* 反馈:真通道(契约 §2.15–2.17,1.3.0)— 分类多选 → 发送;诊断自动采集;
+/* 反馈:真通道(契约 §2.15–2.17,1.3.0)— 分类单选 → 发送;诊断自动采集;
    断网入队自动补发(status 行只报状态,零操作);复制文本 = 链路级次动作 */
-let fbKinds=new Set(['problem']);
+let fbKind='problem';
 const FB_PH={problem:'说说当时的情况,比如:今早七点没登上,日志说登录被拒',
   suggestion:'想建议什么?比如:希望能导出登录记录'};
-function fbToggleKind(k){
-  fbKinds.has(k)?fbKinds.delete(k):fbKinds.add(k);
-  if(!fbKinds.size)fbKinds.add(k);   /* 至少一枚:最后一枚不可取消 */
-  fbSyncKinds();
+function fbPickKind(k){
+  if(fbKind===k)return;   /* 单选:点当前枚不动作,恒有一枚在选 */
+  fbKind=k;fbSyncKinds();
 }
 function fbSyncKinds(){
-  document.querySelectorAll('#fb-kinds .preset').forEach(b=>b.classList.toggle('on',fbKinds.has(b.dataset.kind)));
-  const withProblem=fbKinds.has('problem'),withSug=fbKinds.has('suggestion');
-  $('fb-diag').style.display=withProblem?'block':'none';   /* 纯建议无诊断区 */
-  $('fb-what').placeholder=(!withProblem&&withSug)?FB_PH.suggestion:FB_PH.problem;
-  if(withProblem&&!$('fb-diag').dataset.loaded)loadFbDiag();
+  document.querySelectorAll('#fb-kinds .preset').forEach(b=>b.classList.toggle('on',b.dataset.kind===fbKind));
+  const isProblem=fbKind==='problem';
+  $('fb-diag').style.display=isProblem?'block':'none';   /* 纯建议无诊断区,复制对象随之消失 */
+  $('fb-copy').style.display=isProblem?'':'none';
+  $('fb-what').placeholder=FB_PH[fbKind];
+  if(isProblem&&!$('fb-diag').dataset.loaded)loadFbDiag();
 }
 async function loadFeedback(){
   fbSyncKinds();renderFbPending();
@@ -1369,7 +1369,7 @@ async function loadFeedback(){
 async function loadFbDiag(){
   const diag=$('fb-diag'),box=$('feedback-text');
   diag.dataset.loaded='1';box.textContent='正在生成…';
-  const r=await GG.api.feedbackDiag({kind:[...fbKinds]});
+  const r=await GG.api.feedbackDiag({kind:[fbKind]});
   if(!r.ok){box.textContent='生成失败:'+r.message;diag.dataset.loaded='';return}
   box.textContent=r.data.text;box.dataset.raw=r.data.text;
   $('fb-uid-line').textContent=r.data.uid_masked?('随附:学号 '+r.data.uid_masked+'(便于找到你)'):'';
@@ -1379,11 +1379,11 @@ async function sendFeedback(btn){
   const show=(t,warm)=>{note.textContent=t;note.style.color=warm?'var(--warm)':'var(--ink-2)';note.style.display='block'};
   if(!what)return show('说说具体情况(必填)',true);
   btn.classList.add('busy');btn.disabled=true;
-  const r=await GG.api.feedbackSend({kind:[...fbKinds],what,contact});
+  const r=await GG.api.feedbackSend({kind:[fbKind],what,contact});
   btn.classList.remove('busy');btn.disabled=false;
   if(!r.ok)return show(r.message,true);          /* FB_VALIDATION:表单内提示,不入队 */
   if(r.data.result==='queued')
-    return show('没发出去,已存本地 — 联网后自动补发,不用再点',false);
+    return show('没发出去,已存本地。联网后自动补发,不用再点',false);
   btn.textContent='已收到 ✓ '+r.data.id;setTimeout(()=>{btn.textContent='发送反馈'},2400);
   $('fb-what').value='';$('fb-contact').value='';note.style.display='none';
   renderFbPending();
@@ -1397,7 +1397,7 @@ async function renderFbPending(){
 }
 async function copyFeedback(btn){
   let t=$('feedback-text').dataset.raw||'';
-  if(!t){const r=await GG.api.feedbackDiag({kind:[...fbKinds]});if(r.ok)t=r.data.text}
+  if(!t){const r=await GG.api.feedbackDiag({kind:[fbKind]});if(r.ok)t=r.data.text}
   if(!t)return;
   try{await navigator.clipboard.writeText(t)}
   catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}
