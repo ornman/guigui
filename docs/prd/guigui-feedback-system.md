@@ -27,7 +27,7 @@
     UA: GuiguiDesktop/<ver>        client_id 幂等去重
     单次尝试,失败即入队            ⑤ D1 写入(存底,双槽之一)
                                    ⑥ GitHub issue(投影,双槽之二,
-                                      尽力而为;失败由 cron 对账补)
+                                      尽力而为;失败由对账端点补)
  GG-xx 回执 ←─────────────────┘        │
                                     ┌──┴───┐
                               通知邮件   issues 网页 ← 开发者分诊/修复/close
@@ -71,23 +71,145 @@
 `POST /fb`,JSON。信封层与包体分离;幂等与限频只看信封。传输的是不带注释的纯 JSON;字段注释见 §8 逐字段表。
 
 ```jsonc
-{ "v": 2,
-  "client_id": "8f14e45f-…",       // UUID,幂等键
-  "sender_uid": "2025000000001",    // 后端直附(前端不显示);纯数字或空
-  "app": "desktop", "app_ver": "2.1.0",
-  "kind": ["problem"],              // ⊆ {problem, suggestion},非空
-  "what": "今早没登上…",             // ≤120 字,必填
-  "contact": "",                    // ≤80,可选(QQ/邮箱)
-  "when": "09-07 06:52",            // 自动取最近失败日志时间;纯建议为空
+{
+  // ══ 信封层:传输/幂等/来源识别(幂等与限频只看这一层)══
 
-  "env":    { …环境区… },
-  "self":   { …自身区… },
-  "net":    { …网络区(实时)… },
-  "server": { …服务器区(账号状态)… },
-  "logs":   [ …日志区(带现场)… ],
-  "summary": "09-05 ✓ · 09-06 ✗ · 09-07 ✗",
-  "crashes":[ …崩溃区… ],
-  "latest_ver": "2.1.2" }
+  "v": 2,                            // 协议版本;边缘端见 v=2 走新逻辑,无 v=v1 兼容
+  "client_id": "8f14e45f-9a4c-…",    // UUID,入队时生成一次、终身复用——重试绝不重复入库/重复开 issue
+  "sender_uid": "2025000000001",     // 后端直附(前端不显示明文);未配置学号时为空串
+  "app": "desktop",                  // desktop | web(官网表单)
+  "app_ver": "2.1.0",                // 桂桂版本(信封唯一出处,self 区不再重复)
+
+  // ══ 用户输入层:反馈页上用户填/选的 ══
+
+  "kind": ["problem"],               // ⊆ {problem, suggestion},非空,多选
+  "what": "今早七点没登上,日志说登录被拒",   // 用户原话,≤120 字,唯一必填
+  "contact": "",                     // QQ/邮箱,≤80,可选;学号不在这里,由信封 sender_uid 承担
+  "when": "09-07 06:52",             // 自动取最近一条失败日志时间;纯建议为空串
+
+  // ══ env · 环境区:他的机器和我的有什么不一样(两种 scope 都带)══
+
+  "env": {
+    "os": "Windows 11 26200 x64",    // 系统与内部构建号——老系统缺 API、特定版本坑,对号入座
+    "clock_skew_s": 2.1,             // 用户时钟 vs 认证服务器时钟偏差(秒)——定时全乱的元凶
+    "adapters": [                    // 全部网卡(含虚拟):①当时连的是不是校园网 ②有没有 VPN 抢路由
+      { "name": "WiFi", "kind": "wifi", "ssid": "Campus-WiFi",
+        "ip": "10.x.x.x", "up": true },
+      { "name": "以太网", "kind": "ethernet", "ip": "172.16.0.1", "up": true },
+      { "name": "Clash", "kind": "tun", "up": true }
+                                     // kind:wifi/ethernet=物理;tun=VPN 虚拟;vm=虚拟机的
+                                     // tun 在跑=流量被代理接管,登录可能没走校园网——高频真凶
+    ],
+    "dns": ["192.168.x.x"],          // 当前 DNS——改过/被接管 → 认证域名解析不到或解析错
+    "proxy": { "system": false, "env": false },
+                                     // 两处来源:system=Windows 系统代理;env=HTTP_PROXY 等。
+                                     // 任一为真,桂桂的请求会被劫走
+    "av": { "huorong": true, "qihoo360": false, "defender": true },
+                                     // 杀软在不在跑(只报布尔,不列进程清单)——拦任务/杀进程头号原因
+    "webview2": "120.0.2210.61",     // 界面引擎版本——白屏/点不动/样式崩,先查它
+    "python": "3.12.8",              // 内嵌解释器版本——「我机器好好的」类差异排查用
+    "errors": []                     // 本区采集器失败清单,例 ["adapters: PermissionError"]
+  },
+
+  // ══ self · 自身区:配置对不对、状态机卡哪、任务真跑了吗(两种 scope 都带)══
+
+  "self": {
+    "installed_at": "2026-08-30",    // 安装日期——刚装就坏 vs 用一月才坏,方向完全不同
+    "config": {                      // 配置全文(敏感项打码)——运营商选错、兜底 WiFi 选错在这现形
+      "trigger_time": "07:00", "operator": "校园电信",
+      "heartbeat_minutes": 5, "boot_login": true, "wake_login": true,
+      "patrol_enabled": true, "patrol_interval_minutes": 30,
+      "wifi_fallback_enabled": true, "wifi_fallback_ssid": "Campus-WiFi-2",
+      "vacation_silence": true, "notifications": true, "master": true
+    },
+    "state": {                       // 状态机快照——解释「桂桂为什么这么做」的唯一依据
+      "cred_verified": false,        //   凭据被服务器验证过没;false=最近被判定密码错
+      "unreachable_streak": 1,       //   连续几天连不上;≥2 天+假期静默 → 自动降频
+      "maintenance_streak": 0,       //   连续几天服务器返回怪页面
+      "last_result": "fail",         //   最近一次登录结果 ok|fail|silent
+      "last_settle_date": "09-04"    //   最后一次登上的日期
+    },
+    "tasks": [                       // Windows 任务计划实查(schtasks,不是桂桂自说自话)
+      { "name": "GuiGui", "registered": true,
+        "last_run": "09-07 07:00:03", "last_result": "0x0" },
+                                     // registered=任务还在不在(被杀软删了就 false)
+                                     // last_run=系统记的上次实际运行——分诊第一刀:
+                                     //   没运行=任务问题;运行了没登上=网络问题
+                                     // last_result=系统结果码:0x0=正常跑完;非 0=那次没跑完
+      { "name": "GuiGui-Patrol", "registered": true,
+        "last_run": "09-07 07:15:00", "last_result": "0x1" }
+    ],
+    "proc_uptime_s": 10800,          // 本次 GUI 进程已连续运行秒数
+    "errors": []
+  },
+
+  // ══ net · 网络区(实时):反馈这一刻通不通、走哪条路(仅 problem 携带)══
+
+  "net": {
+    "dns_resolved": "10.1.2.3",      // 认证域名此刻解析到的 IP;null=解析失败;怪 IP=疑似劫持
+    "tcp": true,                     // 到认证服务器端口的 TCP 通断(最原始一层)
+    "http": 200,                     // HTTP 探测状态码;200=服务器应答
+    "latency_ms": 340,               // 探测往返耗时——慢到超时也算一种「不可达」
+    "route_iface": "WiFi",           // 实际走哪块网卡(查路由表)——有 WiFi 却走 TUN,一眼锁定
+    "errors": []
+  },
+
+  // ══ server · 服务器区:服务器怎么看待这个账号/这台机器(仅 problem 携带;实测 2026-09-07)══
+
+  "server": {
+    "chkstatus": {                   // 只读探测,三形态:
+      "state": "no_session",         //   uid_online=会话在线(返回 uid/AC)/ no_session=HTTP 400 /
+      "raw_head": ""                 //   unreachable=够不着;raw_head=响应前 120 字备查
+    },
+    "last_verdict": {                // 最近一次真实登录尝试的服务器判定(取自日志 data,非诊断重放)
+      "ts": "09-07 06:52:11",
+      "rej": "limit_users",          // 四态:error1/error2/bind/limit_users
+      "msga": "Oppp error: Limit Users Err",     // 服务器原话
+      "server_view_ip": "172.16.0.1",        // ss5:服务器看到的来源 IP
+      "mac_hint": ["00aa00bb00cc", "00dd00ee00ff"],  // ss1/ss4:MAC 指纹
+      "aolno": 6152,                 // 在线编号
+      "ubind": "mac1='',ty1=0,mac2='',ty2=0,mac3='',ty3=0,mac4='',ty4=0,mac5='',ty5=0"
+    },                               //   ↑ MAC 绑定策略原文
+    "errors": []
+  },
+
+  // ══ logs · 日志区(带现场):那几天早上发生了什么(仅 problem 携带)══
+
+  "logs": [                          // 最近 7 天,逐天逐条
+    { "date": "09-07", "entries": [
+      { "ts": "06:52:11", "level": "fail",
+                                     // level:ok 成功 / note 备注 / fail 失败 / silent 假期静默
+        "text": "登录被拒:这个学号已在别的设备上登录…",
+                                     //   日志页显示的原句(给人读;日常界面只见它)
+        "data": {                    //   机器现场(只随反馈出现):
+          "ssid": "Campus-WiFi",     //     失败那一刻的无线网——是不是校园网,当场对质
+          "stage": "login",          //     挂在哪步:probe/login/logout
+          "tries": 2,                //     当天第几次尝试
+          "http": 200,               //     HTTP 状态码
+          "rej": "limit_users",      //     服务器拒绝码(四态)
+          "body_head": "Oppp error: Limit Users Err"
+                                     //     服务器响应正文前 80 字(已打码)——绝不存请求 URL(含密码)
+        } }
+    ] }
+  ],
+  "summary": "09-01 ✓ · 09-02 ✓ · 09-03 ✗ · 09-04 ✗ · 09-05 ✗ · 09-06 ✗ · 09-07 ✗",
+                                     // 日志区一行摘要:七天成败趋势——一直好=新问题;
+                                     // 一直坏=配置/环境;忽好忽坏=不稳定因素
+
+  // ══ crashes · 崩溃区:程序自己崩过没(仅 problem 携带)══
+
+  "crashes": [                       // 最近 3 份(全局异常钩子自动落盘,任何未捕获崩溃都在)
+    { "ts": "09-06 22:11:07", "proc": "gui",
+                                     // proc:gui / ensure——哪个进程崩的
+      "trace": "Traceback (most recent call last):\n  File \"app/gui.py\", line 210, in _watch\n…"
+    }                                // 完整堆栈——「程序本身的问题」的直接物证
+  ],
+
+  // ══ 版本对照(两种 scope 都带)══
+
+  "latest_ver": "2.1.2"              // 官网最新版(实时查 /version.json;查不到 null)
+                                     // app_ver 落后于它 → 先让用户升级,大概率白修
+}
 ```
 
 **纯建议瘦身规则**:仅 `problem` 在选时携带 `net / server / logs / summary / crashes`;纯建议只带 `env(基础) / self.app_ver` + 用户输入。听建议不需要网络现场。
@@ -133,12 +255,18 @@
 
 现行 8 条/IP/时在校园共享出口下会把灾情反馈掐死(真出事那天人人来反馈,第 9 人起全 429)。修正:桌面端(UA=GuiguiDesktop + 合法 client_id)30 条/IP/时;网页表单维持 8。429 一律带 `retry_after`。
 
-### 6.3 对账 cron + 管道自监控
+### 6.3 对账端点 + 管道自监控(修正:不押注定时触发能力)
 
-- Pages cron 定时扫 `issue_id IS NULL` 的行补建 issue(PAT 换新后自动追平);
-- cron 发现积压 → 在同仓给自己开 meta-issue「反馈管道积压 N 条」——用管道自己报警管道故障;
+- **`POST /fb/reconcile?key=CRON_KEY`**——调度器无关:Pages 定时触发配置、独立 Worker cron、甚至手动 curl 都能调。不把容灾押注在某个平台的 cron 特性上。
+- 行为:扫 `issue_id IS NULL` 的行 → 逐条补建 issue → 幂等,可随时重跑,重复调用无副作用(PAT 换新后一次调用即追平全部积压)。
+- 积压报警节流:**复用同仓已 OPEN 的 meta-issue 追加评论**,不每次新开——防「报警本身刷屏」。无 OPEN 的 meta-issue 才新建。
 - `/fb/list?key=` 增加 `{pending_issues, last_insert_at}` 健康字段;
 - `GET /version.json`:静态文件,`{latest, released_at, notes?}`,诊断包 `latest_ver` 与桌面端更新检查共用。
+
+另两条服务端不变量(实现与测试都以此为准):
+
+- **幂等竞态**:并发同 `client_id` → 依赖 UNIQUE 约束,插入冲突时反查既有行返回**原** GG-xx,绝不报错、绝不开第二条 issue。
+- **D1 不可达路径的编号**:双槽之一(D1)挂时走 issue 直建,该反馈无 D1 行,回执编号取 `GH-<issue 号>` 前缀区分;此类反馈以 issue 为唯一存底,后续无对账义务(对账只管「D1 有行、issue 缺失」的方向)。
 
 ### 6.4 D1 迁移
 
@@ -156,21 +284,52 @@ CREATE UNIQUE INDEX IF NOT EXISTS fb_client ON fb(client_id);
 
 ## 7. 桌面端设计
 
-### 7.1 模块划分(依赖单向:api → feedback → diagnostics/crashlog/logstore)
+### 7.1 模块与接口(深模块设计)
 
-| 模块 | 职责 |
-|---|---|
-| `core/crashlog.py`(新) | `sys.excepthook` + `threading.excepthook` → `crashes/*.log`(只落盘,绝不自动上传) |
-| `core/diagnostics.py`(重写) | `collect() -> dict`(七区采集,打码在采集时完成)+ `render_text(dict)`(预览渲染);采集器失败 in-band:该区写 `"errors": ["adapters: PermissionError"]` 其余照发 |
-| `core/feedback.py`(新) | 发送/状态码分类/待发队列/退避补发;纯逻辑全可单测 |
-| `app/api.py`(薄桥) | 契约 1.3.0:`feedbackSend` / `feedbackDiag` / `feedbackPendingStatus`(方法 14→17),返回值一律 §4.2 信封 |
+设计语言:接口 = 调用方必须知道的一切(签名 + 不变量 + 顺序约束 + 错误模式);深模块 = 小接口背后藏大量行为,复杂度不给调用方。依赖单向:`api → feedback → diagnostics / crashlog / logstore`。
 
-### 7.2 本地待发队列(L1 容灾)
+**`core/feedback.py` — 深模块,本系统的杠杆点**
 
-- 文件:`pending_feedback.jsonl`(原子写:temp+rename);每条=完整请求载荷 + created_at + attempts;
-- 单次发送尝试 timeout 8s,**不原地重试**——重试是队列的事:退避 30s/5min/30min/次日;
-- 补发触发:app 启动、`net:state` 恢复在线事件、设置页打开;
-- `client_id` 保证补发绝不重复入库/重复开 issue。
+接口只有 3 个方法:
+
+```python
+submit(feedback) -> Outcome      # 用户点「发送反馈」
+pump() -> list[Outcome]          # 到期补发;GUI 打开/网络恢复/ensure 拍上都会调
+status() -> QueueStatus          # 待发条数 + 最老一条年龄(供 UI 状态行)
+```
+
+`Outcome` 与 §4.2 线上状态码一一对应(桥层零翻译):`Submitted(id)` / `SubmittedDegraded(id)` / `Queued(code, next_attempt_at)` / `Rejected(detail)`(仅 VALIDATION,不入队)。
+
+不变量(接口的一部分,调用方需要知道的全部):
+
+1. **用户提交的反馈,要么送达、要么留在本机直到送达**——调用方永不需要「再问一次」;发送失败、入队、退避、补发全部在模块内。
+2. **投递 at-least-once,服务端按 client_id exactly-once** ⇒ 队列无需跨进程锁:`pump()` 可被 GUI 进程与 `--ensure` 进程并发调用而安全(双发被服务端幂等吸收)。GUI 关着时 ensure 拍也能补发。
+3. **client_id 在入队时生成一次、终身复用**;已送达条目经原子重写(temp+rename)移出队列。
+4. 退避表 30s/5min/30min/次日;单次尝试 timeout 8s、**不原地重试**——重试是队列的事,不是调用链的事。
+
+内部 seam(不出接口):transport adapter(生产 urllib / 测试 fake——两个 adapter,真 seam)、clock adapter(退避计时注入,沿用 logstore `_now` 模式)。
+顺序约束:一次用户动作只调一次 `submit`(前端禁用按钮;若双发,是两条独立反馈,服务端不去重——去重只管「同一条的补发」)。
+deletion test:删掉它,发送/重试/幂等/退避/队列复杂度会在 api.py、GUI 启动钩子、ensure 拍三处各冒一份——它在挣钱。
+
+**`core/diagnostics.py` — 内容模块**
+
+接口 2 个方法:`collect(scope) -> dict`、`render(bundle) -> str`(预览文本;issue 排版权在边缘端,两渲染器不重叠——预览渲染数据,issue 渲染版式)。
+瘦身规则(纯建议不带 net/server/logs/crashes)住在**实现里**,调用方不过滤;不变量:**bundle 构造上无密文**——打码在采集时完成,render 与边缘端永不脱敏。7 个采集器是内部 seam:各自 try/except,失败写该区 `errors` 字段,不传染。
+
+**`core/crashlog.py` — 微接口模块**
+
+接口:`install()`(GUI 与 ensure 两进程启动各调一次)+ `recent(n)`(供 diagnostics 采集)。实现:双 excepthook、记录进程身份、封顶轮转。
+
+**`app/api.py` — 桥 seam(适配器角色)**
+
+3 个桥方法(`feedbackSend` / `feedbackDiag` / `feedbackPendingStatus`)是 core 接口向契约信封的翻译;职责就是信封形状本身,不是浅模块。契约 1.3.0,方法 14→17。
+
+### 7.2 服务端模块同律(fb.js)
+
+- 纯函数:`validate(payload)`(字段+限额)/ `render_issue(bundle)`(版式);
+- Adapter:D1 绑定(miniflare 本地可测)/ GitHub API(best-effort,5s 超时,任何异常 → null);
+- handler 只做编排与读 secrets;
+- 不变量:issue 失败永不失败请求;同 client_id 返回同 GG-xx;v1 载荷按默认值映射。
 
 ### 7.3 诊断采集红线
 
@@ -215,7 +374,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS fb_client ON fb(client_id);
 |---|---|---|---|
 | 用户没网 | E_NET_OFFLINE | 本地队列+退避补发 | 「已存本地,联网自动补发」 |
 | Cloudflare/D1 挂 | 503 / DEGRADED | 队列 或 issue 直建 | 无感或「稍后自动」 |
-| GitHub 挂 / PAT 过期 | issue_id NULL | cron 对账补建 + meta-issue 报警 | 完全无感 |
+| GitHub 挂 / PAT 过期 | issue_id NULL | 对账端点补建 + meta-issue 评论报警 | 完全无感 |
 | 双挂 | SINK_DOWN | 队列保留 | 「已存本地」 |
 | 重复提交 | client_id UNIQUE | 返回原 GG-xx | 不出重复 |
 | 挤兑(全校同炸) | 修正后限频 | 30/IP/h(桌面)+ 入队退避 | 稍后自动,不丢 |
@@ -234,8 +393,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS fb_client ON fb(client_id);
 - **AC-F8** `limit_users` 态(实测可稳定复现,见附录 A):日志文案为「已在别的设备登录」方向,**不**出现「密码可能改过了」;`data.rej="limit_users"`;cred_verified 不被置假。
 - **AC-F9** chkstatus 无会话(HTTP 400)被归类为 `no_session`,不产生异常日志。
 - **AC-F10** 桌面端 30 条/IP/时、网页端 8 条/IP/时,429 带 retry_after。
-- **AC-F11** 后端全模块单测通过;mock(?dev=1)覆盖全部响应 code 与样例诊断包 fixture;现有测试全绿。
+- **AC-F11** 后端全模块单测通过(测试走模块接口,不测内部);mock(?dev=1)覆盖全部响应 code 与样例诊断包 fixture;现有测试全绿。
 - **AC-F12** v1 网页表单提交照常入库(向后兼容)。
+- **AC-F13** GUI 与 ensure 双进程并发 `pump()`:服务端仅产生单条 D1 行与单条 issue(client_id 幂等吸收双发)。
+- **AC-F14** `/fb/reconcile` 重复调用幂等(补建不重复);meta-issue 报警走评论追加,不刷屏。
 
 ## 11. 实施切片
 
@@ -244,7 +405,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS fb_client ON fb(client_id);
 | S1 主链路 | 协议 v2 + 状态码信封 + client_id 幂等 + D1 迁移 + issue 投影 + 前端表单/三态/回执 | AC-F1/F2/F4/F12 |
 | S2 容灾 | 本地队列+补发 + 限频修正 + E_NET_* 分类 | AC-F3/F10 |
 | S3 诊断包 | 七区采集(含 server 区/chkstatus 三形态)+ 崩溃捕获 + /version.json + 四态拒绝修复 | AC-F5/F8/F9 |
-| S4 对账 | cron 补 issue + meta-issue 报警 + /fb/list 健康 | AC-F7 |
+| S4 对账 | `/fb/reconcile` 端点 + meta-issue 评论报警 + /fb/list 健康 | AC-F7/F14 |
 
 每片独立可测可交付;S1 完成反馈已可用,后面全是加固。
 
@@ -274,9 +435,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS fb_client ON fb(client_id);
 - **chkstatus 无会话形态**:墙口未认证时 `/drcom/chkstatus` 返回 HTTP 400(归类 `no_session` 依据)。
 - 复查:墙口仍 `not_logged_in`,拒绝无残留,金丝雀干净。
 
-## 附录 B:请求结构注解版(与 §4.1 同源,落契约文档时原样带走)
+## 附录 B:请求结构全文
 
-见 2026-09-07 对话定稿的逐字段注解 JSON(信封/输入/env/self/net/logs+summary/crashes/latest_ver 七区,每字段「是什么/从哪来/诊断什么用」三问注释);随实施进 `docs/tech/guigui-bridge-api-v1.md` §2.15 附表。
+即 §4.1 的注解版 JSON(信封/输入 + env/self/net/server/logs+summary/crashes/latest_ver,逐字段「是什么/从哪来/诊断什么用」)。它是契约的唯一正本:实施时原样拆成 `docs/tech/guigui-bridge-api-v1.md` §2.15 附表,`fb.js` 校验规则、`render_issue` 版式、mock 样例包 fixture 均以此为准,三处不得各写一份。
 
 ## 决策记录(拍板链)
 
