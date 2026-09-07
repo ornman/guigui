@@ -54,6 +54,8 @@ class Ctx:
         self.scan = [{"ssid": "Campus-WiFi", "signal": "strong"}]
         self.connect_ok = True
         self.reconciled = []
+        self.reconcile_ret = (False, False)   # selfheal.reconcile 桩返回 (changed, misaligned)
+        self.task_blocked_calls = []
         self.task_current = True   # scheduler.is_task_current 桩返回值
 
         monkeypatch.setattr(api_mod.detect, "probe",
@@ -80,8 +82,9 @@ class Ctx:
         monkeypatch.setattr(api_mod.vault, "rekey",
                             lambda old, new, pw:
                             (self.rekey_calls.append((old, new, pw)) or None))
-        monkeypatch.setattr(api_mod.selfheal, "reconcile",
-                            lambda cfg: (self.reconciled.append(cfg["master"]), False))
+        monkeypatch.setattr(api_mod.selfheal, "reconcile", self._reconcile_stub)
+        monkeypatch.setattr(api_mod.notify, "task_blocked",
+                            lambda: self.task_blocked_calls.append(1))
         monkeypatch.setattr(api_mod.scheduler, "is_task_current",
                             lambda name, cfg, require_logon=False: self.task_current)
         monkeypatch.setattr(api_mod.time, "sleep", lambda s: None)
@@ -93,6 +96,10 @@ class Ctx:
         if len(self.login_seq) > 1:
             return self.login_seq.pop(0)
         return self.login_seq[0]
+
+    def _reconcile_stub(self, cfg):
+        self.reconciled.append(cfg["master"])
+        return self.reconcile_ret
 
 
 def parse_emitted(window) -> list[tuple[str, dict]]:
@@ -422,7 +429,7 @@ def test_login_with_password_triggers_alignment(ctx):
     ctx.login_seq = [("success", "")]
     out = ctx.api.login({"sid": "2025000000001", "password": "pw"})
     assert out["ok"] is True
-    assert _wait_for(lambda: ctx.reconciled == [True])
+    assert ctx.reconciled == [True]                    # P0-1:同步对齐,返回时已确认
 
 
 def test_master_toggle_unconfigured_skips_create(monkeypatch):
@@ -483,20 +490,20 @@ def test_submit_password_online_correct_verifies_then_stores(ctx):
     ctx.login_seq = [("success", "")]
     out = ctx.api.login({"sid": "2025000000001", "password": "newpw"})
     assert out["data"] == {"result": "success", "uid": "2025…0001", "attempts": 1,
-                           "verified": True}
+                           "verified": True, "task_ok": True}
     assert ctx.set_calls == [("2025000000001", "newpw")]
     assert ensure.load_state()["cred_verified"] is True
-    assert _wait_for(lambda: ctx.reconciled == [True])     # 存完即对齐任务
+    assert ctx.reconciled == [True]                    # 同步:返回时已对齐(P0-1)
 
 
 def test_submit_password_online_no_logout_config_fallback(ctx):
     # 默认桩:门户页无注销配置 → 降级存入,already + 未验证
     out = ctx.api.login({"sid": "2025000000001", "password": "pw"})
     assert out["data"] == {"result": "already", "uid": "2025…0001", "attempts": 0,
-                           "verified": False}
+                           "verified": False, "task_ok": True}
     assert ctx.set_calls == [("2025000000001", "pw")]
     assert ensure.load_state()["cred_verified"] is False
-    assert _wait_for(lambda: ctx.reconciled == [True])
+    assert ctx.reconciled == [True]
 
 
 def test_submit_password_online_throttle_retries_once(ctx):
@@ -525,7 +532,7 @@ def test_submit_password_before_open_stores_unverified(ctx, monkeypatch):
     out = ctx.api.login({"sid": "2025000000001", "password": "pw"})
     assert out["ok"] is True
     assert out["data"] == {"result": "stored", "uid": "2025…0001", "attempts": 1,
-                           "verified": False, "reason": "before_open"}
+                           "verified": False, "reason": "before_open", "task_ok": True}
     assert ctx.set_calls == [("2025000000001", "pw")]     # 存了
     assert ensure.load_state()["cred_verified"] is False  # 未验证
     assert ctx.login_calls and len(ctx.login_calls) == 1  # 锚前单发收手,不重试
@@ -613,6 +620,34 @@ def test_submit_password_logout_ineffective_falls_back(ctx):
     ctx.http_seq = [{"state": "logged_in", "detail": ""}] * 6
     out = ctx.api.login({"sid": "2025000000001", "password": "pw"})
     assert out["data"] == {"result": "already", "uid": "2025…0001", "attempts": 0,
-                           "verified": False}
+                           "verified": False, "task_ok": True}
     assert ctx.set_calls == [("2025000000001", "pw")]
     assert ctx.login_calls == []                       # 没走到真登验证
+
+
+# ── P0-1:开启流程同步确认任务计划(承诺-验证对齐)─────────
+
+
+def test_submit_password_task_ok_true_when_created(ctx):
+    """提交密码成功 → 信封如实带 task_ok:true(任务同步建好,不等后台)。"""
+    ctx.probe_state = {"state": "not_logged_in", "ssid": "x", "detail": ""}
+    ctx.login_seq = [("success", "")]
+    out = ctx.api.login({"sid": "2025000000001", "password": "pw"})
+    assert out["ok"] is True and out["data"]["task_ok"] is True
+    assert ctx.reconciled == [True]                    # 返回前已同步对齐完
+    assert ctx.task_blocked_calls == []
+
+
+def test_submit_password_task_blocked_reports_honestly(ctx):
+    """建任务被安全软件拦 → 密码验证仍算成功,但信封 task_ok:false、
+    同步弹被拦指引、schedule:changed 如实 — 成功页不许空头承诺。"""
+    ctx.probe_state = {"state": "not_logged_in", "ssid": "x", "detail": ""}
+    ctx.login_seq = [("success", "")]
+    ctx.reconcile_ret = (False, True)                  # 建任务被拦(misaligned)
+    out = ctx.api.login({"sid": "2025000000001", "password": "pw"})
+    assert out["ok"] is True                           # 密码验证本身成功
+    assert out["data"]["result"] == "success"
+    assert out["data"]["task_ok"] is False
+    assert ctx.task_blocked_calls                       # 同步弹指引通知
+    events = [p for t, p in parse_emitted(ctx.window) if t == "schedule:changed"]
+    assert events and events[-1]["task_ok"] is False

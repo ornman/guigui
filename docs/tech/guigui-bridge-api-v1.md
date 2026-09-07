@@ -1,4 +1,4 @@
-# 桂桂 v2 · JS↔Python 桥接契约 v1.3.0
+# 桂桂 v2 · JS↔Python 桥接契约 v1.4.0
 
 > **地位**:前后端通信协议的**唯一权威**(《guigui-work-split.md》§一.2)。后端 bridge 实现以此为准;`static/dev/mock.js` 是它的可执行规范(仅开发)。
 > **绑定**:命名空间 `window.guigui.*`。pywebview 经 `js_api` 暴露,实现侧自行决定 camelCase 方法名或 snake_case+映射(契约只锁 JS 侧名字)。
@@ -63,12 +63,17 @@
 - 时延承诺:最坏 ≈ 次数×(10s 超时+间隔),前端以事件驱动 UI,不设本地超时。
 
 ```jsonc
-{ "result": "success", "uid": "2025…7209", "attempts": 1, "verified": true }
+{ "result": "success", "uid": "2025…7209", "attempts": 1, "verified": true, "task_ok": true }
 // result: success | already | stored | rejected | unreachable
 // already = 探测发现已登录(等效成功,不算失败)
 // stored  = 06:50 开门前提交被拒 → 不判密码错误,密码已存(verified=false),
 //           reason="before_open",明早首拍真验证(1.2.0,PRD 4.1.2)
 // verified = 凭证是否已经服务器真验证;真登录成功 true;already/stored+false = 未验证
+// task_ok  = 定时任务是否确认在岗(1.4.0;仅**提交密码**路径的成功信封携带:
+//            success / stored / already)。存完凭据同步建任务做完才回话(PS 调用
+//            秒级);被安全软件拦时 false,后端已同步弹指引通知 — 成功页须如实说
+//            「密码已存,但定时任务被拦」并给重建入口(§2.14),不许空头承诺
+//            「已开启每日自动登录」。已存凭据路径(立即登录)不带此字段
 ```
 
 失败:`AUTH_REJECTED` / `NET_UNREACHABLE`(信封),`result` 不出现在失败信封里。
@@ -261,6 +266,7 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
 | 1.1.1 | 2026-08-31 | §2.6 getConfig/saveConfig 新增 `operator` 枚举(校园用户/校园电信/校园联通/校园其他,注销页 carrier 实测抓全);§2.3 login payload 新增可选 `operator`;login 响应新增 `verified` | 后端已落地(提交密码先验证后入库 + verified 随信封下行);前端已接(三胶囊)|
 | 1.2.0 | 2026-09-06 | PRD 重梳理(af19e1b)落地:§2.3 失败信封可带 `reason`(拒绝三态 AC-19)+ 成功新增 `result:"stored"`(06:50 前提交存未验证);§2.10 recentResult 新增 `verified`(横幅①数据源);新增 §2.13 `taskStatus()` / §2.14 `rebuildTask()`(AC-17,仅点击重建);事件 `login:progress` 新增 `logging_out` 相位(+`online_uid`)、`schedule:changed` 扩 `task_ok`(兑现 §6 增强票);方法 12→14 | 后端已实现(5a018c8);前端已接(等待态/三态文案/横幅两态/主按钮三态修复/改密闭环/任务行,mock 场景 bind/other/unverified)— **生效** |
 | 1.3.0 | 2026-09-07 | 反馈系统重构(PRD `docs/prd/guigui-feedback-system.md` 全案):新增 §2.15 `feedbackSend`(真通道主入口,POST /fb v2,三态 result)/ §2.16 `feedbackDiag`(七区预览+uid 打码披露)/ §2.17 `feedbackPendingStatus`(离线队列状态行);§2.12 `feedback()` 废弃(保留一个版本周期,实现改由 render(collect()) 派生);§2.3 `reason` 增第四态 `limit_users`(实测,拒绝四态);错误码 +1(`FB_VALIDATION`);方法 14→17 | 后端已实现(见 S1-S3 提交链);前端已接(v-feedback 重构 + mock 三方法/limit 场景) |
+| 1.4.0 | 2026-09-07 | QA 验收审计 P0(`docs/plans/qa-fix-plan-2026-09-07.md` §P0-1):§2.3 提交密码路径成功信封(success/stored/already)新增 `task_ok: bool` — login 存完凭据改为**同步**对齐任务计划(masterToggle 同款,PS 调用秒级),被安全软件拦时信封与指引通知同时如实,成功页不许空头承诺「已开启每日自动登录」 | 后端已实现(qa-fix P0 提交链);前端待接(成功页 task_ok 文案 + 重建入口) |
 
 ## 6. 集成待办(联调问题记这里)
 

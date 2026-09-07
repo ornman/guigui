@@ -65,12 +65,15 @@ class GuiGuiApi:
     def attach_window(self, window) -> None:
         self._window = window
 
-    def _align_saved(self, saved: dict) -> None:
-        """后台对齐任务计划(saveConfig / login 共用)。
+    def _reconcile_and_report(self, saved: dict) -> bool:
+        """对齐任务计划并回报在岗(masterToggle / login 收尾 / saveConfig 共用)。
 
-        守卫:首装未完成(uid 空或密码未存)时不建任务 —— 任务属于
+        守卫:master 开但首装未完成(uid 空或密码未存)时不建任务 —— 任务属于
         「开启每日自动登录」那一步,由 login 存完凭据后首次对齐;
-        master 关 → 删任务不受守卫影响。"""
+        master 关 → 删任务不受守卫影响。
+        「已开启每日自动登录」是成功页的直接承诺,对齐同步做完才回话
+        (PS 调用秒级):被拦时立刻弹 task_blocked,信封带 task_ok 让成功页如实说。
+        返回任务是否在岗。"""
         misaligned = False
         try:
             if saved.get("master", True) and not _configured(saved):
@@ -86,6 +89,7 @@ class GuiGuiApi:
         self._emit("schedule:changed",
                    {"master": saved["master"], "trigger_time": saved["trigger_time"],
                     "task_ok": not misaligned})
+        return not misaligned
 
     # ── 事件(契约 §3)──────────────────────────────
 
@@ -216,28 +220,32 @@ class GuiGuiApi:
         if net["state"] == detect.NOT_LOGGED_IN:
             result, msg, attempts = self._attempt_login(cfg, uid, password, operator)
             if result == drcom.SUCCESS:
-                saved = self._store_credential(cfg, uid, operator, password, verified=True)
+                saved, task_ok = self._store_credential(
+                    cfg, uid, operator, password, verified=True)
                 if saved is None:
                     return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
                 ensure.settle_from_gui(saved, uid, attempts)
                 return _ok({"result": "success", "uid": drcom.mask_uid(uid),
-                            "attempts": attempts, "verified": True})
+                            "attempts": attempts, "verified": True,
+                            "task_ok": task_ok})
             if result == drcom.REJECTED:
                 if ensure.before_anchor():
                     # 4.1.2:开门前被拒不判「密码错误」— 密码先存着(未验证),明早首试真验证
-                    saved = self._store_credential(cfg, uid, operator, password, verified=False)
+                    saved, task_ok = self._store_credential(
+                        cfg, uid, operator, password, verified=False)
                     if saved is None:
                         return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
                     return _ok({"result": "stored", "uid": drcom.mask_uid(uid),
                                 "attempts": attempts, "verified": False,
-                                "reason": "before_open"})
+                                "reason": "before_open", "task_ok": task_ok})
                 kind = drcom.classify_rejection(msg)
                 return _err(AUTH_REJECTED,
                             drcom.rejection_text(kind, msg or "密码被服务器拒绝了,核对一下再试"),
                             reason=kind)
             if result == drcom.UNREACHABLE:
                 # 循环中途断网:密码没被否认,存了给明早一次机会
-                saved = self._store_credential(cfg, uid, operator, password, verified=False)
+                saved, _ = self._store_credential(
+                    cfg, uid, operator, password, verified=False)
                 if saved is None:
                     return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
                 return _err(NET_UNREACHABLE, "现在够不着校园网")
@@ -261,24 +269,25 @@ class GuiGuiApi:
             if used is not None and flipped:
                 result, msg, tries = self._verify_login_once(cfg, uid, password, operator)
                 if result == drcom.SUCCESS:
-                    saved = self._store_credential(cfg, uid, operator, password,
-                                                   verified=True)
+                    saved, task_ok = self._store_credential(
+                        cfg, uid, operator, password, verified=True)
                     if saved is None:
                         return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
                     ensure.settle_from_gui(saved, uid, tries)
                     return _ok({"result": "success", "uid": drcom.mask_uid(uid),
-                                "attempts": tries, "verified": True})
+                                "attempts": tries, "verified": True,
+                                "task_ok": task_ok})
                 if result == drcom.REJECTED:
                     if ensure.before_anchor():
                         # 跨过锚点的边缘:注销后已过 06:50 依旧被拒按锚前口径(存未验证)
                         self._restore_network(cfg, old_uid, uid, old_pw)
-                        saved = self._store_credential(cfg, uid, operator, password,
-                                                       verified=False)
+                        saved, task_ok = self._store_credential(
+                            cfg, uid, operator, password, verified=False)
                         if saved is None:
                             return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
                         return _ok({"result": "stored", "uid": drcom.mask_uid(uid),
                                     "attempts": tries, "verified": False,
-                                    "reason": "before_open"})
+                                    "reason": "before_open", "task_ok": task_ok})
                     kind = drcom.classify_rejection(msg)
                     restored = self._restore_network(cfg, old_uid, uid, old_pw)
                     base = drcom.rejection_text(kind, msg or "密码被服务器拒绝了")
@@ -286,8 +295,8 @@ class GuiGuiApi:
                                 reason=kind)
                 if result == drcom.UNREACHABLE:
                     self._restore_network(cfg, old_uid, uid, old_pw)  # 尽力恢复,不看成败
-                    saved = self._store_credential(cfg, uid, operator, password,
-                                                   verified=False)
+                    saved, _ = self._store_credential(
+                        cfg, uid, operator, password, verified=False)
                     if saved is None:
                         return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
                     return _err(NET_UNREACHABLE,
@@ -295,14 +304,16 @@ class GuiGuiApi:
                 self._restore_network(cfg, old_uid, uid, old_pw)
                 return _err(INTERNAL, msg or "认证服务器返回了不认识的格式")
             # 门户无注销配置 / 注销未见翻转:降级存入,verified=false
-            saved = self._store_credential(cfg, uid, operator, password, verified=False)
+            saved, task_ok = self._store_credential(
+                cfg, uid, operator, password, verified=False)
             if saved is None:
                 return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
             return _ok({"result": "already", "uid": drcom.mask_uid(uid),
-                        "attempts": 0, "verified": False})
+                        "attempts": 0, "verified": False, "task_ok": task_ok})
 
         # unreachable / waiting:密码没被否认,存了给明早一次机会
-        saved = self._store_credential(cfg, uid, operator, password, verified=False)
+        saved, _ = self._store_credential(
+            cfg, uid, operator, password, verified=False)
         if saved is None:
             return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
         return _err(NET_UNREACHABLE, "现在够不着校园网")
@@ -362,9 +373,10 @@ class GuiGuiApi:
         return result == drcom.SUCCESS
 
     def _store_credential(self, cfg: dict, uid: str, operator: str,
-                          password: str, *, verified: bool) -> dict | None:
-        """入库:vault(换学号清旧条目)→ config(uid/operator)→ cred_verified。
-        成功后后台对齐任务计划;VaultError 返回 None(调用方回 INTERNAL 信封)。"""
+                          password: str, *, verified: bool) -> tuple[dict | None, bool]:
+        """入库:vault(换学号清旧条目)→ config(uid/operator)→ cred_verified
+        → 同步对齐任务计划(承诺前确认,PS 调用秒级)。
+        返回 (saved, task_ok);VaultError → (None, False),调用方回 INTERNAL 信封。"""
         try:
             if cfg.get("uid") and cfg["uid"] != uid:
                 vault.rekey(cfg["uid"], uid, password)   # 换学号:清旧凭据
@@ -372,15 +384,14 @@ class GuiGuiApi:
                 vault.set_password(uid, password)
         except VaultError as e:
             log.warning("api.login: 凭据存储失败: %s", e)
-            return None
+            return None, False
         saved = config.save({**cfg, "uid": uid, "operator": operator})
         state = ensure.load_state()
         state["cred_verified"] = verified
         ensure.save_state(state)
-        # 存好凭据 = 「开启每日自动登录」落地;对齐放后台(与 saveConfig 同款)
-        threading.Thread(target=lambda: self._align_saved(saved),
-                         daemon=True, name="guigui-align").start()
-        return saved
+        # 存好凭据 = 「开启每日自动登录」落地;同步确认任务在岗,信封如实带 task_ok
+        task_ok = self._reconcile_and_report(saved)
+        return saved, task_ok
 
     # ── 2.4 scanWifi ──────────────────────────────
 
@@ -442,7 +453,7 @@ class GuiGuiApi:
             return _err(INTERNAL, "设置没存上,再试一次")
 
         # 任务计划对齐放后台线程(PS 调用秒级),完成后推 schedule:changed
-        threading.Thread(target=lambda: self._align_saved(saved),
+        threading.Thread(target=lambda: self._reconcile_and_report(saved),
                          daemon=True, name="guigui-align").start()
         return _ok(config.to_bridge(saved))
 
@@ -453,16 +464,8 @@ class GuiGuiApi:
             value = bool(on.get("on")) if isinstance(on, dict) else bool(on)
             cfg = config.load()
             saved = config.save(config.apply_patch(cfg, {"master": value}))
-            # 语义重(建/删任务):同步做完再回话
-            if value and not _configured(saved):
-                misaligned = False   # 首装未完成不建任务(与 _align_saved 同口径)
-            else:
-                _, misaligned = selfheal.reconcile(saved)
-            if misaligned and value:
-                notify.task_blocked()
-            self._emit("schedule:changed",
-                       {"master": saved["master"], "trigger_time": saved["trigger_time"],
-                        "task_ok": not misaligned})
+            # 语义重(建/删任务):同步做完再回话(对齐+被拦通知+事件在共用函数里)
+            self._reconcile_and_report(saved)
             return _ok({"master": saved["master"]})
         except Exception:
             log.exception("api.masterToggle")
