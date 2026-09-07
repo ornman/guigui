@@ -107,15 +107,26 @@
 
 ---
 
-## P2 — 低概率 / 卫生项
+## P2 — 低概率 / 卫生项 — ✅ 已执行(2026-09-07,#8 = 2ce8861、#9 = cb8a70a;#10 按计划暂不动;267 测全绿)
 
-### 8. guigui:// 协议注册失败,通知点击无响应
+### 8. guigui:// 协议注册失败,通知点击无响应 ✅ 2ce8861
 
-`register_protocol` 失败只记日志(`notify.py:137+`)→ 通知照常弹,点击无声无息。修法:注册失败时通知降级(不设 activationType protocol,纯展示)或首次启动 GUI 检测注册状态给一次性提示。低优先级。
+`register_protocol` 失败只记日志(`notify.py:137+`)→ 通知照常弹,点击无声无响。修法:注册失败时通知降级(不设 activationType protocol,纯展示)或首次启动 GUI 检测注册状态给一次性提示。低优先级。
 
-### 9. identify 回填防误抓提示
+> 落地:采纳降级方案 — `send()` 发送前经 `protocol_registered()` 读 HKCU
+> command 子键(查不到一律当未注册,永不抛),未注册成则 toast 去掉
+> activationType/launch 纯展示,不再承诺点击动作;两个分支的 XML 均经
+> PowerShell XmlDocument 实解析验证。一次性提示方案未做(需新状态管理,
+> 且不解决通知本身的落空承诺)。
+
+### 9. identify 回填防误抓提示 ✅ cb8a70a
 
 `identify()` chkstatus 优先(`api.py:123-134`),共享会话下可能回填室友学号;验证阶梯兜底不入库,但 UX 困惑。修法:identify 信封加 `confidence` 或 source 标注,首装表单识别结果旁一句「检测自当前网络会话,确认是你自己的学号」(前端文案,`契约` 轻量)。
+
+> 落地:source 标注路线 — 字段 1.0.1 起即有,零形状变化;契约升 1.4.1
+> 明确三态语义(chkstatus=共享会话检测可能误抓 / config 可信 / none),
+> 前端首装表单旁注为前端待办。mock 侧已完备(`other` 场景专测他人学号),
+> 无需改。confidence 字段未加(source 已够前端区分,不重复造字段)。
 
 ### 10. 架构 backlog(本轮评审记录,暂不动)
 
