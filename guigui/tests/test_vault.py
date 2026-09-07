@@ -26,6 +26,29 @@ class FakeKeyring:
         self.store.pop((service, uid), None)
 
 
+class FakeAdvapi32:
+    """advapi32 降级层的内存替身:同样按 TargetName(=uid@GuiGui)存。"""
+
+    def __init__(self):
+        self.store: dict[str, str] = {}
+        self.broken = False
+
+    def write(self, target, password):
+        if self.broken:
+            raise OSError(1312)   # ERROR_NO_SUCH_USER 模拟系统拒绝
+        self.store[target] = password
+
+    def read(self, target):
+        if self.broken:
+            raise OSError(1008)
+        return self.store.get(target)
+
+    def delete(self, target):
+        if self.broken:
+            raise OSError(5)
+        return self.store.pop(target, None) is not None
+
+
 @pytest.fixture
 def fake_keyring(monkeypatch):
     fk = FakeKeyring()
@@ -33,6 +56,16 @@ def fake_keyring(monkeypatch):
     monkeypatch.setattr(vault.keyring, "get_password", fk.get_password)
     monkeypatch.setattr(vault.keyring, "delete_password", fk.delete_password)
     return fk
+
+
+@pytest.fixture
+def fake_advapi(monkeypatch):
+    """替换 vault 的 _direct_* 系列为内存桩。"""
+    fa = FakeAdvapi32()
+    monkeypatch.setattr(vault, "_direct_set", lambda target, pw: fa.write(target, pw))
+    monkeypatch.setattr(vault, "_direct_get", lambda target: fa.read(target))
+    monkeypatch.setattr(vault, "_direct_delete", lambda target: fa.delete(target))
+    return fa
 
 
 def test_set_get_has(fake_keyring):
@@ -56,10 +89,53 @@ def test_rekey_moves_entry(fake_keyring):
     assert not vault.has_password("old")
 
 
-def test_backend_failure_raises_vault_error_not_plaintext(fake_keyring):
+def test_backend_failure_raises_vault_error_not_plaintext(fake_keyring, fake_advapi):
+    """主路坏 + 降级坏 → VaultError(纪律:永不回退明文)。"""
     fake_keyring.broken = True
+    fake_advapi.broken = True
     with pytest.raises(vault.VaultError):
         vault.set_password("u", "p")
+
+
+# ── P1-4:keyring 异常 → advapi32 降级 ────────────────────────────
+
+
+def test_set_falls_back_to_advapi_when_keyring_broken(fake_keyring, fake_advapi):
+    fake_keyring.broken = True
+    vault.set_password("2025000000001", "pw123")
+    assert vault.has_password("2025000000001")           # 走降级读出来
+    assert vault.get_password("2025000000001") == "pw123"
+    assert fake_advapi.store["2025000000001@GuiGui"] == "pw123"
+
+
+def test_get_falls_back_to_advapi_when_keyring_broken(fake_keyring, fake_advapi):
+    fake_advapi.store["2025000000001@GuiGui"] = "pw123"
+    fake_keyring.broken = True
+    assert vault.get_password("2025000000001") == "pw123"
+    assert vault.has_password("2025000000001")
+
+
+def test_get_returns_none_when_both_backends_fail(fake_keyring, fake_advapi):
+    """读失败不抛(契约 §0 密码永不下行;读失败让上层判 None,不入强错误)。"""
+    fake_keyring.broken = True
+    fake_advapi.broken = True
+    assert vault.get_password("u") is None
+    assert vault.has_password("u") is False
+
+
+def test_delete_falls_back_to_advapi_when_keyring_broken(fake_keyring, fake_advapi):
+    fake_advapi.store["u1@GuiGui"] = "p"
+    fake_keyring.broken = True
+    vault.delete_password("u1")
+    assert "u1@GuiGui" not in fake_advapi.store
+    assert vault.get_password("u1") is None
+
+
+def test_set_advapi32_only_writes_target_correctly(fake_keyring, fake_advapi):
+    """直调路径的 TargetName 必须 = <uid>@GuiGui(与 keyring 同形状,卸载清理才能命中)。"""
+    fake_keyring.broken = True
+    vault.set_password("2025000000001", "pw")
+    assert "2025000000001@GuiGui" in fake_advapi.store
 
 
 # ── 卸载全删:枚举式清理(不依赖 config 当前学号)─────────────

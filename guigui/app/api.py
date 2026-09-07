@@ -34,6 +34,12 @@ SAVE_FAILED = "SAVE_FAILED"
 FB_VALIDATION = "FB_VALIDATION"
 INTERNAL = "INTERNAL"
 
+# 凭据管理器不可用时的出路文案(QA P1-4:8 处共用,改一处全改)
+VAULT_UNAVAILABLE_MSG = (
+    "系统凭据管理器不可用,密码存不下 — "
+    "试试重启电脑,还不行就带着这句反馈给桂桂作者"
+)
+
 # 学校自助服务平台(改密码 / 查流量 / 解绑设备)— openSelfService 交默认浏览器打开
 SELF_SERVICE_URL = "https://bcs.guat.edu.cn/Cas/Login?appid=71999680"
 
@@ -236,7 +242,7 @@ class GuiGuiApi:
                 saved, task_ok = self._store_credential(
                     cfg, uid, operator, password, verified=True)
                 if saved is None:
-                    return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+                    return _err(INTERNAL, VAULT_UNAVAILABLE_MSG)
                 ensure.settle_from_gui(saved, uid, attempts)
                 return _ok({"result": "success", "uid": drcom.mask_uid(uid),
                             "attempts": attempts, "verified": True,
@@ -247,7 +253,7 @@ class GuiGuiApi:
                     saved, task_ok = self._store_credential(
                         cfg, uid, operator, password, verified=False)
                     if saved is None:
-                        return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+                        return _err(INTERNAL, VAULT_UNAVAILABLE_MSG)
                     return _ok({"result": "stored", "uid": drcom.mask_uid(uid),
                                 "attempts": attempts, "verified": False,
                                 "reason": "before_open", "task_ok": task_ok})
@@ -260,7 +266,7 @@ class GuiGuiApi:
                 saved, _ = self._store_credential(
                     cfg, uid, operator, password, verified=False)
                 if saved is None:
-                    return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+                    return _err(INTERNAL, VAULT_UNAVAILABLE_MSG)
                 return _err(NET_UNREACHABLE, "现在够不着校园网")
             return _err(INTERNAL, msg or "认证服务器返回了不认识的格式")
 
@@ -285,7 +291,7 @@ class GuiGuiApi:
                     saved, task_ok = self._store_credential(
                         cfg, uid, operator, password, verified=True)
                     if saved is None:
-                        return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+                        return _err(INTERNAL, VAULT_UNAVAILABLE_MSG)
                     ensure.settle_from_gui(saved, uid, tries)
                     return _ok({"result": "success", "uid": drcom.mask_uid(uid),
                                 "attempts": tries, "verified": True,
@@ -297,7 +303,7 @@ class GuiGuiApi:
                         saved, task_ok = self._store_credential(
                             cfg, uid, operator, password, verified=False)
                         if saved is None:
-                            return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+                            return _err(INTERNAL, VAULT_UNAVAILABLE_MSG)
                         return _ok({"result": "stored", "uid": drcom.mask_uid(uid),
                                     "attempts": tries, "verified": False,
                                     "reason": "before_open", "task_ok": task_ok})
@@ -311,7 +317,7 @@ class GuiGuiApi:
                     saved, _ = self._store_credential(
                         cfg, uid, operator, password, verified=False)
                     if saved is None:
-                        return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+                        return _err(INTERNAL, VAULT_UNAVAILABLE_MSG)
                     return _err(NET_UNREACHABLE,
                                 "验证做到一半网络够不着了,密码先存着,明早首试见真章")
                 self._restore_network(cfg, old_uid, uid, old_pw)
@@ -320,7 +326,7 @@ class GuiGuiApi:
             saved, task_ok = self._store_credential(
                 cfg, uid, operator, password, verified=False)
             if saved is None:
-                return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+                return _err(INTERNAL, VAULT_UNAVAILABLE_MSG)
             return _ok({"result": "already", "uid": drcom.mask_uid(uid),
                         "attempts": 0, "verified": False, "task_ok": task_ok})
 
@@ -328,7 +334,7 @@ class GuiGuiApi:
         saved, _ = self._store_credential(
             cfg, uid, operator, password, verified=False)
         if saved is None:
-            return _err(INTERNAL, "系统凭据管理器不可用,存不下密码")
+            return _err(INTERNAL, VAULT_UNAVAILABLE_MSG)
         return _err(NET_UNREACHABLE, "现在够不着校园网")
 
     def _attempt_login(self, cfg: dict, uid: str, password: str,
