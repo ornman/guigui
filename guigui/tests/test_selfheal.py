@@ -49,10 +49,16 @@ def _cfg(**over):
 
 
 def test_creates_missing_main_task(monkeypatch):
+    """P1-7:master 开 + 巡逻关 → 建 GuiGui / GuiGui-Boot(boot 默认开)两个任务。"""
     fake = FakeScheduler()
     _wire(monkeypatch, fake)
     assert selfheal.reconcile(_cfg()) == (True, False)
-    assert "GuiGui" in fake.tasks and "GuiGui-Patrol" not in fake.tasks
+    assert "GuiGui" in fake.tasks and "GuiGui-Boot" in fake.tasks
+    assert "GuiGui-Patrol" not in fake.tasks
+    assert "GuiGui-Wake" not in fake.tasks    # wake_login 默认关 → 不建
+    # 主任务只含日历触发(LogonTrigger 已迁出)
+    assert "<CalendarTrigger>" in fake.tasks["GuiGui"]
+    assert "<LogonTrigger>" not in fake.tasks["GuiGui"]
 
 
 def test_no_change_when_aligned(monkeypatch):
@@ -89,6 +95,16 @@ def test_patrol_follows_switch(monkeypatch):
     assert "GuiGui" in fake.tasks                          # 主任务不受巡逻开关影响
 
 
+def test_wake_task_created_when_enabled(monkeypatch):
+    """P1-7:wake_login=True 时建 GuiGui-Wake(独立任务,Action 带 --trigger wake)。"""
+    fake = FakeScheduler()
+    _wire(monkeypatch, fake)
+    selfheal.reconcile(_cfg(wake_login=True, tasks_rev=2))
+    assert "GuiGui-Wake" in fake.tasks
+    assert "<EventTrigger>" in fake.tasks["GuiGui-Wake"]
+    assert "--trigger wake" in fake.tasks["GuiGui-Wake"]
+
+
 def test_create_blocked_reports_misaligned(monkeypatch):
     """建任务被安全软件拦截 → (changed=False, misaligned=True),调用方据此 toast。"""
     fake = FakeScheduler()
@@ -111,18 +127,19 @@ def test_remove_blocked_reports_misaligned(monkeypatch):
 
 
 def test_degraded_registration_when_logon_blocked(monkeypatch):
-    """安全软件拦登录触发 → 自动降级注册无 LogonTrigger 版,每日定时不受影响。"""
+    """P1-7:安全软件拦登录触发 → GuiGui-Boot 降级(无 LogonTrigger),GuiGui 不受影响。"""
     fake = FakeScheduler()
     fake.block_logon_trigger = True
     _wire(monkeypatch, fake)
     changed, misaligned = selfheal.reconcile(_cfg())     # boot_login=True
     assert changed is True and misaligned is False       # 降级成功,不算失配
-    assert "<LogonTrigger>" not in fake.tasks["GuiGui"]  # 注册的是降级版
+    # GuiGui-Boot 被降级(无 LogonTrigger),GuiGui(日历)未受影响
+    assert "<LogonTrigger>" not in fake.tasks["GuiGui-Boot"]
     assert "CalendarTrigger" in fake.tasks["GuiGui"]     # 每日触发还在
 
 
 def test_degraded_task_upgrades_after_unblock(monkeypatch):
-    """降级任务不算最新(rev 同但缺登录触发);放行后下一次对齐自动升级完整版。"""
+    """P1-7:GuiGui-Boot 降级任务不算最新;放行后下一次对齐自动升级回含 LogonTrigger。"""
     fake = FakeScheduler()
     fake.block_logon_trigger = True
     _wire(monkeypatch, fake)
@@ -130,4 +147,4 @@ def test_degraded_task_upgrades_after_unblock(monkeypatch):
     fake.block_logon_trigger = False                      # 安全软件放行
     changed, _ = selfheal.reconcile(_cfg())               # rev 未变仍要重建
     assert changed is True
-    assert "<LogonTrigger>" in fake.tasks["GuiGui"]       # 已升级回完整版
+    assert "<LogonTrigger>" in fake.tasks["GuiGui-Boot"]  # 已升级回完整版

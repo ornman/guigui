@@ -43,6 +43,7 @@ def _cfg(**over):
 
 
 def test_main_task_xml_triggers_and_rev():
+    """P1-7:主任务只含 CalendarTrigger(LogonTrigger 已迁到独立任务 GuiGui-Boot)。"""
     xml = scheduler.build_main_task_xml(_cfg(), rev=7)
     assert "GuiGui v2 automation rev=7" in xml
     assert "<RegistrationInfo><Description>GuiGui v2 automation rev=7</Description>" in xml
@@ -50,27 +51,39 @@ def test_main_task_xml_triggers_and_rev():
     assert "<ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>" in xml
     assert "T06:30:00" in xml
     assert "<Interval>PT5M</Interval>" in xml and "<Duration>PT25M</Duration>" in xml
-    assert "<LogonTrigger>" in xml                      # boot_login 默认开
-    assert "<EventTrigger>" not in xml                  # wake_login 默认关
+    assert "<LogonTrigger>" not in xml                  # P1-7:已迁出
+    assert "<EventTrigger>" not in xml                  # wake_login 默认关 + 已迁出
     # 声明与 create_task 落盘编码必须同为 UTF-16(schtasks 规范;不一致报「无法切换编码」)
     assert xml.startswith('<?xml version="1.0" encoding="UTF-16"?>')
+    # P1-7:Action Arguments 带 --trigger calendar,ensure.run 据此判 silent 豁免
+    assert "--trigger calendar" in xml
 
 
-def test_main_task_xml_switch_reflects_config():
-    xml = scheduler.build_main_task_xml(_cfg(boot_login=False, wake_login=True), rev=1)
-    assert "<LogonTrigger>" not in xml
+def test_boot_task_xml_logon_only_with_trigger():
+    """P1-7:GuiGui-Boot 只含 LogonTrigger,Action Arguments 带 --trigger boot。"""
+    xml = scheduler.build_boot_task_xml(_cfg(), rev=2)
+    assert "<LogonTrigger>" in xml
+    assert "<CalendarTrigger>" not in xml
+    assert "<EventTrigger>" not in xml
+    assert "--trigger boot" in xml
+    assert "rev=2" in xml
+
+
+def test_wake_task_xml_event_only_with_trigger():
+    """P1-7:GuiGui-Wake 只含 EventTrigger,Action Arguments 带 --trigger wake。"""
+    xml = scheduler.build_wake_task_xml(_cfg(boot_login=False, wake_login=True), rev=1)
     assert "<EventTrigger>" in xml and "<Delay>PT30S</Delay>" in xml
-    assert "Power-Troubleshooter" in xml
-    assert "EventID=1" in xml
+    assert "Power-Troubleshooter" in xml and "EventID=1" in xml
+    assert "<LogonTrigger>" not in xml
+    assert "<CalendarTrigger>" not in xml
+    assert "--trigger wake" in xml
 
 
-def test_main_task_xml_settings_and_action():
-    xml = scheduler.build_main_task_xml(_cfg(), rev=0)
-    assert "<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>" in xml
-    assert "<ExecutionTimeLimit>PT15M</ExecutionTimeLimit>" in xml
-    assert "<WakeToRun>true</WakeToRun>" in xml
-    assert "<LogonType>InteractiveToken</LogonType>" in xml
-    assert "--ensure" in xml and "<WorkingDirectory>" in xml
+def test_action_parts_unknown_trigger_falls_back_to_calendar():
+    """P1-7:无效 trigger → 默认 calendar(向后兼容旧任务 / 手动运行)。"""
+    exe, arguments, workdir = scheduler.action_parts("bogus")
+    assert "--trigger calendar" in arguments
+    assert workdir
 
 
 def test_patrol_task_xml():
@@ -83,6 +96,18 @@ def test_patrol_task_xml():
     assert "<Duration>P3650D</Duration>" in xml
     assert "rev=3" in xml
     assert "2026-08-31T12:00:00" in xml
+    # P1-7:巡逻任务 Action Arguments 带 --trigger patrol
+    assert "--trigger patrol" in xml
+
+
+def test_main_task_xml_settings_and_action():
+    """主任务 settings 块 + Action 字段不变(P1-7 拆分不影响 shell 包装)。"""
+    xml = scheduler.build_main_task_xml(_cfg(), rev=0)
+    assert "<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>" in xml
+    assert "<ExecutionTimeLimit>PT15M</ExecutionTimeLimit>" in xml
+    assert "<WakeToRun>true</WakeToRun>" in xml
+    assert "<LogonType>InteractiveToken</LogonType>" in xml
+    assert "--ensure" in xml and "<WorkingDirectory>" in xml
 
 
 # ── CRUD / rev 判定(mock schtasks)──────────────────────

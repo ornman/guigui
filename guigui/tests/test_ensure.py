@@ -18,10 +18,12 @@ class Harness:
 
     def __init__(self, monkeypatch, *, cfg_over=None, probe_seq=None,
                  login_seq=None, connect_ok=True, password="pw123",
-                 online_uid="2025000000001", task_xml="<Task><Command>x</Command></Task>"):
+                 online_uid="2025000000001", task_xml="<Task><Command>x</Command></Task>",
+                 trigger="calendar"):
         over = {"uid": "2025000000001"}
         over.update(cfg_over or {})
         self.cfg = config.save(dict(config.DEFAULTS, **over))
+        self.trigger = trigger
         self.probes = list(probe_seq or [{"state": "logged_in"}])
         self.logins = list(login_seq or [("success", "")])
         self.connect_calls = []
@@ -87,7 +89,7 @@ class Harness:
         return seq.pop(0) if len(seq) > 1 else seq[0]
 
     def run(self):
-        return ensure.run()
+        return ensure.run(trigger=self.trigger)
 
     def today_entries(self):
         for day in logstore.query(1):
@@ -539,3 +541,69 @@ def test_throttled_payload_field_parsed(monkeypatch):
     # 节流分支不写 "登录被拒"
     texts = [e["text"] for e in h.today_entries()]
     assert not any(t.startswith("登录被拒") for t in texts)
+
+
+# ── 返校日 silent 豁免(QA P1-7)────────────────────────
+
+
+def _silence_today(monkeypatch):
+    """预先把 state 推到 silent + today 已探(模拟返校日第一拍不可达)。"""
+    state = ensure.load_state()
+    state["silent"] = True
+    state["last_unreachable_date"] = ensure._today()
+    state["unreachable_streak"] = 3
+    ensure.save_state(state)
+
+
+def test_silent_same_day_calendar_trigger_skips(monkeypatch):
+    """QA P1-7:AC-10 字面兑现 — calendar 触发在 silent 同日秒退,不探测。"""
+    _silence_today(monkeypatch)
+    probes = []
+    monkeypatch.setattr(ensure.detect, "probe",
+                        lambda cfg=None: probes.append(1) or {"state": "logged_in"})
+    h = Harness(monkeypatch, trigger="calendar")
+    h.run()
+    assert probes == []                                # 根本没探测
+
+
+def test_silent_same_day_patrol_trigger_skips(monkeypatch):
+    """QA P1-7:patrol 触发维持秒退(巡逻不算天然恢复点)。"""
+    _silence_today(monkeypatch)
+    probes = []
+    monkeypatch.setattr(ensure.detect, "probe",
+                        lambda cfg=None: probes.append(1) or {"state": "logged_in"})
+    h = Harness(monkeypatch, trigger="patrol")
+    h.run()
+    assert probes == []
+
+
+def test_silent_same_day_boot_trigger_probes_normally(monkeypatch):
+    """QA P1-7:boot 触发豁免压制(返校日天然恢复点),正常探测。"""
+    _silence_today(monkeypatch)
+    h = Harness(monkeypatch, probe_seq=[{"state": "logged_in"}],
+                trigger="boot")
+    h.run()
+    assert h.probe_calls >= 1                          # 探测跑了
+    # 收工路径正常走,日志有"网络可达"
+    texts = [e["text"] for e in h.today_entries()]
+    assert any("网络可达" in t for t in texts)
+
+
+def test_silent_same_day_wake_trigger_probes_normally(monkeypatch):
+    """QA P1-7:wake 触发豁免压制(笔记本唤醒 = 返校日恢复点)。"""
+    _silence_today(monkeypatch)
+    h = Harness(monkeypatch, probe_seq=[{"state": "logged_in"}],
+                trigger="wake")
+    h.run()
+    assert h.probe_calls >= 1
+
+
+def test_run_unknown_trigger_falls_back_to_calendar(monkeypatch):
+    """QA P1-7:无效 trigger → 默认 calendar 行为(向后兼容手动运行 / 旧任务)。"""
+    _silence_today(monkeypatch)
+    probes = []
+    monkeypatch.setattr(ensure.detect, "probe",
+                        lambda cfg=None: probes.append(1) or {"state": "logged_in"})
+    # 直接调 ensure.run,无效 trigger 应被 fallback 到 calendar → 秒退
+    ensure.run(trigger="bogus")
+    assert probes == []

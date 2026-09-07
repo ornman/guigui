@@ -310,8 +310,16 @@ def _fail_data(kind: str | None, verdict, tries: int) -> dict | None:
     return {k: v for k, v in data.items() if v is not None}
 
 
-def run() -> int:
-    """静默主流程;任何分支结束前统一落 state(原子写)。"""
+def run(trigger: str = "calendar") -> int:
+    """静默主流程;任何分支结束前统一落 state(原子写)。
+
+    trigger ∈ {"calendar", "boot", "wake", "patrol"},scheduler 通过
+    --trigger <name> 在 Action Arguments 传入(无效值按 calendar 处理)。
+    P1-7 返校日豁免:boot/wake 触发时,silent 同日压制不生效(返校日天然伴随
+    开机/唤醒,应作为恢复点正常探测);calendar/patrol 维持字面秒退。
+    """
+    if trigger not in ("calendar", "boot", "wake", "patrol"):
+        trigger = "calendar"
     cfg = config.load()
     if not cfg.get("master"):
         return 0
@@ -325,7 +333,9 @@ def run() -> int:
     today = _today()
 
     # 假期静默同日:进门即退,零探测请求(AC-10「每天只探 1 次」的字面兑现)
-    if state.get("silent") and state.get("last_unreachable_date") == today:
+    # 但开机/唤醒触发属于返校日天然恢复点,豁免压制(QA P1-7)。
+    if (state.get("silent") and state.get("last_unreachable_date") == today
+            and trigger not in ("boot", "wake")):
         return 0
 
     # 日志卫生:每拍顺带清一次 >90 天的日志文件(AC-18,只动桂桂自己目录)

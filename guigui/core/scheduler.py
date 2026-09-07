@@ -21,8 +21,12 @@ from xml.sax.saxutils import escape
 
 log = logging.getLogger(__name__)
 
-TASK_MAIN = "GuiGui"
+TASK_MAIN = "GuiGui"            # L1 日历拍(CalendarTrigger)
+TASK_BOOT = "GuiGui-Boot"        # L2 开机拍(LogonTrigger)— P1-7 拆分
+TASK_WAKE = "GuiGui-Wake"        # L5 唤醒拍(EventTrigger)— P1-7 拆分
 TASK_PATROL = "GuiGui-Patrol"
+
+VALID_TRIGGERS = ("calendar", "boot", "wake", "patrol")
 
 L1_LEAD_MINUTES = 30   # 提前 30 分钟开始试(PRD §6.1)
 L1_BEATS = 6           # 共 6 次
@@ -53,18 +57,24 @@ def l1_window(trigger_time: str, heartbeat_minutes: int) -> tuple[str, int]:
 # ── Action(dev / frozen 双模式)─────────────────────────
 
 
-def action_parts() -> tuple[str, str, str]:
+def action_parts(trigger: str = "calendar") -> tuple[str, str, str]:
     """返回 (Execute, Arguments, WorkingDirectory)。
 
-    frozen → (guigui.exe, --ensure, exe 目录);
-    dev    → (pythonw.exe, "-m guigui --ensure", 仓库根)。
+    frozen → (guigui.exe, "--ensure --trigger <name>", exe 目录);
+    dev    → (pythonw.exe, "-m guigui --ensure --trigger <name>", 仓库根)。
+
+    P1-7:每个任务 XML 的 Action Arguments 带上 --trigger,ensure.run 据此判
+    豁免。trigger 不在白名单 → 默认 calendar(向后兼容旧任务 / 手动运行)。
     """
+    if trigger not in VALID_TRIGGERS:
+        trigger = "calendar"
+    arg = f"--ensure --trigger {trigger}"
     if getattr(sys, "frozen", False):
-        return sys.executable, "--ensure", str(Path(sys.executable).parent)
+        return sys.executable, arg, str(Path(sys.executable).parent)
     pyw = Path(sys.executable).with_name("pythonw.exe")
     exe = str(pyw if pyw.exists() else Path(sys.executable))
     repo_root = Path(__file__).resolve().parent.parent.parent
-    return exe, "-m guigui --ensure", str(repo_root)
+    return exe, f"-m guigui {arg}", str(repo_root)
 
 
 # ── XML 生成 ─────────────────────────────────────────────
@@ -97,8 +107,8 @@ def _settings_xml() -> str:
     )
 
 
-def _exec_xml() -> str:
-    execute, arguments, workdir = action_parts()
+def _exec_xml(trigger: str = "calendar") -> str:
+    execute, arguments, workdir = action_parts(trigger)
     return (
         "<Actions><Exec>"
         f"<Command>{escape(execute)}</Command>"
@@ -109,8 +119,10 @@ def _exec_xml() -> str:
 
 
 def build_main_task_xml(cfg: dict, rev: int, now=None) -> str:
-    """主任务 GuiGui:L1 Daily+Repetition + L2 AtLogon + L5 唤醒(按开关注入)。
+    """主任务 GuiGui:L1 Daily+Repetition(纯日历拍,P1-7 拆分后只含 CalendarTrigger)。
 
+    开机/唤醒已迁到独立任务 GuiGui-Boot / GuiGui-Wake,以便 Action Arguments
+    能带不同 --trigger,ensure.run 据此判 silent 同日豁免(返校日天然恢复点)。
     结构必须严格按 Task Scheduler schema 顺序:
     RegistrationInfo(含 Description/rev 标记)→ Triggers → Principals → Settings → Actions。
     """
@@ -130,14 +142,6 @@ def build_main_task_xml(cfg: dict, rev: int, now=None) -> str:
         "<StopAtDurationEnd>false</StopAtDurationEnd></Repetition>"
         "</CalendarTrigger>"
     )
-    if cfg.get("boot_login", True):
-        trig += "<LogonTrigger><Enabled>true</Enabled></LogonTrigger>"
-    if cfg.get("wake_login", False):
-        trig += (
-            "<EventTrigger><Enabled>true</Enabled>"
-            f"<Subscription>{escape(_WAKE_QUERY)}</Subscription>"
-            f"<Delay>{WAKE_DELAY}</Delay></EventTrigger>"
-        )
     return (
         '<?xml version="1.0" encoding="UTF-16"?>'
         '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">'
@@ -147,13 +151,58 @@ def build_main_task_xml(cfg: dict, rev: int, now=None) -> str:
         f"<Triggers>{trig}</Triggers>"
         f"{_principal_xml()}"
         f"{_settings_xml()}"
-        f"{_exec_xml()}"
+        f"{_exec_xml('calendar')}"
+        "</Task>"
+    )
+
+
+def build_boot_task_xml(cfg: dict, rev: int, now=None) -> str:
+    """开机任务 GuiGui-Boot:仅 LogonTrigger,Action Arguments 带 --trigger boot。
+
+    P1-7 拆分产物:返校日第一拍(刚开机 WiFi 未就绪)走这里,silent 同日豁免,
+    探测 + 登录 + 通知全流程跑(天然恢复点)。
+    """
+    trig = "<LogonTrigger><Enabled>true</Enabled></LogonTrigger>"
+    return (
+        '<?xml version="1.0" encoding="UTF-16"?>'
+        '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">'
+        "<RegistrationInfo>"
+        f"<Description>GuiGui v2 automation rev={rev}</Description>"
+        "</RegistrationInfo>"
+        f"<Triggers>{trig}</Triggers>"
+        f"{_principal_xml()}"
+        f"{_settings_xml()}"
+        f"{_exec_xml('boot')}"
+        "</Task>"
+    )
+
+
+def build_wake_task_xml(cfg: dict, rev: int, now=None) -> str:
+    """唤醒任务 GuiGui-Wake:仅 EventTrigger(笔记本唤醒/拔电源),--trigger wake。
+
+    P1-7 拆分产物:休眠恢复(返校日宿舍场景常见)走这里豁免 silent 压制。
+    """
+    trig = (
+        "<EventTrigger><Enabled>true</Enabled>"
+        f"<Subscription>{escape(_WAKE_QUERY)}</Subscription>"
+        f"<Delay>{WAKE_DELAY}</Delay></EventTrigger>"
+    )
+    return (
+        '<?xml version="1.0" encoding="UTF-16"?>'
+        '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">'
+        "<RegistrationInfo>"
+        f"<Description>GuiGui v2 automation rev={rev}</Description>"
+        "</RegistrationInfo>"
+        f"<Triggers>{trig}</Triggers>"
+        f"{_principal_xml()}"
+        f"{_settings_xml()}"
+        f"{_exec_xml('wake')}"
         "</Task>"
     )
 
 
 def build_patrol_task_xml(cfg: dict, rev: int, now=None) -> str:
-    """巡逻任务 GuiGui-Patrol:全天每 N 分钟一次。"""
+    """巡逻任务 GuiGui-Patrol:全天每 N 分钟一次,Action Arguments 带 --trigger patrol。"""
     import datetime as dt
 
     now = now or dt.datetime.now()
@@ -176,7 +225,7 @@ def build_patrol_task_xml(cfg: dict, rev: int, now=None) -> str:
         f"<Triggers>{trig}</Triggers>"
         f"{_principal_xml()}"
         f"{_settings_xml()}"
-        f"{_exec_xml()}"
+        f"{_exec_xml('patrol')}"
         "</Task>"
     )
 

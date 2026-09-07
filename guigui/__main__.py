@@ -25,7 +25,14 @@ def main(argv: list[str] | None = None) -> int:
     if "--ensure" in argv:
         from guigui.core import crashlog, ensure
         crashlog.install("ensure")
-        rc = ensure.run()
+        # P1-7:scheduler 在 Action Arguments 传 --trigger <name>;
+        # ensure.run 据此对 silent 同日压制做 boot/wake 豁免(返校日天然恢复点)。
+        trigger = "calendar"
+        if "--trigger" in argv:
+            i = argv.index("--trigger")
+            if i + 1 < len(argv):
+                trigger = argv[i + 1]
+        rc = ensure.run(trigger=trigger)
         _pump_feedback_queue()   # GUI 关着时 ensure 拍也能补发(PRD §7.1)
         return rc
 
