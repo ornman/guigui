@@ -1,0 +1,519 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "桂桂前后端全业务架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1385,
+      520
+    ],
+    "views": [
+      {
+        "id": "user-line",
+        "label": "用户配置线",
+        "focus": [
+          "shell",
+          "views",
+          "router",
+          "bridge",
+          "api",
+          "engine",
+          "drcomsrv"
+        ],
+        "note": "打开桂桂 → 填表提交 → api 验证阶梯 → 真登一次 → 彩带;密码上行一次入 vault"
+      },
+      {
+        "id": "auto-line",
+        "label": "自动登录线",
+        "focus": [
+          "tasksched",
+          "engine",
+          "vault",
+          "drcomsrv",
+          "datadir"
+        ],
+        "note": "07:00/开机/唤醒 --ensure 静默短进程 → 取密码 → 登好 → state/日志落盘"
+      },
+      {
+        "id": "event-line",
+        "label": "事件回推线",
+        "focus": [
+          "datadir",
+          "shell",
+          "bridge",
+          "router"
+        ],
+        "note": "静默线的落盘被 FileWatcher 2s 轮询翻译成契约事件 → 主页日志/横幅如实更新"
+      },
+      {
+        "id": "diag-line",
+        "label": "体检与反馈线",
+        "focus": [
+          "router",
+          "bridge",
+          "api",
+          "schedmod",
+          "fbsrv"
+        ],
+        "note": "横幅③/立即体检 → diagnose 五步 → exit 出口路由;反馈断网入队、联网补发到 issue"
+      },
+      {
+        "id": "security-line",
+        "label": "凭据安全线",
+        "focus": [
+          "views",
+          "api",
+          "vault",
+          "engine"
+        ],
+        "note": "密码只在提交时上行一次,存 Windows 凭据管理器(DPAPI);永不落盘明文、永不下行"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "shell",
+      "type": "frontend",
+      "label": "app/gui.py 壳",
+      "sublabel": "pywebview · FileWatcher",
+      "pos": [
+        70,
+        46
+      ],
+      "size": [
+        200,
+        58
+      ]
+    },
+    {
+      "id": "views",
+      "type": "frontend",
+      "label": "视图层 index.html",
+      "sublabel": "10 视图 v-boot … v-diag",
+      "pos": [
+        70,
+        162
+      ],
+      "size": [
+        200,
+        70
+      ]
+    },
+    {
+      "id": "router",
+      "type": "frontend",
+      "label": "状态与路由引擎",
+      "sublabel": "mainState · 横幅①②③ · 来路栈",
+      "pos": [
+        370,
+        162
+      ],
+      "size": [
+        200,
+        70
+      ]
+    },
+    {
+      "id": "bridge",
+      "type": "messagebus",
+      "label": "app.js 桥接层",
+      "sublabel": "GG 适配器 · guiguiEmit 泵",
+      "pos": [
+        650,
+        162
+      ],
+      "size": [
+        200,
+        70
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "app/api.py 契约桥",
+      "sublabel": "v1.5.0 · 18 方法 · 统一信封",
+      "pos": [
+        930,
+        162
+      ],
+      "size": [
+        210,
+        70
+      ]
+    },
+    {
+      "id": "engine",
+      "type": "backend",
+      "label": "core/ensure·detect·drcom",
+      "sublabel": "探测 → 登录 → 拒绝四态",
+      "pos": [
+        70,
+        296
+      ],
+      "size": [
+        210,
+        70
+      ]
+    },
+    {
+      "id": "tasksched",
+      "type": "cloud",
+      "label": "Windows 任务计划",
+      "sublabel": "07:00 · 开机 · 唤醒 · 巡逻",
+      "tag": "schtasks",
+      "pos": [
+        340,
+        299
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "schedmod",
+      "type": "backend",
+      "label": "core/scheduler·selfheal",
+      "sublabel": "任务四拍 · 幂等对齐",
+      "pos": [
+        550,
+        296
+      ],
+      "size": [
+        200,
+        70
+      ]
+    },
+    {
+      "id": "vault",
+      "type": "security",
+      "label": "core/vault + 凭据管理器",
+      "sublabel": "DPAPI · 密码唯一出口",
+      "pos": [
+        810,
+        296
+      ],
+      "size": [
+        185,
+        70
+      ]
+    },
+    {
+      "id": "datadir",
+      "type": "database",
+      "label": "%LOCALAPPDATA%\\GuiGui\\",
+      "sublabel": "config · state · 日志 · 反馈队列",
+      "pos": [
+        1055,
+        296
+      ],
+      "size": [
+        190,
+        70
+      ]
+    },
+    {
+      "id": "drcomsrv",
+      "type": "external",
+      "label": "Dr.COM 认证服务器",
+      "sublabel": "http://10.1.2.3",
+      "pos": [
+        70,
+        424
+      ],
+      "size": [
+        195,
+        58
+      ]
+    },
+    {
+      "id": "fbsrv",
+      "type": "external",
+      "label": "反馈通道",
+      "sublabel": "pages.dev /fb → issue",
+      "pos": [
+        1155,
+        424
+      ],
+      "size": [
+        170,
+        58
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "WebView2 · static/ 前端",
+      "wraps": [
+        "views",
+        "router",
+        "bridge"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "load-index",
+      "from": "shell",
+      "to": "views",
+      "label": "加载 index.html · 深链",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        170,
+        118
+      ]
+    },
+    {
+      "id": "user-actions",
+      "from": "views",
+      "to": "router",
+      "label": "onclick · 提交",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        330,
+        140
+      ]
+    },
+    {
+      "id": "render-state",
+      "from": "router",
+      "to": "views",
+      "label": "按态渲染",
+      "fromSide": "left",
+      "toSide": "right",
+      "labelAt": [
+        330,
+        220
+      ]
+    },
+    {
+      "id": "call-api",
+      "from": "router",
+      "to": "bridge",
+      "label": "GG.api 调用",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        610,
+        140
+      ]
+    },
+    {
+      "id": "dispatch-events",
+      "from": "bridge",
+      "to": "router",
+      "label": "GG.on 分派",
+      "fromSide": "left",
+      "toSide": "right",
+      "labelAt": [
+        610,
+        220
+      ]
+    },
+    {
+      "id": "eval-py",
+      "from": "bridge",
+      "to": "api",
+      "label": "evaluate_js",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        890,
+        140
+      ]
+    },
+    {
+      "id": "push-events",
+      "from": "api",
+      "to": "bridge",
+      "label": "5 事件",
+      "fromSide": "left",
+      "toSide": "right",
+      "labelAt": [
+        890,
+        220
+      ]
+    },
+    {
+      "id": "fw-events",
+      "from": "shell",
+      "to": "bridge",
+      "label": "FileWatcher → 事件",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "id": "silent-run",
+      "from": "tasksched",
+      "to": "engine",
+      "label": "--ensure 静默进程",
+      "fromSide": "left",
+      "toSide": "right",
+      "labelAt": [
+        310,
+        378
+      ]
+    },
+    {
+      "id": "sched-align",
+      "from": "schedmod",
+      "to": "tasksched",
+      "label": "幂等建删",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "api-engine",
+      "from": "api",
+      "to": "engine",
+      "label": "probe · login · diagnose",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        210,
+        284
+      ]
+    },
+    {
+      "id": "api-sched",
+      "from": "api",
+      "to": "schedmod",
+      "label": "tasks_rev+1 · 重建",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        730,
+        284
+      ]
+    },
+    {
+      "id": "api-vault",
+      "from": "api",
+      "to": "vault",
+      "label": "存 · 真验证",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        1085,
+        252
+      ]
+    },
+    {
+      "id": "api-datadir",
+      "from": "api",
+      "to": "datadir",
+      "label": "config · state · 队列",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        1150,
+        244
+      ]
+    },
+    {
+      "id": "engine-drcom",
+      "from": "engine",
+      "to": "drcomsrv",
+      "label": "GET /drcom/*",
+      "variant": "emphasis",
+      "fromSide": "left",
+      "toSide": "left",
+      "labelAt": [
+        58,
+        404
+      ],
+      "via": [
+        [
+          40,
+          331
+        ],
+        [
+          40,
+          453
+        ]
+      ]
+    },
+    {
+      "id": "engine-vault",
+      "from": "engine",
+      "to": "vault",
+      "label": "取密码(静默线)",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "labelAt": [
+        540,
+        408
+      ]
+    },
+    {
+      "id": "fb-send",
+      "from": "api",
+      "to": "fbsrv",
+      "label": "POST /fb · 补发",
+      "fromSide": "right",
+      "toSide": "top",
+      "labelAt": [
+        1318,
+        318
+      ],
+      "via": [
+        [
+          1300,
+          197
+        ],
+        [
+          1300,
+          400
+        ],
+        [
+          1240,
+          400
+        ]
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "slate",
+      "title": "入口与壳 · guigui/app/",
+      "items": [
+        "gui.py:无边框壳;FileWatcher 2s 轮询落盘→契约事件;深链直达;单实例互斥",
+        "api.py:契约唯一实现 — 统一信封、验证阶梯、diagnose 五步;密码永不下行"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "前端交互 · index.html(一文件两半)",
+      "items": [
+        "10 视图:仪式 / 表单×2 / 断网排查 / 日常四态 / 验证器 / 终态舞台 / 设置·日志·反馈",
+        "状态机 mainState 四态 + 横幅①②③;断网唯一落点 v-guide;彩带只给 verified+task_ok"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "桥与契约 v1.5.0",
+      "items": [
+        "app.js:GG 适配器 + guiguiEmit 泵;后端未绑定 → BRIDGE_MISSING 绝不假数据",
+        "18 方法 + 5 事件(net:state / diag:progress / …);mock = 契约可执行规范(?dev=1)"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "后端核心 · 安全 · 落盘",
+      "items": [
+        "ensure·detect·drcom:四态探测、拒绝四态、假期静默;vault:DPAPI 密码唯一出口",
+        "scheduler·selfheal:四拍任务幂等对齐;落盘 config/state/日志/反馈队列全无密码"
+      ]
+    }
+  ]
+}
