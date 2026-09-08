@@ -166,8 +166,8 @@ footer{position:fixed;left:0;right:0;bottom:0;z-index:25;padding:8px 22px;
         <button onclick="pushNet('waiting',null)">等门(waiting)</button>
       </div>
       <div class="note">经 mock._setNet 真改数据源并推 net:state:当前视图的路由
-        (v-login/v-ok 状态行实时、v-guide 自动跳转、v-main 重渲、boot 等门开门)
-        全部走产品代码,顺带验收 2026-09-07 的路由修复。</div>
+        (v-login/v-ok/详情页断网直跳排查页、v-guide 自动分流、v-main 重渲、boot 等门开门)
+        全部走产品代码,顺带验收 2026-09-08 的路由统一。</div>
     </div>
     <div class="sops">
       <button onclick="reloadStoryPanel()">重载预览</button>
@@ -232,9 +232,8 @@ const PANELS=[
   {label:'被拒 · 密码不对',scene:'ok',setup:W=>okRejectPose(W,'密码不对,改一下再试','wrong_password')},
   {label:'被拒 · 绑定受限(内联入口)',scene:'ok',setup:W=>okRejectPose(W,'密码是对的,但这个账号被绑在别处/受限 — 去自助服务平台看看绑定','bound')},
   {label:'被拒 · 节流(中性提示)',scene:'ok',setup:W=>notePose(W,'ok-note','校园网侧让等 10 秒再试')},
-  {label:'停留时断网(状态行如实)',scene:'ok',setup:W=>W.GGMock._setNet('unreachable','iphone17 pro max')},
 ]},
-{view:'v-login',name:'登录表单(首装未登录 / 改密共用)',frames:[
+{view:'v-login',name:'登录表单(首装未登录 / 改密 / 保存配置共用)',frames:[
   {label:'未登录落地(已连通)',scene:'out',setup:W=>{}},
   {label:'被拒 · 密码不对',scene:'out',setup:W=>W.showLoginErr('密码不对,改一下再试','wrong_password')},
   {label:'被拒 · 学号/运营商错',scene:'out',setup:W=>W.showLoginErr('学号或运营商选错了,核对一下再试','wrong_account')},
@@ -244,40 +243,40 @@ const PANELS=[
   {label:'提交中 · 注销他人会话',scene:'out',setup:W=>{notePose(W,'login-note','现在线上的是 6503…6503,验证时会先注销它,网络会断几秒');busyPose(W,'v-login')}},
   {label:'场景4 · 注销后失败(网先断着)',scene:'out',setup:W=>W.showLoginErr('密码不对,改一下再试;网先断着,输对马上通','wrong_password')},
   {label:'场景4b · 旧凭据已接回',scene:'out',setup:W=>W.showLoginErr('密码不对,改一下再试;已用旧密码把网接回来了,改对再点一次','wrong_password')},
-  {label:'换学号 · 内联确认(密码迁移)',scene:'out',setup:W=>{
-    E(W,'f-sid-login').value='2025000000002';
-    E(W,'login-confirm-text').textContent='学号将从 2025000000001 改为 2025000000002,密码会迁移到新学号';
-    E(W,'login-confirm').style.display='flex'}},
-  {label:'停留时断网(状态行如实 · 场景5)',scene:'out',setup:W=>W.GGMock._setNet('unreachable','iphone17 pro max')},
+  {label:'v-guide ③ 路径(按钮=保存配置)',scene:'down',setup:W=>W.openDetail('v-login')},
 ]},
-{view:'v-success',name:'登录成功(庆祝页 4 变体)',frames:[
-  {label:'真验证成功(彩带)',scene:'daily',setup:W=>W.showSuccess(true,null,true)},
-  {label:'已在线 · 未验证(明早真验)',scene:'daily',setup:W=>W.showSuccess(false,null,true)},
-  {label:'锚前存好(06:50 前提交)',scene:'daily',setup:W=>W.showSuccess(false,'before_open',true)},
-  {label:'任务被拦(重建入口)',scene:'daily',setup:W=>W.showSuccess(true,null,false)},
-  {label:'重建失败(再试一次)',scene:'daily',setup:W=>{W.showSuccess(true,null,false);
-    const b=Q(W,'#success-step .btn');if(b)b.textContent='没建成,再试一次'}},
+{view:'v-success',name:'终态页(彩带 / 保存配置 / 拦截)',frames:[
+  {label:'彩带(真验证 + 任务在岗)',scene:'daily',setup:W=>W.showSuccess(true,null,true)},
+  {label:'保存配置 · 不可达存入',scene:'daily',setup:W=>W.showSuccess(false,'unreachable',true)},
+  {label:'保存配置 · 锚前(06:50 前)',scene:'daily',setup:W=>W.showSuccess(false,'before_open',true)},
+  {label:'保存配置 · 降级存入',scene:'daily',setup:W=>W.showSuccess(false,null,true)},
+  {label:'拦截页(只留重建 · bot sad)',scene:'daily',setup:W=>W.showSuccess(true,null,false)},
+  {label:'拦截页 · 重建失败(再试一次)',scene:'daily',setup:W=>{W.showSuccess(true,null,false);
+    const b=Q(W,'#success-actions .btn');if(b)b.textContent='没建成,再试一次'}},
 ]},
-{view:'v-guide',name:'不可达排查',frames:[
+{view:'v-guide',name:'不可达排查(断网统一落点)',frames:[
   {label:'不可达 · 热点 + 挑校园网',scene:'down',setup:W=>{}},
+  {label:'重新检测中(busy · 结果可见)',scene:'down',setup:W=>W.setBusy(E(W,'guide-reprobe'),true,'检测中…')},
+  {label:'日常开机落地(configured · 可返回)',scene:'daily',setup:W=>W.openDetail('v-guide')},
+  {label:'表单页断网自动跳来(场景5)',scene:'out',setup:W=>W.GGMock._setNet('unreachable','iphone17 pro max')},
 ]},
 {view:'v-main',name:'日常主页',frames:[
   {label:'一切正常',scene:'daily',setup:W=>{}},
   {label:'总开关关(桂桂睡觉)',scene:'daily',setup:W=>W.setAuto(false)},
-  {label:'掉线(out · 自己能修)',scene:'daily',setup:W=>W.wakeProblem('out')},
-  {label:'不可达(down · 外部问题)',scene:'daily',setup:W=>W.wakeProblem('down')},
-  {label:'双横幅(未验证 + 今早失败)',scene:'daily',setup:W=>W.renderBanners({verified:false,outcome:'fail',when:'今早'})},
-  {label:'单横幅(今早没登上)',scene:'daily',setup:W=>W.renderBanners({verified:true,outcome:'fail',when:'今早'})},
+  {label:'掉线(out · 再登一次)',scene:'daily',setup:W=>W.wakeProblem('out')},
+  {label:'不可达(down · 去排查)',scene:'daily',setup:W=>W.wakeProblem('down')},
+  {label:'横幅① 密码还没验证过',scene:'daily',setup:W=>W.renderBanners({verified:false})},
+  {label:'横幅② 自动登录还没生效',scene:'daily',setup:W=>W.setTaskBlocked(true)},
+  {label:'横幅② 重建失败(再试一次)',scene:'daily',setup:W=>{W.setTaskBlocked(true);
+    const b=Q(W,'#main-banners .banner span');if(b)b.textContent='没建成,再试一次'}},
   {label:'重登中(busy 防重复提交)',scene:'daily',setup:W=>W.setBusy(E(W,'main-btn'),true,'登录中…')},
   {label:'重登成功(就地反馈)',scene:'daily',setup:W=>{W.wakeProblem('out');
     W.mood(Q(W,'#boot-bot-greet-main'),'happy');
     E(W,'main-lede').textContent='刚刚把网帮你接回来啦 ✓'}},
-  {label:'重登被拒(就地报)',scene:'daily',setup:W=>{W.wakeProblem('out');
-    E(W,'main-lede').textContent='密码不对,改一下再试,去改一下再试'}},
   {label:'门没开 stored(如实不撒花)',scene:'daily',setup:W=>{W.wakeProblem('out');
     E(W,'main-lede').textContent='还没开门,密码先存着,开门自动登'}},
-  {label:'断网后主页(down + 横幅 · 场景5 终态)',scene:'daily',setup:W=>{W.wakeProblem('down');
-    W.renderBanners({verified:false,outcome:'fail',when:'今早'})}},
+  {label:'断网存配置回主页(down + ①横幅 · 场景5 终态)',scene:'daily',setup:W=>{W.wakeProblem('down');
+    W.renderBanners({verified:false})}},
 ]},
 {view:'v-log',name:'历史日志',frames:[
   {label:'正常历史(含假期静默)',scene:'daily',setup:W=>W.openDetail('v-log')},
@@ -285,7 +284,6 @@ const PANELS=[
 ]},
 {view:'v-settings',name:'高级设置',frames:[
   {label:'默认',scene:'daily',setup:W=>W.openDetail('v-settings')},
-  {label:'定时任务被拦(点此重建)',scene:'daily',setup:W=>{W.openDetail('v-settings');W.renderTaskRow(false)}},
   {label:'WiFi 兜底展开(选网)',scene:'daily',setup:W=>{
     W.openDetail('v-settings');
     E(W,'sw-fallback').classList.add('on');
@@ -299,9 +297,8 @@ const PANELS=[
     const n=E(W,'fb-note');n.textContent='说说具体情况(必填)';n.style.color='var(--warm)';n.style.display='block'}},
   {label:'发送中(转圈防重复)',scene:'daily',setup:W=>{W.openDetail('v-feedback');
     const b=E(W,'fb-send');b.classList.add('busy');b.disabled=true}},
-  {label:'已收到',scene:'daily',setup:W=>{W.openDetail('v-feedback');E(W,'fb-send').textContent='已收到 ✓ GG-35'}},
-  {label:'断网入队(自动补发)',scene:'daily',setup:W=>{W.openDetail('v-feedback');
-    const n=E(W,'fb-note');n.textContent='没发出去,已存本地。联网后自动补发,不用再点';n.style.color='var(--ink-2)';n.style.display='block'}},
+  {label:'终态 · 收到(工单号在文案)',scene:'daily',setup:W=>W.showFeedbackEnd(true,'GG-37')},
+  {label:'终态 · 没发出去(重发/等待补发)',scene:'daily',setup:W=>W.showFeedbackEnd(false)},
   {label:'有积压反馈(pending 行)',scene:'daily',setup:W=>{W.openDetail('v-feedback');
     const p=E(W,'fb-pending');p.textContent='有 1 条没发出去的反馈,联网自动补发';p.style.display='block'}},
 ]},
@@ -333,11 +330,12 @@ const STORIES=[
   {t:'状态行如实',d:'此时网已翻为未登录(服务器仍可达),若回 v-ok 状态行保持「已连上」(连通性与登录态分开报)。',scene:'ladder_fail'},
   {t:'输对再点 → 成功',d:'第二幕:网络已在 not_logged_in,走正常真登路径,一次登好(彩带)。',scene:'ladder_fail',free:'再点一次「开启每日自动登录」'},
 ]},
-{t:'S5 登录页断网(场景5)',s:'填一半切网 → 状态行如实 → 硬提交',steps:[
+{t:'S5 登录页断网(场景5)',s:'填一半切网 → 直跳排查 → 保存配置终态',steps:[
   {t:'落地 v-login',d:'可达+没登录,正常填表。',scene:'out'},
-  {t:'用户切网',d:'亲手:点右下网络切换器「不可达(热点)」→ 停留在登录页的表单不被打断,但状态行实时翻成「10.1.2.3 · 连不上」(2026-09-07 修复,原先写死假连通)。',scene:'out',free:'点「网络状态切换器」里的「不可达(热点)」'},
-  {t:'硬提交',d:'先在表单填个密码再点「立即登录」:mock 数据源已不可达 → NET_UNREACHABLE;后端此时已把密码存了(未验证),前端跳排查页。回主页(点标题栏「桂桂 / GuiGui」)看:down 态 + 「密码还没验证过」横幅。',scene:'out',free:'先填个密码,点「立即登录」,再点标题栏名字回主页'},
-  {t:'网回来了',d:'玩切换器:v-guide 里推「未登录」自动跳回登录页;推「已登录」直接回主页 ok 态。',scene:'out',free:'回 v-guide 后点「未登录(可达)」'},
+  {t:'用户切网',d:'亲手:点右下网络切换器「不可达(热点)」→ 登录页停留时断网,直接跳排查页(2026-09-08 路由统一,原先只刷状态行;表单数据保留,回来还在)。',scene:'out',free:'点「网络状态切换器」里的「不可达(热点)」'},
+  {t:'③ 先保存配置',d:'亲手:点排查页 ③「先保存配置,连上后桂桂自动登录」→ 回到登录页,表单还在,提交按钮变成「保存配置」。',scene:'out',free:'点 ③ 回登录页,看按钮文案'},
+  {t:'提交 → 保存配置终态',d:'亲手:填上密码点「保存配置」→ 不可达但后端已把密码存了 → 保存配置终态页「配置保存成功!连上校园网后自动执行登录」,不撒彩带。',scene:'out',free:'填个密码点「保存配置」'},
+  {t:'回主页看状态',d:'亲手:点「完成,回主页」→ 主页 down 态(去排查)+ 横幅①「密码还没验证过,去改一下」;再用切换器推「未登录(可达)」看恢复路由。',scene:'out',free:'回主页后点「未登录(可达)」'},
 ]},
 {t:'S6 恢复后密码错(场景6)',s:'不可达 → 可达 → 密码错',steps:[
   {t:'v-guide',d:'不可达,等网。',scene:'down'},
@@ -348,22 +346,19 @@ const STORIES=[
 {t:'S7a 门没开',s:'06:50 前提交 → stored 不撒花',steps:[
   {t:'主页(密码已存)',d:'beforeopen 底座:密码已存未验证,门没开。',scene:'beforeopen'},
   {t:'重登 → stored',d:'亲手:点「立即重新登录」→ 返回 stored(门没开,密码先存着)→ 文案「还没开门,密码先存着,开门自动登」(2026-09-07 前端补的如实分支,原先错当成功)。',scene:'beforeopen',free:'点主页「立即重新登录」'},
-  {t:'改密页提交',d:'走 高级设置 → 账号与密码 → 修改 → 提交新密码 → 成功页锚前变体「还没到开门时间(06:50),密码先存着,明早第一次自动登录会真验证」。',scene:'beforeopen',free:'自己走一遍改密提交'},
+  {t:'改密页提交',d:'走 高级设置 → 账号与密码 → 修改 → 提交新密码 → 保存配置终态页「配置已保存,校园网 06:50 开门后自动验证登录」(2026-09-08 终态收敛,锚前不再是成功页变体)。',scene:'beforeopen',free:'自己走一遍改密提交'},
 ]},
 {t:'S7b 节流',s:'太快了,服务器让等 10 秒',steps:[
   {t:'提交被节流',d:'throttled 底座落地登录页;输密码点登录:等待行「被节流了,服务器让等 10 秒,桂桂等一下接着试…」→ 信封 AUTH_REJECTED / throttled,中性展示(不进密码警告框,节流不是密码错)。',scene:'throttled',free:'填密码点「立即登录」,看等待行与最终提示'},
 ]},
 {t:'S7c 任务被拦',s:'密码存好了,杀软拦了定时任务',steps:[
-  {t:'成功页 blocked 变体',d:'blocked 底座:输密码点「开启每日自动登录」→ 登录成功但 task_ok=false:成功页如实说「密码存好了,自动登录还差一步」+ 重建按钮,不撒彩带。',scene:'blocked',free:'填密码点「开启每日自动登录」'},
-  {t:'点重建',d:'亲手:点「重建定时任务」→ mock 一次修好 → 页面自动重渲成真成功(彩带补上)。',scene:'blocked',free:'点「重建定时任务」'},
+  {t:'拦截终态页',d:'blocked 底座:输密码点「开启每日自动登录」→ 登录成功但 task_ok=false:拦截页只留「重建定时任务」一个按钮(没有「完成,回主页」,2026-09-08 重做),bot 换 sad 思考脸,不撒彩带。',scene:'blocked',free:'填密码点「开启每日自动登录」'},
+  {t:'点重建 → 放行',d:'亲手:点「重建定时任务」→ mock 一次修好 → verified=true → 自动重渲成彩带页放行(全有或全无:重建成功且验证通过才见彩带)。',scene:'blocked',free:'点「重建定时任务」'},
 ]},
-{t:'S7d 误抓室友学号',s:'预填他人号 → 换号确认 → 阶梯回滚',steps:[
+{t:'S7d 误抓室友学号',s:'预填他人号 → 直接改号 → 阶梯回滚',steps:[
   {t:'预填他人学号',d:'ladder_back 底座(日常改密):线上是室友的号,chkstatus 抓回他人学号预填。',scene:'ladder_back'},
-  {t:'换号确认',d:'用户改成自己的学号提交 → 内联确认「密码会迁移到新学号」(防手滑)。',scene:'ladder_back',setup:W=>{
-    E(W,'f-sid-login').value='2025000000002';
-    E(W,'login-confirm-text').textContent='学号将从 2025000000001 改为 2025000000002,密码会迁移到新学号';
-    E(W,'login-confirm').style.display='flex'}},
-  {t:'阶梯回滚',d:'亲手:点「继续」→ 注销他人 → 真登被拒 → 旧凭据把网接回来,信封「已用旧密码把网接回来了,改对再点一次」(场景 4 的日常变体,网络不留断)。',scene:'ladder_back',free:'点「继续」,等流程跑完看错误行'},
+  {t:'直接改号提交',d:'亲手:学号改成自己的,填密码点「立即登录」— 换学号确认框已删(2026-09-08),密码迁移静默执行,验证不过当场自纠。',scene:'ladder_back',free:'改学号、填密码,点「立即登录」'},
+  {t:'阶梯回滚',d:'注销他人会话 → 真登被拒 → 旧凭据把网接回来,信封「已用旧密码把网接回来了,改对再点一次」(场景 4 的日常变体,网络不留断),警告块直显。',scene:'ladder_back'},
 ]},
 {t:'S7e 桂桂睡觉',s:'总开关一关,自动化全停',steps:[
   {t:'睡觉态',d:'主页总开关关:bot 睡着,「好,我先歇着,想我了再开」;设置里 master 同步。亲手点开关也行。',scene:'daily',setup:W=>W.setAuto(false),free:'亲手点主页开关试试'},
