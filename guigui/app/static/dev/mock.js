@@ -23,7 +23,11 @@
      ladder_back  阶梯回滚·日常(2026-09-07 场景 4 变体):configured 且线上他人 → 注销 →
                   真登被拒 → 旧凭据把网接回 → 信封带「;已用旧密码把网接回来了,改对再点一次」
      beforeopen   锚前存入(2026-09-07 场景 7):06:50 前提交 → stored/reason=before_open/
-                  verified=false/task_ok=true;主页重登(已存凭据)同样返 stored */
+                  verified=false/task_ok=true;主页重登(已存凭据)同样返 stored
+     diag_ok     验证器全绿(1.5.0):logged_in + 学号一致 + 任务在岗 + 无崩溃 → exit=ok
+     diag_cred   验证器凭据败:not_logged_in + 已存密码 → 真登被拒 wrong_password → exit=login
+     diag_task   验证器任务败:logged_in + taskOk=false → 第 4 步 fail「多半被安全软件拦了」→ exit=task_blocked
+     diag_app    验证器程序败:logged_in 一切正常但崩溃记录 → 第 5 步 fail → exit=app_fault */
 (function(){
 'use strict';
 const LS_SCENE='gg-mock-scene',LS_CFG='gg-mock-cfg';
@@ -71,6 +75,10 @@ if(SCENE==='blocked'){S.net.state='not_logged_in';S.taskOk=false}
 if(SCENE==='other'){S.configured=true;S.verified=true}
 if(SCENE==='ladder_back'){S.configured=true;S.verified=true}
 if(SCENE==='beforeopen'){S.net.state='not_logged_in';S.configured=true;S.verified=false;S.pwd='secret'}
+if(SCENE==='diag_ok'){S.configured=true;S.verified=true;S.pwd='secret'}
+if(SCENE==='diag_cred'){S.net.state='not_logged_in';S.configured=true;S.verified=false;S.pwd='secret'}
+if(SCENE==='diag_task'){S.configured=true;S.verified=true;S.pwd='secret';S.taskOk=false}
+if(SCENE==='diag_app'){S.configured=true;S.verified=true;S.pwd='secret'}
 if(SCENE==='unverified'){S.configured=true;S.verified=false;
   S.last={when:'今早',time:'07:00',tries:3,outcome:'fail'};
   S.logs[0].entries=[{ts:'07:00:01',level:'fail',text:'登录被拒:密码不对,改一下再试'}]}
@@ -196,6 +204,75 @@ window.GGMock={
   },
   async recentResult(){await delay(50);return OK({...S.last,verified:S.verified})},
   async taskStatus(){await delay(80);return S.cfg.master?OK({ok:S.taskOk}):OK({ok:true,note:'off'})},
+  /* ── 2.18 diagnose(1.5.0 验证器):五步与后端逐字一致(diag_* 四场景);
+     与 _setNet 联动:当前网态真改第 1-3 步走向 ── */
+  async diagnose(){
+    const steps=[];let exit='ok',verdict='一切正常,网是通的';
+    const conclude=(c,t)=>{if(exit==='ok'){exit=c;verdict=t}};
+    const step=async(i,key,label,state,detail,reason)=>{
+      emit('diag:progress',{step:i,key,state:'running',detail:'正在查…'});
+      await delay(280+Math.random()*180);
+      const item={key,label,state,detail};
+      if(reason)item.reason=reason;
+      steps.push(item);
+      emit('diag:progress',{step:i,key,state,detail});
+    };
+    const net=S.net;
+    /* ① 网络连通(链路层) */
+    if(net.state==='waiting')await step(1,'network','网络连通','fail','网络还没就绪,像刚开机');
+    else if(net.ssid)await step(1,'network','网络连通','ok','已连上 '+net.ssid);
+    else await step(1,'network','网络连通','ok','已联网(非 WiFi)');
+    /* ② 认证服务器 */
+    const up=net.state==='logged_in'||net.state==='not_logged_in';
+    const server=net.server||'10.1.2.3';
+    if(up)await step(2,'server','认证服务器','ok',server+' 可达');
+    else{await step(2,'server','认证服务器','fail',server+' 连不上');conclude('net_down','连不上校园网,先看看网络')}
+    /* ③ 凭据验证(副作用仅此步:真登一次看得见) */
+    if(!up)await step(3,'credential','凭据验证','skip','服务器够不着,密码没能验证');
+    else if(!S.configured||!S.pwd){
+      await step(3,'credential','凭据验证','fail','还没存密码,先去填一次');
+      conclude('login','密码还没存,先去填一次')}
+    else if(net.state==='logged_in'){
+      const online=(SCENE==='other'||SCENE==='ladder_fail'||SCENE==='ladder_back')?OTHER_UID:UID;
+      if(online===UID)await step(3,'credential','凭据验证','ok','在线,学号一致 ✓');
+      else{
+        await step(3,'credential','凭据验证','fail','线上是别人的学号(2025…6503),登录一次换回自己');
+        conclude('login','线上是别人的号,登录一次换回自己')}
+    }else{
+      /* not_logged_in:用已存凭据真登一次 */
+      emit('login:progress',{phase:'requesting',attempt:1,attempts:1});
+      await delay(900);
+      if(SCENE==='diag_cred'||SCENE==='rejected'){
+        await step(3,'credential','凭据验证','fail','密码不对,改一下再试','wrong_password');
+        conclude('login','凭据有问题,去登录页改一下')
+      }else{
+        S.net.state='logged_in';S.verified=true;
+        const e={ts:nowTs(),level:'ok',text:'已登录 · '+UID_MASK};
+        S.logs[0].entries.push(e);
+        emit('log:appended',{day_label:'今天',entry:e});
+        netEmit();
+        await step(3,'credential','凭据验证','ok','密码对,顺手把网登上了 ✓')
+      }
+    }
+    /* ④ 定时任务(按配置只数该在岗的;从缺失反推被拦,如实「多半」) */
+    const beats=[
+      ['GuiGui',S.cfg.master],
+      ['GuiGui-Boot',S.cfg.master&&S.cfg.boot_login!==false],
+      ['GuiGui-Wake',S.cfg.master&&S.cfg.wake_login],
+      ['GuiGui-Patrol',S.cfg.master&&S.cfg.patrol_enabled]];
+    const expected=beats.filter(b=>b[1]);
+    if(!expected.length)await step(4,'task','定时任务','skip','总开关关着,自动化本来就没开');
+    else if(!S.taskOk){
+      await step(4,'task','定时任务','fail','任务不在岗,多半被安全软件拦了');
+      conclude('task_blocked','自动登录还没生效,定时任务被拦了')}
+    else await step(4,'task','定时任务','ok',expected.length+' 项任务都在岗');
+    /* ⑤ 程序自身 */
+    if(SCENE==='diag_app'){
+      await step(5,'app','程序自身','fail','最近有 1 次崩溃记录');
+      conclude('app_fault','桂桂自己出了点问题,带着结论反馈给开发者')}
+    else await step(5,'app','程序自身','ok','无崩溃记录');
+    return OK({steps,verdict,exit});
+  },
   async rebuildTask(){
     await delay(600);
     S.taskOk=true;   /* QA:重建一次就修好 */

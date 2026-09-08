@@ -1,4 +1,4 @@
-# 桂桂 v2 · JS↔Python 桥接契约 v1.4.3
+# 桂桂 v2 · JS↔Python 桥接契约 v1.5.0
 
 > **地位**:前后端通信协议的**唯一权威**(《guigui-work-split.md》§一.2)。后端 bridge 实现以此为准;`static/dev/mock.js` 是它的可执行规范(仅开发)。
 > **绑定**:命名空间 `window.guigui.*`。pywebview 经 `js_api` 暴露,实现侧自行决定 camelCase 方法名或 snake_case+映射(契约只锁 JS 侧名字)。
@@ -95,6 +95,10 @@ cred_verified 不置假,拒绝现场四件入日志 data 与诊断包 server 区
 前端按「稍后再试」中性展示不进密码警告框;期间推 `login:progress` `phase:"throttled"` 带 `waitsec`)
 | `before_open`(已存密码、明早自动验证 — 仅限已存凭据路径)。message 已按各态拼好人话,前端直显即可;
 `reason` 缺省 = 服务器原文透传,前端不猜。
+
+> **呈现映射(1.5.0 说明,信封形状零变化)**:前端对 `verified:false`(stored / 降级存入 / 不可达存入)
+> 一律落「保存配置」终态页(不撒彩带),不再有「未验证成功页」变体;`task_ok:false` 落拦截终态页
+> (只留重建按钮)。路由单一事实源见 `docs/plans/ui-routing-rework-2026-09-08.md` §1。
 
 ### 2.4 scanWifi() — 扫描可用网络(v-guide 列表 / 设置 WiFi 兜底选择)
 
@@ -236,6 +240,36 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
 // 补发由后端自驱(GUI 打开/网络恢复/ensure 拍都会 pump),前端零操作。
 ```
 
+### 2.18 diagnose() — 验证器:五步全量体检(1.5.0 新增,仅用户显式触发)
+
+时延承诺:第 3 步可能真登一次(副作用,看得见地跑),最坏 ≈ login 单发 + 节流等待;
+**启动静默体检永远不调本方法**(只读检查走 §2.1 probe + §2.13 taskStatus,计划 2.1 铁律)。
+进入 v-diag 即自动开跑,无需再点开始。执行期间逐步推 `diag:progress`,末了回总结信封:
+
+```jsonc
+// 事件载荷(每步 2 条:running → ok|fail|skip;key 同下)
+{ "step": 3, "key": "credential", "state": "fail", "detail": "密码不对,改一下再试" }
+
+// data(steps 顺序恒为五步;skip = 该步没法下结论,不装)
+{ "steps": [
+    { "key": "network",    "label": "网络连通",   "state": "ok",   "detail": "已连上 Campus-WiFi" },
+    { "key": "server",     "label": "认证服务器", "state": "ok",   "detail": "10.1.2.3 可达" },
+    { "key": "credential", "label": "凭据验证",   "state": "fail", "detail": "密码不对,改一下再试",
+      "reason": "wrong_password" },
+    { "key": "task",       "label": "定时任务",   "state": "ok",   "detail": "2 项任务都在岗" },
+    { "key": "app",        "label": "程序自身",   "state": "ok",   "detail": "无崩溃记录" }
+  ],
+  "verdict": "凭据有问题,去登录页改一下",   // 人话结论,大字直显
+  "exit": "login" }                        // login|task_blocked|ok|app_fault|net_down(路由唯一依据)
+```
+
+- `reason` 仅 credential 步被拒时携带(§2.3 拒绝四态),登录页警告块预填用。
+- 第 3 步副作用语义:`not_logged_in` → 用已存凭据真登一次(成功顺手把网接上并推 `net:state`);
+  `logged_in` → chkstatus 只读核对学号,**不注销**;被节流 → skip(不冤枉密码)。
+- 第 4 步按配置只查该存在的任务(§2.13 同源四拍);杀软拦截无法直接查,只从任务缺失反推,
+  detail 如实「多半被拦」,不装确定。
+- 多故障并存的退出优先级:net_down > login > task_blocked > app_fault > ok。
+
 ### 2.13 taskStatus() — 定时任务在岗状态(1.2.0 新增,AC-17)
 
 ```jsonc
@@ -257,7 +291,8 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
 | `net:state` | `{state, ssid}`(同 probe.net 子集) | GUI 打开期间网络状态变化(含 connectWifi 之后、等待开门开门后) |
 | `login:progress` | `{phase, attempt?, attempts?, online_uid?, waitsec?}`;phase ∈ probe\|connecting_wifi\|logging_out\|requesting\|retrying\|throttled | login/connectWifi 执行中;`logging_out` = 验证阶梯正在注销当前会话(断几秒),线上是别人的学号时带 `online_uid`(打码)如实注明(1.2.0,PRD 4.1.2);`throttled` = 服务器节流、后端按 `waitsec` 秒等待后接着试(1.4.0 实装、1.4.2 补登记) |
 | `log:appended` | `{day_label, entry}`(entry 同 2.9) | 静默 ensure 落日志(GUI 开着时主页内嵌日志追加) |
-| `schedule:changed` | `{master, trigger_time, task_ok}` | selfheal 对齐/外部变更后,前端同步两处开关与 desc;`task_ok`=任务在岗(1.2.0,设置页「定时任务」行) |
+| `schedule:changed` | `{master, trigger_time, task_ok}` | selfheal 对齐/外部变更后,前端同步两处开关与 desc;`task_ok`=任务在岗(1.2.0,主页横幅②数据源) |
+| `diag:progress` | `{step, key, state, detail}`;state ∈ running\|ok\|fail\|skip | `diagnose()` 执行中逐步推进(1.5.0);前端 v-diag 链路实时渲染,未知步骤忽略 |
 
 ## 4. 启动时序(约定,非方法)
 
@@ -281,6 +316,7 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
 | 1.4.1 | 2026-09-07 | QA 审计 P2-9:§2.2 `identify` 的 `source` 语义明确(零形状变化,字段 1.0.1 起即有)— `chkstatus` = 检测自当前网络共享会话,回填值可能是室友学号,前端首装表单识别结果旁必须给确认提示(「检测自当前网络会话,确认是你自己的学号」方向);`config` 可信免提示;`none` 无回填 | 后端无需改(信封一直如实);前端已接(首装/登录表单 chkstatus 旁注,mock `other` 场景验过,2026-09-07)— **生效** |
 | 1.4.2 | 2026-09-07 | 补登记票(零行为变化):§2.3 `reason` 枚举 + §3 `login:progress` 补登 `throttled`/`waitsec` — 1.4.0 随 QA P1-6 实装于后端与 mock,当时漏改本文;本次随前端适配(节流按「稍后再试」中性渲染)一并入册 | 前端已接(fb0723c;?dev=1&scene=throttled 可验)— **生效** |
 | 1.4.3 | 2026-09-07 | §2.2 撤销「首装表单 chkstatus 旁注确认提示」强制(1.4.1 引入)— 用户拍板:这行文字没必要,按零摩擦原则移除;`source` 三态语义保留(后端/mock 零变化),误抓由登录被拒(wrong_account 文案)自纠 | 前端已接(旁注已移除,e95beb8;mock 无需改,`other` 场景仍验信封)— **生效** |
+| 1.5.0 | 2026-09-08 | 验证器落地(计划 `docs/plans/ui-routing-rework-2026-09-08.md` P1):新增 §2.18 `diagnose()`(五步信封 + `exit` 枚举;第 3 步含真登副作用,**仅用户显式进 v-diag 触发**,启动静默体检不碰);§3 新增事件 `diag:progress`;§2.3 补「呈现映射」说明(`verified:false` → 保存配置终态页,信封零变化);方法 18 个 | 后端已实现(api.diagnose + 11 测);mock 同步(diagnose + `diag_ok/diag_cred/diag_task/diag_app` 四场景,与后端逐字一致);前端已接(v-diag 页 + 横幅③/设置「立即体检」两入口 + 登录页带结论预填)— **生效** |
 
 ## 6. 集成待办(联调问题记这里)
 

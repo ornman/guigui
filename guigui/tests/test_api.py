@@ -738,3 +738,130 @@ def test_submit_password_task_blocked_reports_honestly(ctx):
     assert ctx.task_blocked_calls                       # 同步弹指引通知
     events = [p for t, p in parse_emitted(ctx.window) if t == "schedule:changed"]
     assert events and events[-1]["task_ok"] is False
+
+
+# ── 2.18 diagnose(1.5.0 验证器)──────────────────────────
+
+
+def _diag_events(ctx):
+    return [p for t, p in parse_emitted(ctx.window) if t == "diag:progress"]
+
+
+def test_diagnose_all_ok_logged_in_identity_match(ctx):
+    ctx.chk_uid = "2025000000001"          # 线上学号 = 配置学号 → 只读核对通过
+    out = ctx.api.diagnose()
+    assert out["ok"] is True
+    d = out["data"]
+    assert [s["key"] for s in d["steps"]] == [
+        "network", "server", "credential", "task", "app"]
+    assert [s["state"] for s in d["steps"]] == ["ok"] * 5
+    assert d["steps"][0]["detail"] == "已连上 Campus-WiFi"
+    assert d["steps"][2]["detail"] == "在线,学号一致 ✓"
+    assert d["steps"][3]["detail"] == "2 项任务都在岗"   # 默认配置:日历+开机两拍
+    assert d["exit"] == "ok" and d["verdict"] == "一切正常,网是通的"
+    # 逐步推进事件:每步 running → 终态,顺序对齐(计划 2.2)
+    ev = _diag_events(ctx)
+    assert [(e["step"], e["state"]) for e in ev] == [
+        (1, "running"), (1, "ok"), (2, "running"), (2, "ok"),
+        (3, "running"), (3, "ok"), (4, "running"), (4, "ok"),
+        (5, "running"), (5, "ok")]
+
+
+def test_diagnose_net_down_skips_credential_but_checks_task(ctx):
+    ctx.probe_state = {"state": "unreachable", "ssid": "iphone17 pro max",
+                       "detail": "refused"}
+    out = ctx.api.diagnose()
+    d = out["data"]
+    assert d["steps"][0]["state"] == "ok"                 # 链路在(热点)
+    assert d["steps"][0]["detail"] == "已连上 iphone17 pro max"
+    assert d["steps"][1]["state"] == "fail"
+    assert d["steps"][1]["detail"] == "10.1.2.3 连不上"
+    assert d["steps"][2]["state"] == "skip"               # 凭据没法验,不装结论
+    assert d["steps"][3]["state"] == "ok"                 # 任务/程序照查(只读)
+    assert d["exit"] == "net_down"
+
+
+def test_diagnose_wrong_password_exit_login_with_reason(ctx):
+    ctx.probe_state = {"state": "not_logged_in", "ssid": "Campus-WiFi", "detail": ""}
+    ctx.login_seq = [("rejected", "userid error2")]
+    out = ctx.api.diagnose()
+    s3 = out["data"]["steps"][2]
+    assert s3["state"] == "fail"
+    assert s3["detail"] == "密码不对,改一下再试"          # rejection_text 单一来源
+    assert s3["reason"] == "wrong_password"               # 登录页警告块预填用
+    assert out["data"]["exit"] == "login"
+
+
+def test_diagnose_real_login_success_emits_net_state(ctx):
+    ctx.probe_state = {"state": "not_logged_in", "ssid": "Campus-WiFi", "detail": ""}
+    ctx.login_seq = [("success", "")]
+    out = ctx.api.diagnose()
+    assert out["data"]["steps"][2]["detail"] == "密码对,顺手把网登上了 ✓"
+    types = [t for t, _p in parse_emitted(ctx.window)]
+    assert "net:state" in types                            # 网态真翻了,各视图跟真
+
+
+def test_diagnose_throttled_is_skip_not_fail(ctx, monkeypatch):
+    ctx.probe_state = {"state": "not_logged_in", "ssid": "Campus-WiFi", "detail": ""}
+    ctx.login_seq = [("rejected", "登录太频繁")]
+    monkeypatch.setattr(api_mod.drcom, "parse_waitsec", lambda *a, **k: 10)
+    out = ctx.api.diagnose()
+    s3 = out["data"]["steps"][2]
+    assert s3["state"] == "skip" and "节流" in s3["detail"]
+    assert out["data"]["exit"] == "ok"                    # 节流不是密码错,不跳登录页
+
+
+def test_diagnose_task_blocked_from_missing_beats(ctx):
+    ctx.chk_uid = "2025000000001"
+    ctx.task_current = False
+    out = ctx.api.diagnose()
+    s4 = out["data"]["steps"][3]
+    assert s4["state"] == "fail"
+    assert s4["detail"] == "任务不在岗,多半被安全软件拦了"  # 如实「多半」,不装确定
+    assert out["data"]["exit"] == "task_blocked"
+
+
+def test_diagnose_master_off_task_step_skips(ctx):
+    ctx.chk_uid = "2025000000001"
+    config.save(config.apply_patch(config.load(), {"master": False}))
+    out = ctx.api.diagnose()
+    s4 = out["data"]["steps"][3]
+    assert s4["state"] == "skip" and "总开关" in s4["detail"]
+
+
+def test_diagnose_app_fault_on_recent_crash(ctx, monkeypatch):
+    ctx.chk_uid = "2025000000001"
+    monkeypatch.setattr(api_mod.crashlog, "recent", lambda n=3: [{"ts": "x"}])
+    out = ctx.api.diagnose()
+    s5 = out["data"]["steps"][4]
+    assert s5["state"] == "fail" and "崩溃记录" in s5["detail"]
+    assert out["data"]["exit"] == "app_fault"
+
+
+def test_diagnose_priority_net_down_beats_task_blocked(ctx):
+    ctx.probe_state = {"state": "unreachable", "ssid": None, "detail": ""}
+    ctx.task_current = False
+    out = ctx.api.diagnose()
+    assert out["data"]["exit"] == "net_down"              # 先有网,才谈得上自动化
+
+
+def test_diagnose_online_other_uid_exit_login(ctx):
+    ctx.chk_uid = "2025000000002"                        # 线上是室友的号
+    out = ctx.api.diagnose()
+    s3 = out["data"]["steps"][2]
+    assert s3["state"] == "fail" and "别人的学号" in s3["detail"]
+    assert out["data"]["exit"] == "login"
+
+
+def test_diagnose_no_stored_password(ctx):
+    monkeypatch_vault = pytest.MonkeyPatch()
+    monkeypatch_vault.setattr(api_mod.vault, "has_password", lambda uid: False)
+    try:
+        ctx.chk_uid = None
+        ctx.probe_state = {"state": "not_logged_in", "ssid": "Campus-WiFi", "detail": ""}
+        out = ctx.api.diagnose()
+        s3 = out["data"]["steps"][2]
+        assert s3["state"] == "fail" and "还没存密码" in s3["detail"]
+        assert out["data"]["exit"] == "login"
+    finally:
+        monkeypatch_vault.undo()

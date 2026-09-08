@@ -277,7 +277,7 @@ input[type=password]::-ms-clear{display:none}
 .btn.quiet.busy::after{border-color:oklch(23% 0.015 295 / .25);border-top-color:var(--ink)}
 @keyframes spin{to{transform:rotate(360deg)}}
 /* 主页横幅:①密码还没验证过 ②自动登录还没生效(任务被拦,点击就地重建);
-   ③试了几次还没登上(P1 随 v-diag 上线);「今早没登上」已删(2026-09-08) */
+   ③试了几次还没登上(再登失败 ≥2,进验证器);「今早没登上」已删(2026-09-08) */
 .banner{display:flex;align-items:center;gap:8px;margin:10px 0 0;padding:9px 12px;border-radius:10px;
   background:oklch(58% 0.15 295 / 0.07);border:1px solid oklch(58% 0.15 295 / 0.22);
   font:500 12.5px/1.5 Inter,"PingFang SC",sans-serif;color:var(--accent);cursor:pointer;
@@ -288,6 +288,18 @@ input[type=password]::-ms-clear{display:none}
 .submit-note{display:flex;align-items:center;gap:6px;margin:8px 0 0;padding:8px 12px;border-radius:10px;
   background:oklch(58% 0.15 295 / 0.06);font:500 12px/1.5 Inter,"PingFang SC",sans-serif;color:var(--ink-2)}
 .submit-note .link{margin-top:0;font-size:12px}
+/* 验证器链路(v-diag,1.5.0):五步行,状态符 ✓✗○ 与 running 脉冲;结论区复用 .tiny-label */
+.diag-step{display:flex;align-items:baseline;gap:10px;padding:10px 2px;
+  border-bottom:1px solid oklch(60% 0.01 295 / 0.15);font-size:14.5px}
+.diag-step .no{font-size:12px;color:var(--ink-3);flex-shrink:0}
+.diag-step .lbl{flex-shrink:0;min-width:5em}
+.diag-step .st{flex-shrink:0;width:1.3em;text-align:center;font-size:13px}
+.diag-step .dt{color:var(--ink-2);font-size:13px;font-family:Inter,"PingFang SC",sans-serif}
+.diag-step[data-state=pending]{opacity:.45}
+.diag-step[data-state=ok] .st{color:var(--accent)}
+.diag-step[data-state=fail] .st,.diag-step[data-state=fail] .dt{color:var(--warm)}
+.diag-step[data-state=skip] .st,.diag-step[data-state=skip] .dt{color:var(--ink-3)}
+.diag-step[data-state=running] .st{color:var(--accent);animation:pulse 1.2s ease-in-out infinite}
 /* 常用时间药丸:一键填充输入框 */
 .presets{display:flex;gap:6px;flex-wrap:wrap}
 .preset{padding:7px 12px;border-radius:99px;border:1px solid oklch(60% 0.01 295 / 0.3);
@@ -682,12 +694,34 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
         <div class="sw on" data-cfg="notifications" onclick="toggleCfg(this)"></div></div>
 
       <div class="tiny-label">系统</div>
+      <div class="row"><div><div class="t">立即体检</div><div class="d">网络、密码、任务、程序,从头到尾查一遍</div></div>
+        <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openDetail('v-diag')">去体检</button></div>
       <div class="row"><div><div class="t">显示桂桂</div></div>
         <div class="sw on" id="sw-gui" onclick="toggleGui(this)"></div></div>
 
       <div class="row"><div><div class="t">反馈</div><div class="d">问题或建议都说给桂桂听,一键直达开发者</div></div>
         <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openDetail('v-feedback')">反馈</button></div>
       <div style="height:8px"></div>
+    </div>
+
+    <!-- 验证器(1.5.0):进入即自动开跑,五步链路逐拍可见;结论大字 + 按 exit 出口;
+         第 3 步有副作用(真登一次)所以只在这里显式跑,启动静默体检不进本页 -->
+    <div class="v" id="v-diag">
+      <button class="back" onclick="backFrom('v-diag')">‹ 返回</button>
+      <div class="greet">
+        <div class="bot bot-greet" id="boot-bot-greet-diag" data-state="thinking" data-size="58"></div>
+        <div>
+          <h1 style="font-size:22px">排查问题。</h1>
+          <p class="lede">桂桂从头到尾查一遍,每步都给你看到:</p>
+        </div>
+      </div>
+      <div id="diag-steps"></div>
+      <div id="diag-verdict" style="display:none">
+        <div class="tiny-label" style="margin-top:16px">结论</div>
+        <div id="diag-verdict-text" style="font-size:18px;font-weight:600;line-height:1.5"></div>
+        <button class="btn" id="diag-exit" onclick="diagExit()" style="display:none"></button>
+      </div>
+      <button class="link" style="margin-top:18px" onclick="openDetail('v-feedback')">排查也没解决?说给桂桂听 →</button>
     </div>
 
     <!-- 反馈:真通道(契约 §2.15–2.17,1.3.0)— 分类单选 + 一句话;诊断包自动采集;
@@ -730,7 +764,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
 <script>
 const win=document.getElementById('win');
 const $=id=>document.getElementById(id);
-const views=['v-boot','v-ok','v-login','v-success','v-guide','v-main','v-settings','v-log','v-feedback'];
+const views=['v-boot','v-ok','v-login','v-success','v-guide','v-main','v-settings','v-log','v-feedback','v-diag'];
 /* 主页日志钉底保留条数:全天历史走 v-log;过多会顶飞「历史日志 →」 */
 const MAIN_LOG_KEEP=5;
 let mainState='ok',configured=false,hasPwd=false;
@@ -794,7 +828,7 @@ function show(id){
   }else{next.classList.add('on')}
 }
 /* 来路栈:首次进入时记录,返回后清除(报告 5.5);不再每次覆盖 */
-function openDetail(id){if(!(id in origin))origin[id]=currentView();show(id);if(id==='v-settings')loadSettings();if(id==='v-log')loadLogs();if(id==='v-guide')renderGuide();if(id==='v-login')fillLoginLanding();if(id==='v-feedback')loadFeedback()}
+function openDetail(id){if(!(id in origin))origin[id]=currentView();show(id);if(id==='v-settings')loadSettings();if(id==='v-log')loadLogs();if(id==='v-guide')renderGuide();if(id==='v-login')fillLoginLanding();if(id==='v-feedback')loadFeedback();if(id==='v-diag')startDiag()}
 function backFrom(id){const dest=origin[id]||'v-main';delete origin[id];if(dest==='v-main'){renderMain();renderMainData()}show(dest);greet();document.body.classList.remove('setup')}
 function greetText(){const h=new Date().getHours();return h<11?'早上好':(h<18?'下午好':'晚上好')}
 function greet(){const g=greetText()+'。';
@@ -977,6 +1011,7 @@ async function quickLogin(){
   const r=await GG.api.login({});
   setBusy($('main-btn'),false);
   if(r.ok){
+    loginFailStreak=0;   /* 成功清零(横幅③随消) */
     if(r.data&&r.data.result==='stored'){
       /* 锚前存入(门没开):密码存了但没登上,不是成功,如实说 */
       mood(gb,'idle');
@@ -988,12 +1023,15 @@ async function quickLogin(){
     $('main-lede').textContent='刚刚把网帮你接回来啦 ✓';
     renderBannersRefresh();return}
   if(r.code==='AUTH_REJECTED'){
-    /* 被拒=凭据问题:跳改密页(带返回),警告块预填结论,改对重试(错误路由总表) */
+    /* 被拒=凭据问题:跳改密页(带返回),警告块预填结论;连续 ≥2 次出横幅③(错误路由总表) */
+    loginFailStreak++;renderBannersRefresh();
     openDetail('v-login');
     showLoginErr(r.message||'密码好像不对',r.reason);return}
   if(r.code==='NOT_CONFIGURED'){openDetail('v-login')}
   else if(r.code==='NET_UNREACHABLE'){openDetail('v-guide')}
-  else{$('main-lede').textContent=r.message||'出了点问题,再试一次'}
+  else{
+    loginFailStreak++;renderBannersRefresh();
+    $('main-lede').textContent=r.message||'出了点问题,再试一次'}
 }
 /* 流程动作 */
 /* 终态舞台(3.4/3.7):成功三态(彩带/保存配置/拦截)+ 反馈两态共用同一舞台;
@@ -1099,7 +1137,7 @@ async function loginNow(){
   setBusy(btn,true,fromGuide?'保存中…':'验证中…');
   const r=await GG.api.login({sid:sidVal||undefined,password:pwdVal||undefined,operator:pickedOperator('#op-dd-login')});
   setBusy(btn,false);hideSubmitNotes();
-  if(r.ok){configured=true;hasPwd=true;
+  if(r.ok){configured=true;hasPwd=true;loginFailStreak=0;
     showSuccess(r.data.verified===true,r.data.reason,r.data.task_ok);renderBannersRefresh();return}
   if(r.code==='AUTH_REJECTED'){
     if(r.reason==='throttled'){
@@ -1291,10 +1329,11 @@ GG.on('schedule:changed',e=>{
 /* 任务被拦横幅②的数据源(2026-09-08 收敛为单一状态位):
    启动静默体检 / schedule:changed / 主页数据轮询 / 重建结果,都经 setTaskBlocked 汇聚 */
 let taskBlocked=false;
+let loginFailStreak=0;   /* 主页「再登一次」连续失败计数:成功清零,≥2 → 横幅③进验证器(计划 3.5) */
 function setTaskBlocked(b){taskBlocked=!!b;renderBannersRefresh()}
 /* 主页横幅(终态,重做后仅三种):①密码还没验证过(仅保存配置路径,点击直达改密页,
-   连上后自动登成功即消)②自动登录还没生效(任务被拦,点击就地重建);
-   ③试了几次还没登上(P1 随 v-diag 上线)。「今早没登上」已删(最近结果行已显示) */
+   连上后自动登成功即消)②自动登录还没生效(任务被拦,点击就地重建)
+   ③试了几次还没登上(再登连续失败 ≥2,进验证器;成功清零)。「今早没登上」已删(最近结果行已显示) */
 function renderBanners(rec){
   const box=$('main-banners');if(!box)return;
   let h='';
@@ -1302,6 +1341,8 @@ function renderBanners(rec){
     h+='<div class="banner" onclick="openDetail(\'v-login\')"><span>密码还没验证过,去改一下</span><span class="arr">›</span></div>';
   if(configured&&taskBlocked)
     h+='<div class="banner banner-task" onclick="rebuildTaskBanner()"><span>自动登录还没生效,点此重建</span><span class="arr">›</span></div>';
+  if(configured&&loginFailStreak>=2)
+    h+='<div class="banner" onclick="openDetail(\'v-diag\')"><span>试了几次还没登上?完整排查</span><span class="arr">›</span></div>';
   box.innerHTML=h;
 }
 /* 横幅②就地重建(带 busy);失败变「没建成,再试一次」,成功横幅消失 */
@@ -1312,6 +1353,62 @@ async function rebuildTaskBanner(){
   if(r.ok&&r.data.ok){setTaskBlocked(false);return}
   el.innerHTML='<span>没建成,再试一次</span><span class="arr">›</span>';
 }
+
+/* ═══ 验证器 v-diag(契约 §2.18,1.5.0)═══
+   进入即自动开跑(openDetail 钩子),五步链路随 diag:progress 逐拍上屏;
+   结论大字 + 按 exit 出口;app_fault/net_down 就地说明,页底反馈小出口兜底 */
+const DIAG_KEYS=[['network','网络连通'],['server','认证服务器'],['credential','凭据验证'],['task','定时任务'],['app','程序自身']];
+const DIAG_ICONS={ok:'✓',fail:'✗',skip:'○',running:'●',pending:'·'};
+let diagState=null;
+function renderDiag(){
+  const box=$('diag-steps');if(!box)return;
+  box.innerHTML=DIAG_KEYS.map((k,i)=>{
+    const s=(diagState&&diagState.steps[k[0]])||{state:'pending',detail:''};
+    return '<div class="diag-step" data-state="'+s.state+'"><span class="no">'+'①②③④⑤'.charAt(i)+
+      '</span><span class="lbl">'+k[1]+'</span><span class="st">'+(DIAG_ICONS[s.state]||'·')+
+      '</span><span class="dt">'+esc(s.detail||'')+'</span></div>';
+  }).join('');
+  const v=$('diag-verdict');
+  if(diagState&&diagState.done){
+    v.style.display='block';
+    $('diag-verdict-text').textContent=diagState.verdict||'';
+    const btn=$('diag-exit'),ex=diagState.exit;
+    if(ex==='login'||ex==='task_blocked'||ex==='ok'){
+      btn.style.display='block';
+      btn.textContent=ex==='login'?'去登录页改一下':(ex==='task_blocked'?'重建定时任务':'完成,回主页');
+    }else btn.style.display='none';
+  }else v.style.display='none';
+}
+async function startDiag(){
+  diagState={steps:{},verdict:null,exit:null,done:false};
+  renderDiag();
+  const r=await GG.api.diagnose();
+  if(r.ok){
+    diagState.done=true;diagState.verdict=r.data.verdict;diagState.exit=r.data.exit;
+    (r.data.steps||[]).forEach(s=>{diagState.steps[s.key]={state:s.state,detail:s.detail,reason:s.reason}});
+  }else{
+    /* BRIDGE_MISSING / INTERNAL:就地报后端原话,结论区当出气口 */
+    diagState.done=true;diagState.verdict=r.message||'体检没跑完,再试一次';diagState.exit=null;
+  }
+  renderDiag();
+}
+/* 出口路由(错误路由总表):凭据→登录页预填结论;任务→拦截终态页;ok→回主页 */
+function diagExit(){
+  const ex=diagState?diagState.exit:null;
+  if(ex==='login'){
+    const s=(diagState.steps&&diagState.steps.credential)||{};
+    openDetail('v-login');
+    showLoginErr(s.detail||'凭据有问题,改一下再试',s.reason);
+    return}
+  if(ex==='task_blocked'){showSuccess(true,null,false);return}
+  goDaily();
+}
+GG.on('diag:progress',e=>{
+  if(!e||!e.key)return;
+  if(!diagState)diagState={steps:{},verdict:null,exit:null,done:false};
+  diagState.steps[e.key]={state:e.state,detail:e.detail};
+  if(currentView()==='v-diag')renderDiag();
+});
 /* 自助服务平台:交系统默认浏览器,桂桂本体内不开网页;失败就地报,不弹窗 */
 async function openSelfService(btn,failText,origText){
   const r=await GG.api.openSelfService();

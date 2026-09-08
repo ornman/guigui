@@ -16,7 +16,7 @@ import logging
 import threading
 import time
 
-from guigui.core import config, detect, diagnostics, drcom, ensure, feedback, logstore, notify, scheduler, selfheal, vault, wifictl
+from guigui.core import config, crashlog, detect, diagnostics, drcom, ensure, feedback, logstore, notify, scheduler, selfheal, vault, wifictl
 from guigui.core.config import ConfigError
 from guigui.core.vault import VaultError
 from guigui.core.wifictl import WifiConnectError, WifiScanError
@@ -588,6 +588,162 @@ class GuiGuiApi:
         except Exception:
             log.exception("api.rebuildTask")
             return _err(INTERNAL, "重建没成功,再试一次")
+
+    # ── 2.18 diagnose(1.5.0 验证器)──────────────
+
+    def _diag_progress(self, step: int, key: str, state: str, detail: str) -> None:
+        self._emit("diag:progress",
+                   {"step": step, "key": key, "state": state, "detail": detail})
+
+    def diagnose(self) -> dict:
+        """五步顺序体检(契约 §2.18),逐步推 diag:progress,末了回总结信封。
+
+        铁律(计划 2.1):第三步有副作用(not_logged_in 时真登一次),
+        只许用户显式进 v-diag 触发;启动静默体检走 probe+taskStatus(只读),
+        永远不跑本方法。杀软拦截无法直接查:第 4 步只从任务缺失反推,
+        detail 如实说「多半被拦」,不装确定。"""
+        steps: list[dict] = []
+
+        def finish(step, key, label, state, detail, reason=None):
+            item = {"key": key, "label": label, "state": state, "detail": detail}
+            if reason:
+                item["reason"] = reason
+            steps.append(item)
+            self._diag_progress(step, key, state, detail)
+
+        exit_code, verdict = "ok", "一切正常,网是通的"
+
+        def conclude(code, text):
+            nonlocal exit_code, verdict
+            if exit_code == "ok":
+                exit_code, verdict = code, text
+
+        try:
+            cfg = config.load()
+        except Exception:
+            log.exception("api.diagnose: config 读不回")
+            finish(5, "app", "程序自身", "fail", "配置文件读不回来")
+            return _ok({"steps": steps, "verdict": "桂桂自己的文件出了问题",
+                        "exit": "app_fault"})
+
+        # ① 网络连通(链路层:网卡/SSID)
+        self._diag_progress(1, "network", "running", "正在查…")
+        net = detect.probe(cfg)
+        if net["state"] == detect.WAITING:
+            finish(1, "network", "网络连通", "fail", "网络还没就绪,像刚开机")
+        elif net.get("ssid"):
+            finish(1, "network", "网络连通", "ok", f"已连上 {net['ssid']}")
+        else:
+            finish(1, "network", "网络连通", "ok", "已联网(非 WiFi)")
+
+        # ② 认证服务器(HTTP)
+        self._diag_progress(2, "server", "running", "正在查…")
+        server = net.get("server") or "10.1.2.3"
+        server_up = net["state"] in (detect.LOGGED_IN, detect.NOT_LOGGED_IN)
+        if server_up:
+            finish(2, "server", "认证服务器", "ok", f"{server} 可达")
+        else:
+            finish(2, "server", "认证服务器", "fail", f"{server} 连不上")
+            conclude("net_down", "连不上校园网,先看看网络")
+
+        # ③ 凭据验证(副作用仅此步:看得见地真登一次)
+        if not server_up:
+            finish(3, "credential", "凭据验证", "skip", "服务器够不着,密码没能验证")
+        else:
+            self._diag_progress(3, "credential", "running", "正在查…")
+            uid = cfg.get("uid") or ""
+            try:
+                stored = vault.get_password(uid) if uid and vault.has_password(uid) else None
+                vault_ok = True
+            except VaultError:
+                stored, vault_ok = None, False
+            if not vault_ok:
+                finish(3, "credential", "凭据验证", "fail",
+                       "系统凭据管理器不可用,密码没能验证")
+                conclude("app_fault", "系统凭据管理器不可用,带着结论反馈给开发者")
+            elif not stored:
+                finish(3, "credential", "凭据验证", "fail", "还没存密码,先去填一次")
+                conclude("login", "密码还没存,先去填一次")
+            elif net["state"] == detect.LOGGED_IN:
+                online = drcom.chkstatus_uid(cfg["url"])
+                if online is None:
+                    finish(3, "credential", "凭据验证", "skip", "已在线,线上学号没能核对")
+                elif online == uid:
+                    finish(3, "credential", "凭据验证", "ok", "在线,学号一致 ✓")
+                else:
+                    finish(3, "credential", "凭据验证", "fail",
+                           f"线上是别人的学号({drcom.mask_uid(online)}),登录一次换回自己")
+                    conclude("login", "线上是别人的号,登录一次换回自己")
+            else:   # not_logged_in + 有存凭据 → 真登一次
+                result, msg, tries, waitsec = self._verify_login_once(
+                    cfg, uid, stored, cfg.get("operator", drcom.DEFAULT_OPERATOR))
+                if result == drcom.SUCCESS:
+                    ensure.settle_from_gui(cfg, uid, tries)
+                    finish(3, "credential", "凭据验证", "ok", "密码对,顺手把网登上了 ✓")
+                    net2 = detect.probe(cfg)   # 网态真翻了,推事件让各视图跟真
+                    self._emit("net:state",
+                               {"state": net2["state"], "ssid": net2.get("ssid")})
+                elif result == drcom.REJECTED:
+                    kind = drcom.classify_rejection(msg, waitsec=waitsec)
+                    if kind == drcom.REJ_THROTTLED:
+                        finish(3, "credential", "凭据验证", "skip", "被节流了,密码没能当场验证")
+                        conclude("ok", "被节流了,没能验完;稍等几分钟再来一次")
+                    else:
+                        finish(3, "credential", "凭据验证", "fail",
+                               drcom.rejection_text(kind, msg or "密码可能改过了"),
+                               reason=kind)
+                        conclude("login", "凭据有问题,去登录页改一下")
+                elif result == drcom.UNREACHABLE:
+                    finish(3, "credential", "凭据验证", "fail", "登录途中连不上了")
+                    conclude("net_down", "连不上校园网,先看看网络")
+                else:
+                    finish(3, "credential", "凭据验证", "fail",
+                           msg or "认证服务器返回了不认识的格式")
+                    conclude("app_fault", "认证服务器回了不认识的格式")
+
+        # ④ 定时任务(只读 schtasks /query;从缺失反推被拦,如实「多半」)
+        self._diag_progress(4, "task", "running", "正在查…")
+        beats = (
+            (scheduler.TASK_MAIN, selfheal.should_main_task_exist(cfg),
+             lambda: scheduler.is_task_current(scheduler.TASK_MAIN, cfg)),
+            (scheduler.TASK_BOOT, selfheal.should_boot_task_exist(cfg),
+             lambda: scheduler.is_task_current(scheduler.TASK_BOOT, cfg,
+                                               require_logon=True)),
+            (scheduler.TASK_WAKE, selfheal.should_wake_task_exist(cfg),
+             lambda: scheduler.is_task_current(scheduler.TASK_WAKE, cfg)),
+            (scheduler.TASK_PATROL, selfheal.should_patrol_task_exist(cfg),
+             lambda: scheduler.is_task_current(scheduler.TASK_PATROL, cfg)),
+        )
+        expected = [(name, cur) for name, want, cur in beats if want]
+        if not expected:
+            finish(4, "task", "定时任务", "skip", "总开关关着,自动化本来就没开")
+        elif any(not cur() for _name, cur in expected):
+            finish(4, "task", "定时任务", "fail", "任务不在岗,多半被安全软件拦了")
+            conclude("task_blocked", "自动登录还没生效,定时任务被拦了")
+        else:
+            finish(4, "task", "定时任务", "ok", f"{len(expected)} 项任务都在岗")
+
+        # ⑤ 程序自身(config 已读回;vault 可用;近期崩溃;bridge 能调即活)
+        self._diag_progress(5, "app", "running", "正在查…")
+        app_issues = []
+        try:
+            vault.has_password(cfg.get("uid") or "")
+        except Exception:
+            app_issues.append("系统凭据管理器不可用")
+        try:
+            crashes = crashlog.recent()
+        except Exception:
+            crashes = []
+            app_issues.append("崩溃记录读不出来")
+        if crashes:
+            app_issues.append(f"最近有 {len(crashes)} 次崩溃记录")
+        if app_issues:
+            finish(5, "app", "程序自身", "fail", ";".join(app_issues))
+            conclude("app_fault", "桂桂自己出了点问题,带着结论反馈给开发者")
+        else:
+            finish(5, "app", "程序自身", "ok", "无崩溃记录")
+
+        return _ok({"steps": steps, "verdict": verdict, "exit": exit_code})
 
     # ── 2.9 logs ──────────────────────────────────
 
