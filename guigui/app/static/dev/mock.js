@@ -27,7 +27,10 @@
      diag_ok     验证器全绿(1.5.0):logged_in + 学号一致 + 任务在岗 + 无崩溃 → exit=ok
      diag_cred   验证器凭据败:not_logged_in + 已存密码 → 真登被拒 wrong_password → exit=login
      diag_task   验证器任务败:logged_in + taskOk=false → 第 4 步 fail「多半被安全软件拦了」→ exit=task_blocked
-     diag_app    验证器程序败:logged_in 一切正常但崩溃记录 → 第 5 步 fail → exit=app_fault */
+     diag_app    验证器程序败:logged_in 一切正常但崩溃记录 → 第 5 步 fail → exit=app_fault
+     streak     日常·重登连败(2026-09-08 横幅③/验证器链故事):configured+密码存过验证过,
+                但密码已被人改 — 已存凭据重登也拒 wrong_password;diagnose 第 3 步
+                同样真登被拒 → exit=login(文案与 rejected 场景逐字一致) */
 (function(){
 'use strict';
 const LS_SCENE='gg-mock-scene',LS_CFG='gg-mock-cfg';
@@ -79,6 +82,7 @@ if(SCENE==='diag_ok'){S.configured=true;S.verified=true;S.pwd='secret'}
 if(SCENE==='diag_cred'){S.net.state='not_logged_in';S.configured=true;S.verified=false;S.pwd='secret'}
 if(SCENE==='diag_task'){S.configured=true;S.verified=true;S.pwd='secret';S.taskOk=false}
 if(SCENE==='diag_app'){S.configured=true;S.verified=true;S.pwd='secret'}
+if(SCENE==='streak'){S.net.state='not_logged_in';S.configured=true;S.verified=true;S.pwd='secret'}
 if(SCENE==='unverified'){S.configured=true;S.verified=false;
   S.last={when:'今早',time:'07:00',tries:3,outcome:'fail'};
   S.logs[0].entries=[{ts:'07:00:01',level:'fail',text:'登录被拒:密码不对,改一下再试'}]}
@@ -149,7 +153,7 @@ window.GGMock={
       S.pwd=pwd;
       return OK({result:'stored',uid:UID_MASK,attempts:1,verified:false,reason:'before_open',task_ok:S.taskOk});
     }
-    if(SCENE==='rejected')return ERR('AUTH_REJECTED','密码不对,改一下再试','wrong_password');
+    if(SCENE==='rejected'||SCENE==='streak')return ERR('AUTH_REJECTED','密码不对,改一下再试','wrong_password');
     if(SCENE==='bind')return ERR('AUTH_REJECTED','密码是对的,但这个账号被绑在别处/受限 — 去自助服务平台看看绑定','bound');
     if(SCENE==='limit')return ERR('AUTH_REJECTED','这个学号已在别的设备上登录(比如在别处登过没下线),那边下线后桂桂会自动登好','limit_users');
     if(SCENE==='throttled'){
@@ -242,7 +246,7 @@ window.GGMock={
       /* not_logged_in:用已存凭据真登一次 */
       emit('login:progress',{phase:'requesting',attempt:1,attempts:1});
       await delay(900);
-      if(SCENE==='diag_cred'||SCENE==='rejected'){
+      if(SCENE==='diag_cred'||SCENE==='rejected'||SCENE==='streak'){
         await step(3,'credential','凭据验证','fail','密码不对,改一下再试','wrong_password');
         conclude('login','凭据有问题,去登录页改一下')
       }else{

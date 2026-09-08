@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>桂桂 · 状态总览(美术工作台)</title>
-<!-- dev-only 状态画廊:陈列 9 视图 × 全部状态帧 + 用户故事流程步进 + 网络切换器。
+<!-- dev-only 状态画廊:陈列 10 视图 × 全部状态帧 + 用户故事流程步进 + 网络切换器。
      打包必须整目录排除 static/dev/(与 mock.js 同规)。
      打开方式(须 http,file:// 下 iframe 跨源驱动不了):
        cd guigui/app/static && python -m http.server 8000
@@ -269,6 +269,15 @@ const PANELS=[
   {label:'横幅② 自动登录还没生效',scene:'daily',setup:W=>W.setTaskBlocked(true)},
   {label:'横幅② 重建失败(再试一次)',scene:'daily',setup:W=>{W.setTaskBlocked(true);
     const b=Q(W,'#main-banners .banner span');if(b)b.textContent='没建成,再试一次'}},
+  {label:'横幅③ 再登连败 ≥2(文案拟稿)',scene:'streak',setup:W=>{(async()=>{
+    /* 两连败走产品真路径(计数器只能由 quickLogin 改);步间等 500ms:
+       show() 的 .on 有 250ms 延迟,紧跟 backFrom 会被 cur===next 吞掉,收尾错留 v-login */
+    const wait=ms=>new Promise(r=>setTimeout(r,ms));
+    await W.quickLogin();await wait(500);   /* 失败 1:跳改密页预填警告 */
+    W.backFrom('v-login');await wait(500);  /* 返回主页(1 次失败不出横幅) */
+    await W.quickLogin();await wait(500);   /* 失败 2:计数 ≥2 */
+    W.backFrom('v-login');await wait(500);  /* 返回主页,横幅③ 在场 */
+  })()}},
   {label:'重登中(busy 防重复提交)',scene:'daily',setup:W=>W.setBusy(E(W,'main-btn'),true,'登录中…')},
   {label:'重登成功(就地反馈)',scene:'daily',setup:W=>{W.wakeProblem('out');
     W.mood(Q(W,'#boot-bot-greet-main'),'happy');
@@ -301,6 +310,24 @@ const PANELS=[
   {label:'终态 · 没发出去(重发/等待补发)',scene:'daily',setup:W=>W.showFeedbackEnd(false)},
   {label:'有积压反馈(pending 行)',scene:'daily',setup:W=>{W.openDetail('v-feedback');
     const p=E(W,'fb-pending');p.textContent='有 1 条没发出去的反馈,联网自动补发';p.style.display='block'}},
+]},
+{view:'v-diag',name:'验证器(1.5.0 · 进入即自动开跑)',frames:[
+  {label:'跑步中(①✓ ②●脉冲)',scene:'out',setup:W=>{
+    /* scene 独占:从真跑过的帧切来必重挂 iframe(diagState 全新),
+       否则 pose 只往旧状态合并,③④⑤ 会残留上一次真跑的结果;
+       show 而非 openDetail:不触发自动开跑,走 diag:progress 事件入口摆拍中段;
+       emit 延后 350ms:show() 的 .on 有 250ms 延迟,同步 emit 时
+       currentView() 还是旧视图,handler 不渲,步骤区会永远空着;
+       重复点自身幂等(done 恒 false,①② 重复赋同值) */
+    W.show('v-diag');
+    setTimeout(()=>{
+      W.guiguiEmit('diag:progress',{step:1,key:'network',state:'ok',detail:'已连上 Campus-WiFi'});
+      W.guiguiEmit('diag:progress',{step:2,key:'server',state:'running',detail:'正在查…'});
+    },350)}},
+  {label:'全绿 · exit=ok',scene:'diag_ok',setup:W=>W.openDetail('v-diag')},
+  {label:'凭据败 · exit=login(预填登录页)',scene:'diag_cred',setup:W=>W.openDetail('v-diag')},
+  {label:'任务败 · exit=task_blocked(拦截页)',scene:'diag_task',setup:W=>W.openDetail('v-diag')},
+  {label:'程序败 · exit=app_fault(就地说明)',scene:'diag_app',setup:W=>W.openDetail('v-diag')},
 ]},
 ];
 
@@ -366,6 +393,19 @@ const STORIES=[
 {t:'S7f 等门',s:'刚开机网络栈未就绪',steps:[
   {t:'bootWait',d:'waiting 底座:桂桂睡在门口等开门,「每 30 秒看一次」。mock 约 3.2s 后开门推事件自动进主页(想反复看就点「重载预览」)。',scene:'waiting'},
   {t:'开门进主页',d:'事件到达:门开了(按实际网态落主页,不预写假绿,2026-09-07 修复)→ 日常页。',scene:'waiting'},
+]},
+{t:'S8 启动静默任务体检',s:'开机无感检查,被拦才亮横幅②',steps:[
+  {t:'开机仪式(体检并行)',d:'diag_task 底座:网正常但定时任务不在岗。仪式期间并行跑 taskStatus(只读、秒回、2s 超时保护),用户全程无感 — 验证器铁律的另一半:只有只读检查才许静默,全量五步必须显式进 v-diag 才跑。',scene:'diag_task',setup:W=>bootPose(W,'桂桂伸了个懒腰,正在检查网络…','sleep',0)},
+  {t:'落主页 · 横幅②已亮',d:'仪式结束照常落主页:静默体检发现任务不在岗 → 横幅②「自动登录还没生效,点此重建」。不弹窗、不跳页、不打断。',scene:'diag_task',setup:W=>W.goDaily()},
+  {t:'就地重建',d:'亲手:点横幅② → busy「重建中…」→ mock 一次修好 → schedule:changed 推 task_ok=true → 横幅消失。全程不离开主页。',scene:'diag_task',free:'点横幅② 试试重建'},
+]},
+{t:'S9 连败两次→排查→反馈',s:'再登连败 ≥2 → 验证器 → 兜底反馈',steps:[
+  {t:'掉线落地(streak 底座)',d:'streak 底座:密码存过也验证过,但已被人在别处改掉 — 已存凭据重登必被拒。主页 out 态,按钮「再登一次」。',scene:'streak'},
+  {t:'第一次失败',d:'亲手:点「再登一次」→ AUTH_REJECTED/wrong_password → 失败计数 1,自动跳改密页,警告块预填后端原话。此时还没横幅 — 一次失败可能只是手滑。',scene:'streak',free:'点「再登一次」,看被拒后跳改密页'},
+  {t:'第二次失败 · 横幅③亮',d:'亲手:‹ 返回 回主页,再点「再登一次」→ 又被拒 → 计数 2,回主页横幅③「试了几次还没登上?完整排查」出现。文案是拟稿,请在这里过目定稿。',scene:'streak',free:'返回主页再试一次,再返回看横幅③'},
+  {t:'进验证器(自动开跑)',d:'亲手:点横幅③ → v-diag 进入即自动开跑五步,不用再点开始:①网络 ✓ ②服务器 ✓ ③真登一次也被拒 ✗ ④任务 ✓ ⑤程序 ✓ → 结论「凭据有问题,去登录页改一下」。',scene:'streak',free:'点横幅③,等结论出来'},
+  {t:'出口:登录页预填结论',d:'亲手:点「去登录页改一下」→ 回登录页,警告块预填的就是验证器结论(与被拒同组件同位置)— 错误路由总表的 login 出口。',scene:'streak',free:'点「去登录页改一下」'},
+  {t:'兜底:说给桂桂听',d:'验证器也解决不了时的固定小出口:‹ 返回 回 v-diag(结论还在),点页底「排查也没解决?说给桂桂听 →」→ 反馈页;填一句发送 → 「收到」终态页,工单号在文案行。',scene:'streak',setup:W=>W.show('v-diag'),free:'点「说给桂桂听 →」,填一句发送'},
 ]},
 ];
 
