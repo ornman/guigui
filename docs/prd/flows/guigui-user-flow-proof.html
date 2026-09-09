@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>桂桂 · 前端业务流程(用户白板正本复刻)</title>
+<style>
+:root{--purple:#7c5cd6;--purplebg:#efe9fc;--gray:#5b5b66;--graybg:#f2f2f4;--grayline:#b9bac2;--yellow:#fff3cd;--ink:#232329;--red:#c0392b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:14px/1.5 "PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:#fafafa}
+header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid #e4e4e8;padding:10px 18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+header h1{font-size:16px}
+header .sub{color:#8a8a92;font-size:12px}
+header button{border:1px solid #cfcfd6;background:#fff;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:12.5px}
+header button.on{background:var(--purple);color:#fff;border-color:var(--purple)}
+.legend{display:flex;gap:12px;font-size:12px;color:#666;align-items:center;margin-left:auto;flex-wrap:wrap}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+#wrap{overflow:auto;height:calc(100vh - 54px)}
+#canvas{position:relative;width:2900px;height:1330px;background:
+ linear-gradient(#fff,#fff),repeating-linear-gradient(0deg,transparent,transparent 39px,#f3f3f6 40px),
+ repeating-linear-gradient(90deg,transparent,transparent 39px,#f3f3f6 40px);background-blend-mode:normal}
+svg{position:absolute;inset:0}
+.node{position:absolute;border:1.5px solid var(--grayline);background:var(--graybg);border-radius:22px;
+ padding:6px 10px;font-size:12.5px;line-height:1.35;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer}
+.node.page{background:var(--purplebg);border-color:var(--purple);border-radius:26px;font-weight:600}
+.node.note{background:var(--yellow);border-color:#e6d9a8;font-size:12px}
+.node.add{border-style:dashed;background:#fff}
+.node .tag{position:absolute;top:-9px;right:-6px;background:#fff;border:1px solid var(--purple);color:var(--purple);
+ font-size:10px;border-radius:8px;padding:0 5px;line-height:1.5}
+.node .tag.audit{border-color:#d99; color:var(--red)}
+.node.dim{opacity:.25}
+.node.lit{box-shadow:0 0 0 3px rgba(124,92,214,.28)}
+.edge{stroke:#9a9aa4;stroke-width:1.4;fill:none}
+.edge.cond{stroke-dasharray:0}
+.edge.add{stroke:var(--purple);stroke-dasharray:5 4}
+.edge.dim{opacity:.12}
+.edge.lit{stroke:var(--purple);stroke-width:2.2}
+.elabel{position:absolute;transform:translate(-50%,-50%);background:#fff;border:1px solid #ddd;border-radius:10px;
+ font-size:11px;color:#555;padding:1px 7px;white-space:nowrap;pointer-events:none}
+.elabel.add{color:var(--purple);border-color:var(--purple)}
+.elabel.dim{opacity:.12}
+.band{position:absolute;left:16px;font-size:13px;font-weight:700;color:#9a9aa4;letter-spacing:.12em}
+#tip{position:fixed;z-index:50;max-width:340px;background:#232329;color:#fff;border-radius:10px;padding:9px 12px;
+ font-size:12px;line-height:1.5;display:none;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#tip b{color:#cbb8ff}
+.auditbadge{position:absolute;font-size:10px;color:var(--red);border:1px solid var(--red);border-radius:8px;
+ padding:0 5px;background:#fff;display:none;z-index:5}
+body.show-audit .auditbadge{display:block}
+</style>
+</head>
+<body>
+<header>
+ <h1>桂桂 · 前端业务流程</h1>
+ <span class="sub">用户白板正本复刻 · 依据 PDF 矢量解析(141 文字/96 节点/84 连线)· 拍板⑤-⑨已融入</span>
+ <button id="btn-audit" onclick="toggleAudit(this)">显示审计标注</button>
+ <div class="legend">
+  <span><i class="sw" style="background:var(--purplebg);border:1.5px solid var(--purple)"></i>页面显示(紫)</span>
+  <span><i class="sw" style="background:var(--graybg);border:1.5px solid var(--grayline)"></i>状态·后端动作</span>
+  <span><i class="sw" style="background:var(--yellow);border:1.5px solid #e6d9a8"></i>决策注释</span>
+  <span><i class="sw" style="background:#fff;border:1.5px dashed var(--purple)"></i>拍板新增(原图没有)</span>
+ </div>
+</header>
+<div id="wrap"><div id="canvas">
+<svg id="svg" width="2900" height="1330"></svg>
+<div class="band" style="top:18px">── 首装链(单行道)──</div>
+<div class="band" style="top:736px">── 日常链(静默探测驱动)──</div>
+<div id="nodes"></div>
+<div id="labels"></div>
+<div id="badges"></div>
+</div></div>
+<div id="tip"></div>
+<script>
+/* ── 节点:t=page紫/state灰/note黄/add拍板补;x,y 画布坐标;w,h 尺寸 ── */
+const N=[
+ // 启动与首装分流
+ {id:'vboot',x:40,y:150,w:150,h:56,t:'page',l:'v-boot(启动自检)',a:'拍板⑤:开门判断全局去除(你的黄便利贴)'},
+ {id:'note-door',x:66,y:52,w:130,h:44,t:'note',l:'去除开门判断',a:'你的原便利贴,拍板⑤采纳'},
+ {id:'shouzhuang',x:250,y:158,w:96,h:40,t:'state',l:'首装'},
+ {id:'pan1',x:400,y:158,w:84,h:40,t:'state',l:'判断'},
+ {id:'netbad',x:540,y:66,w:170,h:52,t:'state',l:'网络(10.1.2.3)不可达'},
+ {id:'netok',x:540,y:250,w:170,h:52,t:'state',l:'正常启动网络(10.1.2.3可达)'},
+ {id:'vguide',x:790,y:66,w:150,h:52,t:'page',l:'进入不可达#v-guide',a:'D1/P1-3:当前SSID要标「当前·连着」禁点;网恢复已配置用户自动重登(P0-7)'},
+ {id:'pan2',x:790,y:250,w:84,h:40,t:'state',l:'判断'},
+ {id:'weidl',x:930,y:212,w:96,h:40,t:'state',l:'未登录'},
+ {id:'yidl',x:930,y:292,w:96,h:40,t:'state',l:'已经登录'},
+ {id:'pullacc',x:1075,y:292,w:132,h:40,t:'state',l:'自动拉取当前账号'},
+ {id:'loginpg',x:1068,y:146,w:214,h:74,t:'page',l:'进入登录页(#vok和vlogin合并)',a:'=P2-1 表单合一;拍板⑦保留返回键'},
+ {id:'note-mode',x:1075,y:238,w:190,h:40,t:'note',l:'按登录/未登录/配置模式显示状态栏'},
+ // 登录页内部与提交
+ {id:'hint1',x:1075,y:20,w:150,h:38,t:'state',l:'自有功能显示简单提示'},
+ {id:'hint2',x:1075,y:70,w:150,h:38,t:'state',l:'密码学号未填提示'},
+ {id:'submit',x:1340,y:158,w:120,h:44,t:'state',l:'用户提交表单'},
+ {id:'cfgmode',x:1340,y:270,w:130,h:52,t:'page',l:'配置模式',tag:'新概念',a:'保存配置一级化:只存凭据+只建业务任务,不验证'},
+ {id:'bj',x:1530,y:158,w:200,h:64,t:'state',l:'后端判断(验证密码是否正确并返回状态码)'},
+ // 后端判断七分支(x 1810 纵排)
+ {id:'r-pwd',x:1810,y:14,w:130,h:38,t:'state',l:'密码不对'},
+ {id:'r-thr',x:1810,y:62,w:130,h:38,t:'state',l:'节流(让等N秒)',tag:'拍板⑥补',add:1,a:'原图漏了;契约1.4.0真实行为,中性等待行不进密码警告'},
+ {id:'r-op',x:1810,y:110,w:130,h:38,t:'state',l:'学号运营商错误'},
+ {id:'r-unreach',x:1810,y:158,w:130,h:44,t:'state',l:'连不上10.1.2.3'},
+ {id:'r-bind',x:1810,y:212,w:130,h:38,t:'state',l:'绑定受限'},
+ {id:'r-dev',x:1810,y:260,w:150,h:44,t:'state',l:'学号已在别的设备上登录'},
+ {id:'r-ok',x:1810,y:318,w:150,h:38,t:'state',l:'没有任何问题通过'},
+ {id:'fb',x:2030,y:150,w:176,h:56,t:'page',l:'反馈给登录页(登录页状态显示)'},
+ {id:'log1',x:2030,y:250,w:110,h:38,t:'state',l:'进入日志'},
+ {id:'notify',x:1810,y:356,w:130,h:38,t:'state',l:'配置模式发通知'},
+ {id:'younet',x:1530,y:356,w:96,h:38,t:'state',l:'有网'},
+ // 任务创建与两级验证器
+ {id:'db',x:1650,y:430,w:170,h:44,t:'state',l:'后端提交凭证进入数据库'},
+ {id:'unvdb',x:1470,y:430,w:140,h:44,t:'state',l:'未验证数据库'},
+ {id:'create',x:1650,y:500,w:190,h:52,t:'state',l:'创建(配置模式只创建业务计划任务)'},
+ {id:'mkmain',x:1900,y:478,w:150,h:44,t:'state',l:'建立业务计划任务'},
+ {id:'mkverify',x:1900,y:534,w:200,h:56,t:'state',l:'建立验证器用的近期计划任务(已登录=注销重登/未登录=正常登录)',tag:'先不管·拍板⑨',a:'E:验证器任务机制本轮 park'},
+ {id:'v1',x:2160,y:500,w:210,h:56,t:'state',l:'后端验证器(判断计划任务是否正常创建,通知是否发送)'},
+ {id:'crok',x:2430,y:534,w:100,h:40,t:'state',l:'创建成功'},
+ {id:'crrerr',x:2430,y:446,w:100,h:40,t:'state',l:'创建失败'},
+ {id:'v2',x:2590,y:500,w:210,h:56,t:'state',l:'后端验证器(判断刚刚的计划任务是否成功登录校园网)'},
+ {id:'vfail',x:2430,y:360,w:170,h:44,t:'state',l:'验证器计划任务登录失败'},
+ {id:'vok',x:2590,y:620,w:170,h:44,t:'state',l:'验证器计划任务完成任务成功'},
+ {id:'vdel',x:2810,y:620,w:80,h:44,t:'state',l:'删除验证器计划任务',tag:'先不管·拍板⑨'},
+ {id:'intercept',x:2590,y:360,w:210,h:56,t:'page',l:'进入拦截页(要求用户通过安全软件白名单)',a:'P1-1:缺「先不管,回主页」出口——仍然成立'},
+ {id:'rebuild',x:2810,y:290,w:76,h:40,t:'state',l:'重建链路'},
+ {id:'re3',x:2700,y:180,w:110,h:40,t:'state',l:'重建失败3次'},
+ {id:'fbk',x:2700,y:100,w:96,h:40,t:'page',l:'问题反馈'},
+ {id:'detector',x:2830,y:180,w:64,h:44,t:'page',l:'检测器页面'},
+ {id:'okpg',x:2590,y:700,w:120,h:44,t:'page',l:'进入成功页'},
+ {id:'setpg',x:2760,y:700,w:90,h:44,t:'page',l:'设置页'},
+ {id:'home',x:2760,y:770,w:90,h:44,t:'page',l:'返回主页'},
+ {id:'cfgok',x:2160,y:700,w:220,h:56,t:'page',l:'配置模式进入成功页(显示已经配置好了,只需等待网来)'},
+ {id:'btnback',x:2430,y:700,w:120,h:40,t:'state',l:'按钮:返回不可达页'},
+ {id:'adv',x:2160,y:790,w:100,h:40,t:'state',l:'高级设置'},
+ // 日常链
+ {id:'daily',x:250,y:880,w:130,h:44,t:'state',l:'非首装(日常)'},
+ {id:'silent',x:440,y:880,w:210,h:64,t:'state',l:'后端验证器静默探测(网络,计划任务是否建在,最新的日志信息,程序运行,数据库是否正常)'},
+ {id:'fine',x:720,y:1030,w:96,h:40,t:'state',l:'一切正常'},
+ {id:'neton',x:720,y:880,w:170,h:52,t:'state',l:'有网络但是当前状态没登录'},
+ {id:'part',x:720,y:790,w:140,h:40,t:'state',l:'某个环节有问题'},
+ {id:'dailypg',x:1000,y:1030,w:96,h:48,t:'page',l:'日常页',a:'横幅①②③在此页与状态页并存(拍板⑧)'},
+ {id:'bigB',x:1000,y:872,w:224,h:80,t:'page',l:'大头状态页{成功页的变种,背景蓝色变红,提示当前网络断开了}(guigui表情沮丧)',tag:'拍板⑧·非首装独有',a:'=P1-10 新增视图;与横幅并存'},
+ {id:'probe5',x:1310,y:950,w:180,h:52,t:'state',l:'验证器5s探测一次网络(=能不能连上10.1.2.3,不触发登录)',tag:'拍板⑧'},
+ {id:'vault',x:720,y:700,w:120,h:40,t:'state',l:'凭证库有问题'},
+ {id:'rebuild2',x:880,y:700,w:96,h:40,t:'state',l:'自动重建'},
+ {id:'degrade',x:1030,y:700,w:190,h:44,t:'state',l:'后端重建3次失败后降级凭证库系统'},
+ {id:'taskfail',x:720,y:640,w:120,h:40,t:'state',l:'计划任务失效'},
+ {id:'intercept2',x:880,y:640,w:210,h:52,t:'page',l:'拦截页要求重建(直到功能正常,返回日常页)'},
+ {id:'logskip',x:720,y:590,w:210,h:52,t:'state',l:'日志:今天没有正常登录,但是网络可以连上10.1.2.3'},
+ {id:'autotest',x:960,y:590,w:130,h:44,t:'state',l:'自动登录测试看看'},
+ {id:'beret',x:1130,y:590,w:96,h:40,t:'state',l:'后端返回'},
+ {id:'d-pwd',x:1290,y:540,w:110,h:38,t:'state',l:'密码不对'},
+ {id:'d-op',x:1290,y:585,w:110,h:38,t:'state',l:'学号运营商错误'},
+ {id:'d-bind',x:1290,y:630,w:110,h:38,t:'state',l:'绑定受限'},
+ {id:'d-dev',x:1290,y:675,w:140,h:44,t:'state',l:'学号已在别的设备上登录'},
+ {id:'bigA',x:1490,y:584,w:224,h:80,t:'page',l:'大头状态页{成功页的变种,背景蓝色变红}提示,根据后端返回的状态来(guigui表情沮丧)',tag:'拍板⑦分流'},
+ {id:'swap',x:1490,y:690,w:200,h:40,t:'state',l:'提示:是否更换账号?',tag:'拍板⑦',add:1},
+ {id:'loginpg2',x:1760,y:590,w:150,h:52,t:'page',l:'登录页(无返回键)',a:'拍板⑦:保留返回键,返回=带错误横幅的日常页'},
+ {id:'chain',x:1960,y:590,w:170,h:52,t:'page',l:'一套链路走下来直到到达成功页'},
+ {id:'noway',x:450,y:620,w:130,h:40,t:'state',l:'当下连不上'},
+ {id:'advpg',x:1000,y:1150,w:110,h:44,t:'page',l:'高级设置页'},
+ {id:'fb2',x:840,y:1150,w:96,h:44,t:'page',l:'问题反馈'},
+ {id:'timeedit',x:1170,y:1150,w:200,h:52,t:'state',l:'修改时间配置并且自动走完完整链路'},
+];
+/* ── 边:label 可空;add=拍板新增虚线;audit 审计徽记 ── */
+const E=[
+ ['vboot','shouzhuang','开机'],['vboot','daily','非首装'],['shouzhuang','pan1',''],['pan1','netbad','不可达'],
+ ['pan1','netok','可达'],['netbad','vguide',''],['vguide','netbad','选择重新检测',['back']],
+ ['vguide','pan2','选择wifi之后可达'],['vguide','cfgmode','选择保存配置先(黄)'],['netok','pan2',''],
+ ['pan2','weidl','未登录'],['pan2','yidl','已登录'],['yidl','pullacc',''],['weidl','loginpg',''],['pullacc','loginpg',''],
+ ['loginpg','hint1','页面元素'],['hint1','hint2',''],['loginpg','cfgmode','先保存配置'],
+ ['loginpg','submit','填完提交'],['cfgmode','submit','以配置模式提交'],['cfgmode','unvdb','存而不验'],
+ ['unvdb','db',''],['submit','bj',''],['younet','bj','已在线提交(already)'],
+ ['bj','r-pwd',''],['bj','r-thr',''],['bj','r-op',''],['bj','r-unreach',''],['bj','r-bind',''],['bj','r-dev',''],['bj','r-ok','200'],
+ ['r-pwd','fb',''],['r-thr','fb','中性等待行'],['r-op','fb',''],['r-unreach','fb',''],['r-bind','fb',''],['r-dev','fb',''],
+ ['r-unreach','vguide','引导排查'],['fb','submit','改对再试(回环)',['back']],['fb','log1','每次被拒记日志'],
+ ['notify','fb',''],['r-ok','db',''],['db','create',''],['create','mkmain',''],['create','mkverify',''],
+ ['mkmain','v1',''],['mkverify','v1',''],['v1','crrerr',''],['v1','crok',''],
+ ['crok','v2',''],['v2','vfail',''],['v2','vok',''],['vok','vdel','完成后删除'],
+ ['vok','okpg',''],['vfail','intercept',''],['crrerr','log1',''],['crrerr','vfail','转验证'],
+ ['intercept','rebuild',''],['rebuild','crrerr','重建后再验'],['intercept','re3','连续失败'],
+ ['re3','fbk',''],['re3','detector',''],['okpg','setpg',''],['okpg','home',''],['setpg','intercept','重建入口'],
+ ['crok','cfgok','仅配置模式'],['cfgok','adv',''],['cfgok','btnback',''],['btnback','vguide','返回不可达页'],
+ ['daily','silent',''],['silent','fine','全绿'],['silent','neton','状态异常'],['silent','part','部件异常'],
+ ['fine','dailypg','点击登录,完整流程正常后'],['neton','bigB',''],['bigB','silent','恢复后回探',['back']],
+ ['part','vault',''],['part','taskfail',''],['part','logskip',''],['part','noway',''],
+ ['vault','rebuild2',''],['rebuild2','degrade','3次失败'],['degrade','dailypg','正常就返回日常页'],
+ ['degrade','fb2','降级仍失败'],['taskfail','intercept2',''],['intercept2','dailypg','重建成功'],
+ ['logskip','autotest',''],['autotest','beret',''],
+ ['beret','d-pwd',''],['beret','d-op',''],['beret','d-bind',''],['beret','d-dev',''],
+ ['d-pwd','bigA','去登录页改'],['d-op','bigA','去登录页改'],['d-bind','bigA',''],['d-dev','bigA',''],
+ ['bigA','swap','绑定/别设备时'],['swap','loginpg2','换,去登录页'],['bigA','dailypg','不更换·返回(带错误横幅)'],
+ ['d-pwd','loginpg2',''],['d-op','loginpg2',''],['bigA','loginpg2','点击登录'],
+ ['loginpg2','chain',''],['chain','okpg','到达'],
+ ['bigA','probe5','每5s'],['bigB','probe5',''],['probe5','dailypg','通了'],['probe5','beret','通但状态异常'],['probe5','noway','还不通'],
+ ['dailypg','advpg',''],['advpg','fb2',''],['advpg','timeedit','点击修改时间的保存'],['timeedit','chain','走完整链路'],
+];
+/* ── 渲染 ── */
+const cv=document.getElementById('canvas'),svg=document.getElementById('svg');
+const byId={};N.forEach(n=>byId[n.id]=n);
+function box(n){const w=n.w||140,h=n.h||46;
+ return {x1:n.x,y1:n.y,x2:n.x+w,y2:n.y+h,cx:n.x+w/2,cy:n.y+h/2,w,h}}
+const B={};N.forEach(n=>B[n.id]=box(n));
+function port(a,b){ // 返回 [起点,终点,路径]
+ const A=B[a],C=B[b];let p1,q1;
+ if(Math.abs(A.cy-C.cy)<30&&C.x1>=A.x1){p1=[A.x2,A.cy];q1=[C.x1-4,C.cy];return [p1,q1,`M${p1} L${q1}`];}
+ const midY=(Math.max(A.y1,C.y1)+Math.min(A.y2,C.y2))/2;
+ if(C.x1>A.x2+20){p1=[A.x2,A.cy];q1=[C.x1-4,C.cy];
+  const mx=(p1[0]+q1[0])/2;
+  return [p1,q1,`M${p1[0]},${p1[1]} L${mx},${p1[1]} L${mx},${q1[1]} L${q1[0]},${q1[1]}`];}
+ if(A.x1>C.x2+20){p1=[A.x1,A.cy];q1=[C.x2+4,C.cy];
+  const mx=(p1[0]+q1[0])/2;
+  return [p1,q1,`M${p1[0]},${p1[1]} L${mx},${p1[1]} L${mx},${q1[1]} L${q1[0]},${q1[1]}`];}
+ // 垂直主导
+ p1=[A.cx,A.cy>A.y1&&true?(C.y1>A.y2?A.y2:C.y1):A.cy];p1=[A.cx,(C.y1>A.y2)?A.y2:(C.y2<A.y1?A.y1:A.cy)];
+ q1=[C.cx,(C.y1>A.y2)?C.y1:(C.y2<A.y1?C.y2:C.cy)];
+ return [p1,q1,`M${p1[0]},${p1[1]} L${q1[0]},${q1[1]}`];
+}
+svg.innerHTML='<defs><marker id="arr" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#9a9aa4"/></marker><marker id="arrp" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#7c5cd6"/></marker></defs>';
+const EN=[],host=svg;
+E.forEach((e,i)=>{
+ const [p1,q1,d]=port(e[0],e[1]);
+ const add=Array.isArray(e[3])&&e[3].includes('add');
+ const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+ p.setAttribute('d',d);p.setAttribute('class','edge'+(add?' add':''));
+ p.setAttribute('marker-end',add?'url(#arrp)':'url(#arr)');
+ p.dataset.from=e[0];p.dataset.to=e[1];
+ host.appendChild(p);EN.push({el:p,from:e[0],to:e[1]});
+});
+const nhost=document.getElementById('nodes'),lhost=document.getElementById('labels');
+N.forEach(n=>{
+ const d=document.createElement('div');
+ d.className='node '+n.t+(n.add?' add':'');
+ d.style.left=n.x+'px';d.style.top=n.y+'px';d.style.width=(n.w||140)+'px';d.style.height=(n.h||46)+'px';
+ d.textContent=n.l;d.dataset.id=n.id;
+ if(n.tag){const t=document.createElement('span');t.className='tag';t.textContent=n.tag;d.appendChild(t);}
+ if(n.a)d.dataset.audit=n.a;
+ nhost.appendChild(d);
+});
+E.forEach(e=>{
+ if(!e[2])return;
+ const A=B[e[0]],C=B[e[1]];
+ const lx=(A.cx+C.cx)/2,ly=(A.cy+C.cy)/2-14;
+ const d=document.createElement('div');
+ d.className='elabel'+((Array.isArray(e[3])&&e[3].includes('add'))||/拍板|先不管/.test(e[2])?' add':'');
+ d.style.left=lx+'px';d.style.top=ly+'px';d.textContent=e[2];
+ d.dataset.from=e[0];d.dataset.to=e[1];
+ lhost.appendChild(d);
+});
+/* 交互:hover 高亮关联 */
+function lit(id,on){
+ document.querySelectorAll('.edge').forEach(p=>{
+  const hit=p.dataset.from===id||p.dataset.to===id;
+  p.classList.toggle('lit',on&&hit);p.classList.toggle('dim',on&&!hit);});
+ document.querySelectorAll('.elabel').forEach(l=>{
+  const hit=l.dataset.from===id||l.dataset.to===id;
+  l.classList.toggle('dim',on&&!hit);});
+ document.querySelectorAll('.node').forEach(n=>{
+  n.classList.toggle('dim',on&&n.dataset.id!==id&&false);});
+ const me=document.querySelector('.node[data-id="' + id + '"]');
+ if(me)me.classList.toggle('lit',on);
+}
+document.querySelectorAll('.node').forEach(n=>{
+ n.addEventListener('mouseenter',()=>lit(n.dataset.id,true));
+ n.addEventListener('mouseleave',()=>lit(n.dataset.id,false));
+ const tip=document.getElementById('tip');
+ n.addEventListener('mousemove',ev=>{
+  const a=n.dataset.audit;
+  if(!a){tip.style.display='none';return}
+  tip.style.display='block';
+  tip.style.left=Math.min(ev.clientX+14,innerWidth-360)+'px';
+  tip.style.top=(ev.clientY+14)+'px';
+  tip.innerHTML='<b>审计标注</b>'+a;
+ });
+ n.addEventListener('mouseleave',()=>{document.getElementById('tip').style.display='none'});
+});
+function toggleAudit(btn){
+ btn.classList.toggle('on');
+ document.body.classList.toggle('show-audit');
+ // 徽章:有 audit 的节点右上角红字 P*/D* 摘要
+ if(!document.getElementById('badges').childElementCount){
+  N.forEach(n=>{
+   if(!n.a)return;
+   const b=document.createElement('div');b.className='auditbadge';
+   b.style.left=(n.x+(n.w||140)-46)+'px';b.style.top=(n.y-22)+'px';
+   b.textContent='审计';document.getElementById('badges').appendChild(b);
+  });
+ }
+}
+</script>
+</body>
+</html>
