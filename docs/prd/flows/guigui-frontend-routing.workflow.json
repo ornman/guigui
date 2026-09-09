@@ -1,0 +1,562 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "桂桂 · 前端交互路由全景(现状 / 修完后)",
+    "locale": "zh-CN",
+    "quality_profile": "standard",
+    "output": "docs/prd/flows/guigui-frontend-routing.workflow.html",
+    "views": [
+      {
+        "id": "as-is",
+        "label": "现状 as-is",
+        "focus": [
+          "launch",
+          "boot-ritual",
+          "boot-wait",
+          "boot-missing",
+          "form-v",
+          "ladder",
+          "guide",
+          "diag",
+          "main-ok",
+          "main-bad",
+          "banners",
+          "st-confetti",
+          "st-saved",
+          "st-blocked",
+          "net-event",
+          "recover",
+          "form-rejected"
+        ],
+        "note": "当下真实行为:标 D1~D7=链级设计问题(实测/查证);标 P*=已入修复计划;不标注=健康链。"
+      },
+      {
+        "id": "to-be",
+        "label": "修完后 to-be(拟)",
+        "focus": [
+          "auto-relogin",
+          "boot-wait-first",
+          "boot-ritual",
+          "boot-missing",
+          "recover",
+          "boot-wait",
+          "form-v",
+          "st-saved",
+          "st-confetti",
+          "st-blocked",
+          "main-ok",
+          "guide",
+          "form-rejected"
+        ],
+        "note": "计划执行后的新链路:虚线「拟」节点/边=计划新增(P0-7/P0-8/P1-8/P1-9);现状问题边将删除或改道。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "boot",
+      "label": "启动仪式"
+    },
+    {
+      "id": "form",
+      "label": "表单与验证阶梯"
+    },
+    {
+      "id": "daily",
+      "label": "日常主页"
+    },
+    {
+      "id": "exit",
+      "label": "终态舞台"
+    },
+    {
+      "id": "guide",
+      "label": "排查与验证器"
+    },
+    {
+      "id": "sys",
+      "label": "系统事件"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "launch",
+      "lane": "boot",
+      "col": 0,
+      "type": "frontend",
+      "label": "启动",
+      "sublabel": "开机/双击/深链(待验)",
+      "tag": "入口",
+      "yOffset": 104
+    },
+    {
+      "id": "boot-ritual",
+      "lane": "boot",
+      "col": 1,
+      "type": "frontend",
+      "label": "v-boot 仪式",
+      "sublabel": "probe 分流·1.5s",
+      "tag": "分岔"
+    },
+    {
+      "id": "boot-wait",
+      "lane": "boot",
+      "col": 2,
+      "type": "frontend",
+      "label": "等门页",
+      "sublabel": "06:50·靠 ensure 轮询",
+      "tag": "D7→拟自轮询",
+      "yOffset": 104
+    },
+    {
+      "id": "boot-wait-first",
+      "lane": "boot",
+      "col": 3,
+      "type": "frontend",
+      "label": "首装等门",
+      "sublabel": "连上带你登录",
+      "tag": "拟 P0-8"
+    },
+    {
+      "id": "boot-missing",
+      "lane": "boot",
+      "col": 4,
+      "type": "frontend",
+      "label": "后端缺席",
+      "sublabel": "BRIDGE_MISSING",
+      "tag": "D5→拟重试"
+    },
+    {
+      "id": "form-v",
+      "lane": "form",
+      "col": 0,
+      "type": "frontend",
+      "label": "登录表单",
+      "sublabel": "学号回填·密码键入",
+      "tag": "B7 误抓风险"
+    },
+    {
+      "id": "ladder",
+      "lane": "form",
+      "col": 1,
+      "type": "frontend",
+      "label": "阶梯",
+      "sublabel": "在线=注销→真登",
+      "tag": "诚实边界"
+    },
+    {
+      "id": "banners",
+      "lane": "daily",
+      "col": 3,
+      "type": "frontend",
+      "label": "横幅①②③",
+      "sublabel": "①改密②重建③体检",
+      "tag": "P0-5·P1-4"
+    },
+    {
+      "id": "main-bad",
+      "lane": "daily",
+      "col": 4,
+      "type": "frontend",
+      "label": "主页·异常",
+      "sublabel": "再登/去排查",
+      "tag": "P0-1/2/3"
+    },
+    {
+      "id": "main-ok",
+      "lane": "daily",
+      "col": 5,
+      "type": "frontend",
+      "label": "主页·在网",
+      "sublabel": "详情族·来路栈",
+      "tag": "常态"
+    },
+    {
+      "id": "st-confetti",
+      "lane": "exit",
+      "col": 3,
+      "type": "frontend",
+      "label": "彩带·全有",
+      "sublabel": "真登✓+任务在岗",
+      "tag": "唯一庆祝"
+    },
+    {
+      "id": "st-saved",
+      "lane": "exit",
+      "col": 4,
+      "type": "frontend",
+      "label": "保存配置",
+      "sublabel": "「连上后自动登」未兑现",
+      "tag": "D2→拟兑现"
+    },
+    {
+      "id": "st-blocked",
+      "lane": "exit",
+      "col": 5,
+      "type": "frontend",
+      "label": "拦截页",
+      "sublabel": "唯一出口=重建",
+      "tag": "P1-1·P1-7"
+    },
+    {
+      "id": "guide",
+      "lane": "guide",
+      "col": 2,
+      "type": "frontend",
+      "label": "排查页 v-guide",
+      "sublabel": "①挑网②重检③存配置",
+      "tag": "D1·P1-3"
+    },
+    {
+      "id": "diag",
+      "lane": "guide",
+      "col": 3,
+      "type": "frontend",
+      "label": "验证器 v-diag",
+      "sublabel": "五步·③步真登",
+      "tag": "P1-6"
+    },
+    {
+      "id": "net-event",
+      "lane": "sys",
+      "col": 1,
+      "type": "external",
+      "label": "net:state 事件",
+      "sublabel": "FileWatcher 2s",
+      "tag": "GUI 不自探网"
+    },
+    {
+      "id": "recover",
+      "lane": "sys",
+      "col": 2,
+      "type": "external",
+      "label": "网恢复",
+      "sublabel": "not_logged_in",
+      "tag": "D1"
+    },
+    {
+      "id": "auto-relogin",
+      "lane": "sys",
+      "col": 3,
+      "type": "frontend",
+      "label": "自动重登",
+      "sublabel": "已配置→直接登",
+      "tag": "拟 P0-7"
+    },
+    {
+      "id": "form-rejected",
+      "lane": "form",
+      "col": 2,
+      "type": "frontend",
+      "label": "被拒·留在表单",
+      "sublabel": "密码/绑定/限额/节流",
+      "tag": "文案如实"
+    }
+  ],
+  "edges": [
+    {
+      "id": "t01",
+      "from": "launch",
+      "to": "boot-ritual",
+      "label": "开机",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "t03",
+      "from": "boot-ritual",
+      "to": "main-ok",
+      "label": "日常直达",
+      "role": "main"
+    },
+    {
+      "id": "t04",
+      "from": "boot-ritual",
+      "to": "form-v",
+      "label": "首装",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "t05",
+      "from": "boot-ritual",
+      "to": "boot-wait",
+      "label": "等门",
+      "role": "branch"
+    },
+    {
+      "id": "t06",
+      "from": "boot-wait",
+      "to": "main-ok",
+      "role": "main",
+      "variant": "emphasis",
+      "label": "开门"
+    },
+    {
+      "id": "t07",
+      "from": "boot-ritual",
+      "to": "boot-missing",
+      "label": "桥接失败",
+      "role": "error"
+    },
+    {
+      "id": "t08",
+      "from": "boot-ritual",
+      "to": "guide",
+      "label": "不可达/等门压down",
+      "role": "branch"
+    },
+    {
+      "id": "t10",
+      "from": "boot-ritual",
+      "to": "boot-wait-first",
+      "label": "拟:首装等门",
+      "role": "branch",
+      "variant": "dashed"
+    },
+    {
+      "id": "t11",
+      "from": "boot-wait-first",
+      "to": "form-v",
+      "label": "拟:就绪填表",
+      "role": "main",
+      "variant": "dashed"
+    },
+    {
+      "id": "t20",
+      "from": "form-v",
+      "to": "ladder",
+      "label": "提交密码",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "t21",
+      "from": "ladder",
+      "to": "st-confetti",
+      "label": "真登✓",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "t22",
+      "from": "ladder",
+      "to": "st-saved",
+      "label": "存而未验",
+      "role": "branch"
+    },
+    {
+      "id": "t23",
+      "from": "ladder",
+      "to": "st-blocked",
+      "label": "任务被拦",
+      "role": "error"
+    },
+    {
+      "id": "t30",
+      "from": "main-bad",
+      "to": "main-ok",
+      "label": "再登成功",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "t33",
+      "from": "main-bad",
+      "to": "guide",
+      "label": "去排查",
+      "role": "branch"
+    },
+    {
+      "id": "t34",
+      "from": "banners",
+      "to": "form-v",
+      "label": "①改密",
+      "role": "branch"
+    },
+    {
+      "id": "t35",
+      "from": "banners",
+      "to": "diag",
+      "label": "③体检",
+      "role": "branch"
+    },
+    {
+      "id": "t38",
+      "from": "main-ok",
+      "to": "banners",
+      "label": "条件出现",
+      "role": "branch"
+    },
+    {
+      "id": "t40",
+      "from": "guide",
+      "to": "form-v",
+      "label": "空表单",
+      "role": "branch"
+    },
+    {
+      "id": "t42",
+      "from": "diag",
+      "to": "form-v",
+      "label": "exit=login",
+      "role": "branch"
+    },
+    {
+      "id": "t43",
+      "from": "diag",
+      "to": "st-blocked",
+      "label": "exit=任务拦",
+      "role": "branch"
+    },
+    {
+      "id": "t50",
+      "from": "st-confetti",
+      "to": "main-ok",
+      "label": "完成",
+      "role": "main"
+    },
+    {
+      "id": "t51",
+      "from": "st-saved",
+      "to": "main-ok",
+      "label": "完成",
+      "role": "main"
+    },
+    {
+      "id": "t52",
+      "from": "st-blocked",
+      "to": "main-ok",
+      "label": "拟:先不管",
+      "role": "branch",
+      "variant": "dashed"
+    },
+    {
+      "id": "t53",
+      "from": "st-blocked",
+      "to": "st-confetti",
+      "label": "重建放行",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "t60",
+      "from": "net-event",
+      "to": "main-bad",
+      "label": "掉线/不可达",
+      "role": "async"
+    },
+    {
+      "id": "t62",
+      "from": "net-event",
+      "to": "boot-wait",
+      "label": "waiting",
+      "role": "async"
+    },
+    {
+      "id": "t63",
+      "from": "net-event",
+      "to": "diag",
+      "label": "断网·旧结果",
+      "role": "async"
+    },
+    {
+      "id": "t64",
+      "from": "recover",
+      "to": "form-v",
+      "label": "拉空表单",
+      "role": "async"
+    },
+    {
+      "id": "t65",
+      "from": "recover",
+      "to": "st-saved",
+      "label": "静默",
+      "role": "async"
+    },
+    {
+      "id": "t66",
+      "from": "recover",
+      "to": "auto-relogin",
+      "label": "拟:已配置",
+      "role": "async",
+      "variant": "dashed"
+    },
+    {
+      "id": "t67",
+      "from": "auto-relogin",
+      "to": "main-ok",
+      "label": "拟:登上",
+      "role": "main",
+      "variant": "dashed"
+    },
+    {
+      "id": "t32",
+      "from": "main-bad",
+      "to": "form-v",
+      "label": "被拒改密",
+      "role": "branch"
+    },
+    {
+      "id": "t24",
+      "from": "ladder",
+      "to": "form-rejected",
+      "label": "被拒",
+      "role": "error"
+    },
+    {
+      "id": "t25",
+      "from": "form-rejected",
+      "to": "form-v",
+      "label": "改对再试",
+      "role": "return"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "怎么读这张图",
+      "items": [
+        "主轨=理想主旅程(启动→仪式→表单→阶梯→在网);中带=分支/事件/异常;底带=终态",
+        "标 D1~D7=链级设计问题(实测/查证);标 P*=已入修复计划;虚线「拟」=计划新增",
+        "右上角切换焦点视图:「现状 as-is」vs「修完后 to-be」同画布对比",
+        "改图=改本 JSON 后重跑 archify deliver(源:docs/prd/flows/guigui-frontend-routing.lifecycle.json)"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "现状七处链级问题(全在跨页半程)",
+      "items": [
+        "D1 网恢复把已配置用户拉空表单 / 保存页静默(实测)",
+        "D2 「连上后自动登录」承诺的唯一执行者是明早任务",
+        "D3 首装+等门落「这条路今天不通」排查页(死亡开局)",
+        "D5 后端缺席页无重试按钮(死胡同)",
+        "D7 等门轮询靠 ensure 进程,任务被拦即永夜(代码查证)",
+        "B7 学号误抓靠服务器文案自纠,不区分则死循环(待拍板)",
+        "D6 改密路径 lede 仍说「还没登录」(用户手写文案,待拍板)"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "修复对照(2026-09-09 计划,8 P0+9 P1+3 P2)",
+      "items": [
+        "P0-7 网恢复自动重登(拟节点):recover 按配置态分岔 → 治 D1+D2",
+        "P0-8 首装等门(拟节点):waiting 不再落排查页 → 治 D3",
+        "P1-9 缺席页「再试一次」(拟回环边) → 治 D5",
+        "P1-8 等门页 GUI 侧 30s 自轮询(拟,见等门节点标签) → 治 D7",
+        "此前两轮:P0-1~P0-6(反馈吞字/假成功/waiting/防重/横幅/mock 对齐) + P1-1~P1-7"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "健康链(21/46 条,占近半)",
+      "items": [
+        "首装三分流 / 五终态路由 / 被拒四分支文案",
+        "阶梯翻车·回滚两幕 / 锚前存入 / 总开关联动",
+        "假期静默 / 反馈三态+草稿回填 / 兜底选网 / 来路栈",
+        "核心发现:短板不在页面内,在状态翻转的跨页半程——问题边全是下半程"
+      ]
+    }
+  ]
+}
