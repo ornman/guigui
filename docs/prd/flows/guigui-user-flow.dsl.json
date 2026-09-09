@@ -443,6 +443,46 @@
       "timeedit",
       "chain",
       ""
+     ],
+     [
+      "fine",
+      "probe5",
+      "5s探测能否连上"
+     ],
+     [
+      "probe5",
+      "probe5b",
+      "通了"
+     ],
+     [
+      "probe5b",
+      "fine",
+      "登录没问题"
+     ],
+     [
+      "probe5b",
+      "neton",
+      "有问题"
+     ],
+     [
+      "logskip",
+      "logbig",
+      ""
+     ],
+     [
+      "logbig",
+      "beret",
+      "点击进入检测"
+     ],
+     [
+      "logbig",
+      "dailypg",
+      "返回"
+     ],
+     [
+      "fb2",
+      "dailypg",
+      "返回"
      ]
     ]
    },
@@ -1042,7 +1082,7 @@
       {
        "type": "rect",
        "id": "logskip",
-       "text": "日志:没登上但网通",
+       "text": "日志:今早没登上 但当下网络+登录态都正常",
        "width": 140,
        "height": 44,
        "fillColor": "#DBEAFE",
@@ -1225,6 +1265,33 @@
        "text": "#问题反馈",
        "width": 110,
        "height": 44,
+       "fillColor": "#EFE9FC",
+       "borderColor": "#7C5CD6",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "probe5b",
+       "text": "5s探测=登录态状态(⑧)",
+       "width": 160,
+       "height": 48,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937",
+       "borderDash": "dashed"
+      },
+      {
+       "type": "rect",
+       "id": "logbig",
+       "text": "#大头状态页 今天的日志显示断了!点击进入检测·危险提示:可能短暂断网",
+       "width": 220,
+       "height": 64,
        "fillColor": "#EFE9FC",
        "borderColor": "#7C5CD6",
        "borderWidth": 2,
