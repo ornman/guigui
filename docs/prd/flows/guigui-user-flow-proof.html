@@ -196,7 +196,8 @@ const E=[
 const svg=document.getElementById('svg');
 const B={};N.forEach(n=>B[n.id]={x1:n.x,y1:n.y,x2:n.x+(n.w||140),y2:n.y+(n.h||46),cx:n.x+(n.w||140)/2,cy:n.y+(n.h||46)/2});
 const SIDES=['R','L','T','B'];
-const HEAD={R:[1,0],L:[-1,0],T:[0,-1],B:[0,1]};
+const HEAD={R:[1,0],L:[-1,0],T:[0,-1],B:[0,1]};   // 出边航向
+const OPP={R:[-1,0],L:[1,0],T:[0,1],B:[0,-1]};     // 入边航向(进入该侧端口时的行进方向)
 function portPt(n,s){const b=B[n];
  return s==='R'?[b.x2,b.cy]:s==='L'?[b.x1,b.cy]:s==='T'?[b.cx,b.y1]:[b.cx,b.y2];}
 function segHit(p,q,na,nb){
@@ -250,7 +251,7 @@ function candidates(a,b){
    const c=hA?[Q[0],P[1]]:[P[0],Q[1]];
    out.push({pts:[P,c,Q],sa,sb});
   }else if(hA){ // 水平-水平:对齐直连(0 转)或 Z(2 转)或 U 绕行
-   if(Math.abs(P[1]-Q[1])<=12){const y=(P[1]+Q[1])/2;
+   if(Math.abs(P[1]-Q[1])<=2){const y=(P[1]+Q[1])/2;
     out.push({pts:[[P[0],y],[Q[0],y]],sa,sb});}
    else{
     for(const mx of [(P[0]+Q[0])/2,P[0]+60,Q[0]-60,P[0]-90,Q[0]+90,P[0]+170,Q[0]-170]){
@@ -265,7 +266,7 @@ function candidates(a,b){
     }
    }
   }else{ // 垂直-垂直:对齐直连或 Z 或 U
-   if(Math.abs(P[0]-Q[0])<=12){const x=(P[0]+Q[0])/2;
+   if(Math.abs(P[0]-Q[0])<=2){const x=(P[0]+Q[0])/2;
     out.push({pts:[[x,P[1]],[x,Q[1]]],sa,sb});}
    else{
     for(const my of [(P[1]+Q[1])/2,P[1]+60,Q[1]-60,P[1]-80,Q[1]+80]){
@@ -357,6 +358,23 @@ function gAstar(s,t){
  }
  return out2;
 }
+function ports(a,b){
+ const A=B[a],C=B[b];
+ if(C.x1>=A.x2-8)return[[A.x2,A.cy],[C.x1,C.cy]];
+ if(A.x1>=C.x2+8)return[[A.x1,A.cy],[C.x2,C.cy]];
+ if(C.y1>=A.y2-8)return[[A.cx,A.y2],[C.cx,C.y1]];
+ if(A.y1>=C.y2+8)return[[A.cx,A.y1],[C.cx,C.y2]];
+ return[[A.x2,A.cy],[C.x1,C.cy]];
+}
+function recti(pts){
+ const out=[pts[0]];
+ for(let i=1;i<pts.length;i++){
+  const p=out[out.length-1],q=pts[i];
+  if(Math.abs(q[0]-p[0])>1&&Math.abs(q[1]-p[1])>1)out.push([q[0],p[1]]);
+  out.push(q);
+ }
+ return out;
+}
 function smartRoute(a,b){
  const cands=[];
  for(const c of candidates(a,b)){
@@ -365,7 +383,7 @@ function smartRoute(a,b){
   const d1=[pts[1][0]-pts[0][0],pts[1][1]-pts[0][1]];
   if(d1[0]*HEAD[c.sa][0]+d1[1]*HEAD[c.sa][1]<=0)continue;
   const dn=[pts[pts.length-1][0]-pts[pts.length-2][0],pts[pts.length-1][1]-pts[pts.length-2][1]];
-  if(dn[0]*HEAD[c.sb][0]+dn[1]*HEAD[c.sb][1]<=0)continue;
+  if(dn[0]*OPP[c.sb][0]+dn[1]*OPP[c.sb][1]<=0)continue;
   c.t=nturns(pts);c.len=plen(pts);
   c.clear=pathClear(pts,a,b);
   cands.push(c);
@@ -375,10 +393,11 @@ function smartRoute(a,b){
   clear.sort((x,y)=>(x.t-y.t)||(x.len-y.len));
   return clear[0].pts;
  }
- // 一级半兜底:网格 A*
- const sc=gFree(portPt(a,'R')),tc=gFree(portPt(b,'L'));
- const gpts=gAstar(sc,tc);
- if(gpts)return gpts;
+ // 二级兜底:网格 A*,但端口仍从边中心进出
+ const [pa0,pb0]=ports(a,b);
+ const sc=gFree(pa0),tc=gFree(pb0);
+ const inner=gAstar(sc,tc);
+ if(inner)return recti([pa0,...inner,pb0]);
  cands.sort((x,y)=>(x.t-y.t)||(pathHits(x.pts,a,b)-pathHits(y.pts,a,b)));
  return cands.length?cands[0].pts:[[B[a].x2,B[a].cy],[B[b].x1,B[b].cy]];
 }
@@ -387,7 +406,9 @@ svg.innerHTML='<defs><marker id="arr" markerWidth="9" markerHeight="8" refX="8" 
 const nodeRects=N.map(n=>({x:n.x,y:n.y,w:n.w||140,h:n.h||46}));
 const placedL=[],ELS=[];
 E.forEach(e=>{
- const pts=smartRoute(e[0],e[1]);
+ let pts;
+ try{pts=smartRoute(e[0],e[1]);}
+ catch(err){window.__errs.push('route '+e[0]+'->'+e[1]+': '+err.message);pts=[[B[e[0]].cx,B[e[0]].cy],[B[e[1]].cx,B[e[1]].cy]];}
  const add=(Array.isArray(e[3])&&e[3].includes('add'));
  const p=document.createElementNS('http://www.w3.org/2000/svg','path');
  p.setAttribute('d',d2path(pts));p.setAttribute('class','edge'+(add?' add':''));
