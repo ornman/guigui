@@ -1,0 +1,75 @@
+flowchart TB
+ subgraph BOOT["启动仪式与首装链"]
+  vboot(["v-boot 启动自检"]) --> shouzhuang[首装] --> pan1[判断]
+  pan1 -->|不可达| netbad["网络 10.1.2.3 不可达"] --> vguide(["进入不可达 #v-guide"])
+  vguide -->|选择重新检测| netbad
+  vguide -->|选WiFi后可达| pan2[判断]
+  vguide -->|选择保存配置先| cfgmode(["配置模式"])
+  pan1 -->|可达| netok["正常启动网络 可达"] --> pan2
+  pan2 -->|未登录| weidl[未登录] --> loginpg
+  pan2 -->|已登录| yidl[已经登录] --> pullacc[自动拉取当前账号] --> loginpg
+ end
+ subgraph FORM["表单与验证阶梯"]
+  loginpg(["进入登录页 #vok 和 vlogin 合并"]) -->|空提交| hint2[密码学号未填提示]
+  loginpg --> submit[用户提交表单] --> bj["后端判断 验证密码是否正确并返回状态码"]
+  cfgmode -->|以配置模式提交| submit
+  cfgmode --> unvdb[未验证数据库] --> db[后端提交凭证进入数据库]
+  bj -->|密码不对| rpwd[密码不对] --> fb
+  bj -->|节流·拍板⑥| rthr[节流 让等N秒·中性提示] --> fb
+  bj -->|学号运营商错| rop[学号运营商错误] --> fb
+  bj -->|连不上| runreach[连不上10.1.2.3] --> fb
+  runreach --> vguide
+  bj -->|绑定受限| rbind[绑定受限] --> fb
+  bj -->|学号已在别的设备| rdev[学号已在别的设备上登录] --> fb
+  fb["反馈给登录页·登录页状态显示"] -->|改对再试| submit
+  fb --> log1[进入日志]
+  bj -->|没有任何问题通过| rok[没有任何问题通过] --> db
+  db --> create[创建·配置模式只创建业务计划任务]
+  create --> mkmain[建立业务计划任务] --> v1[后端验证器 判断任务创建与通知]
+  create --> mkverify["建立验证器用近期计划任务 ·先不管 拍板⑨"] --> v1
+  v1 -->|创建失败| crrerr[创建失败] --> log1
+  crrerr --> vfail[验证器计划任务登录失败]
+  v1 -->|创建成功| crok[创建成功] --> v2[后端验证器 判断任务是否成功登录校园网]
+  v2 -->|登录失败| vfail
+  v2 -->|任务成功| vok[验证器任务完成] --> vdel[删除验证器任务·拍板⑨先不管]
+  vok --> okpg(["进入成功页"])
+  vfail --> intercept(["进入拦截页 要求通过安全软件白名单"])
+  intercept --> rebuild[重建链路] --> crrerr
+  intercept --> re3[重建失败3次]
+  re3 --> fbk(["问题反馈"])
+  re3 --> detector(["检测器页面"])
+  younet[有网] -->|已在线提交| bj
+  cfgok(["配置模式进入成功页 显示已配置好只等网来"]) --> adv[高级设置]
+  cfgok -->|按钮 返回不可达页| vguide
+ end
+ subgraph DAILY["日常链 静默探测驱动"]
+  daily0[非首装 日常] --> silent["后端验证器静默探测 网络/计划任务/日志/程序/数据库"]
+  silent -->|一切正常| fine[一切正常] -->|点击登录 完整流程正常后| dailypg(["日常页"])
+  silent -->|状态异常| neton[有网络但当前状态没登录] --> bigB(["大头状态页 蓝变红 提示网络断开 guigui沮丧"])
+  bigB -->|恢复后回探| silent
+  bigB --> probe5["验证器5s探测一次网络 =10.1.2.3连通性 不触发登录"]
+  probe5 -->|通了| dailypg
+  probe5 -->|通但状态异常| beret[后端返回]
+  probe5 -->|还不通| noway[当下连不上] --> vguide2(["进入不可达 #v-guide"])
+  part[某个环节有问题] --> vault[凭证库有问题] --> rebuild2[自动重建] --> degrade[后端重建3次失败降级凭证库系统]
+  degrade -->|正常| dailypg
+  degrade -->|仍失败| fb2(["问题反馈"])
+  part --> taskfail[计划任务失效] --> intercept2(["拦截页要求重建 直到功能正常返回日常页"])
+  part --> logskip["日志 今天没有正常登录 但网络可连上10.1.2.3"] --> autotest[自动登录测试看看] --> beret
+  beret -->|密码不对| dpwd[密码不对] --> bigA(["大头状态页 按后端返回的状态 guigui沮丧"])
+  beret -->|学号运营商错| dop[学号运营商错误] --> bigA
+  beret -->|绑定受限| dbind[绑定受限] --> bigA
+  beret -->|学号在别的设备| ddev[学号已在别的设备上登录] --> bigA
+  bigA -->|密码/运营商错 去登录页改| loginpg2(["登录页 保留返回键"])
+  bigA -->|绑定/别设备 提示是否更换账号| swap["提示 是否更换账号 拍板⑦"]
+  swap -->|换| loginpg2
+  bigA -->|不更换 返回 带错误横幅| dailypg
+  loginpg2 --> chain[一套链路走下来直到到达成功页] --> okpg
+  dailypg --> advpg(["高级设置页"])
+  advpg --> fb2
+  advpg -->|点击修改时间的保存| timeedit[修改时间配置并自动走完整链路] --> chain
+ end
+ classDef page fill:#efe9fc,stroke:#7c5cd6,stroke-width:2px,color:#1a1a2e
+ classDef state fill:#f2f2f4,stroke:#b9bac2,color:#232329
+ classDef note fill:#fff3cd,stroke:#e6d9a8,color:#5c4a1e
+ class vboot,vguide,loginpg,cfgmode,fb,intercept,okpg,setpg,home,cfgok,vguide2,dailypg,bigB,bigA,loginpg2,chain,advpg,fb2,fbk,detector,intercept2 page
