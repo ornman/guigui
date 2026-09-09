@@ -1,0 +1,1240 @@
+{
+ "version": 2,
+ "nodes": [
+  {
+   "type": "frame",
+   "id": "root",
+   "x": 40,
+   "y": 40,
+   "layout": "dagre",
+   "width": "fit-content",
+   "height": "fit-content",
+   "padding": 60,
+   "fillColor": "#F8FAFC",
+   "borderColor": "#CBD5E1",
+   "borderWidth": 1,
+   "borderRadius": 16,
+   "layoutOptions": {
+    "rankdir": "LR",
+    "nodesep": 46,
+    "ranksep": 110,
+    "edges": [
+     [
+      "launch",
+      "pan1",
+      ""
+     ],
+     [
+      "pan1",
+      "netbad",
+      "否"
+     ],
+     [
+      "pan1",
+      "netok",
+      "是"
+     ],
+     [
+      "netbad",
+      "vguide",
+      ""
+     ],
+     [
+      "vguide",
+      "netbad",
+      "重检"
+     ],
+     [
+      "vguide",
+      "pan2",
+      "选WiFi后"
+     ],
+     [
+      "vguide",
+      "cfgmode",
+      "选保存配置(黄)"
+     ],
+     [
+      "netok",
+      "pan2",
+      ""
+     ],
+     [
+      "pan2",
+      "weidl",
+      "未登录"
+     ],
+     [
+      "pan2",
+      "yidl",
+      "已登录"
+     ],
+     [
+      "weidl",
+      "loginpg",
+      ""
+     ],
+     [
+      "yidl",
+      "loginpg",
+      ""
+     ],
+     [
+      "loginpg",
+      "submit",
+      "填完提交"
+     ],
+     [
+      "loginpg",
+      "cfgmode",
+      "先保存配置"
+     ],
+     [
+      "cfgmode",
+      "submit",
+      "以配置模式"
+     ],
+     [
+      "cfgmode",
+      "unvdb",
+      "存而不验"
+     ],
+     [
+      "unvdb",
+      "db",
+      "验证通过"
+     ],
+     [
+      "submit",
+      "bj",
+      ""
+     ],
+     [
+      "bj",
+      "r_pwd",
+      ""
+     ],
+     [
+      "bj",
+      "r_thr",
+      ""
+     ],
+     [
+      "bj",
+      "r_op",
+      ""
+     ],
+     [
+      "bj",
+      "r_unreach",
+      ""
+     ],
+     [
+      "bj",
+      "r_bind",
+      ""
+     ],
+     [
+      "bj",
+      "r_dev",
+      ""
+     ],
+     [
+      "r_pwd",
+      "fb",
+      ""
+     ],
+     [
+      "r_thr",
+      "fb",
+      ""
+     ],
+     [
+      "r_op",
+      "fb",
+      ""
+     ],
+     [
+      "r_unreach",
+      "fb",
+      ""
+     ],
+     [
+      "r_bind",
+      "fb",
+      ""
+     ],
+     [
+      "r_dev",
+      "fb",
+      ""
+     ],
+     [
+      "r_unreach",
+      "vguide",
+      "引导排查"
+     ],
+     [
+      "fb",
+      "submit",
+      "改对再试"
+     ],
+     [
+      "bj",
+      "db",
+      "没问题·通过"
+     ],
+     [
+      "db",
+      "create",
+      ""
+     ],
+     [
+      "create",
+      "mkverify",
+      ""
+     ],
+     [
+      "create",
+      "v1",
+      "业务任务"
+     ],
+     [
+      "mkverify",
+      "v1",
+      ""
+     ],
+     [
+      "v1",
+      "vfail",
+      "创建失败"
+     ],
+     [
+      "v1",
+      "v2",
+      "创建成功"
+     ],
+     [
+      "v2",
+      "vfail",
+      "登录失败"
+     ],
+     [
+      "v2",
+      "vok",
+      "成功"
+     ],
+     [
+      "vok",
+      "okpg",
+      ""
+     ],
+     [
+      "vfail",
+      "intercept",
+      ""
+     ],
+     [
+      "intercept",
+      "re3",
+      "重建×3失败"
+     ],
+     [
+      "launch",
+      "silent",
+      "非首装"
+     ],
+     [
+      "silent",
+      "fine",
+      "全绿"
+     ],
+     [
+      "silent",
+      "neton",
+      "状态异常"
+     ],
+     [
+      "silent",
+      "part",
+      "部件异常"
+     ],
+     [
+      "fine",
+      "dailypg",
+      "点击登录·流程正常"
+     ],
+     [
+      "neton",
+      "bigB",
+      ""
+     ],
+     [
+      "bigB",
+      "silent",
+      "恢复回探"
+     ],
+     [
+      "bigB",
+      "probe5",
+      "每5s"
+     ],
+     [
+      "probe5",
+      "dailypg",
+      "通了"
+     ],
+     [
+      "probe5",
+      "beret",
+      "通但异常"
+     ],
+     [
+      "probe5",
+      "noway",
+      "还不通"
+     ],
+     [
+      "noway",
+      "vguide",
+      ""
+     ],
+     [
+      "part",
+      "vault",
+      ""
+     ],
+     [
+      "vault",
+      "rebuild2",
+      ""
+     ],
+     [
+      "rebuild2",
+      "degrade",
+      "3次失败"
+     ],
+     [
+      "degrade",
+      "dailypg",
+      "正常返回"
+     ],
+     [
+      "degrade",
+      "fb2",
+      "仍失败"
+     ],
+     [
+      "part",
+      "taskfail",
+      ""
+     ],
+     [
+      "taskfail",
+      "intercept2",
+      ""
+     ],
+     [
+      "intercept2",
+      "dailypg",
+      "重建成功"
+     ],
+     [
+      "part",
+      "logskip",
+      ""
+     ],
+     [
+      "logskip",
+      "autotest",
+      ""
+     ],
+     [
+      "autotest",
+      "beret",
+      ""
+     ],
+     [
+      "beret",
+      "d_pwd",
+      ""
+     ],
+     [
+      "beret",
+      "d_op",
+      ""
+     ],
+     [
+      "beret",
+      "d_bind",
+      ""
+     ],
+     [
+      "beret",
+      "d_dev",
+      ""
+     ],
+     [
+      "d_pwd",
+      "bigA",
+      ""
+     ],
+     [
+      "d_op",
+      "bigA",
+      ""
+     ],
+     [
+      "d_bind",
+      "bigA",
+      ""
+     ],
+     [
+      "d_dev",
+      "bigA",
+      ""
+     ],
+     [
+      "bigA",
+      "loginpg2",
+      "密码/运营商错·去改"
+     ],
+     [
+      "bigA",
+      "swap",
+      "绑定/别设备"
+     ],
+     [
+      "swap",
+      "loginpg2",
+      "换"
+     ],
+     [
+      "bigA",
+      "dailypg",
+      "不换·带横幅返回"
+     ],
+     [
+      "loginpg2",
+      "chain",
+      ""
+     ],
+     [
+      "chain",
+      "okpg",
+      "到达"
+     ],
+     [
+      "dailypg",
+      "advpg",
+      ""
+     ],
+     [
+      "advpg",
+      "fb2",
+      ""
+     ],
+     [
+      "advpg",
+      "timeedit",
+      "改时间保存"
+     ],
+     [
+      "timeedit",
+      "chain",
+      ""
+     ]
+    ]
+   },
+   "children": [
+    {
+     "type": "frame",
+     "id": "g1",
+     "layout": "dagre",
+     "layoutOptions": {
+      "isCluster": true,
+      "clusterTitle": "🚀 首装链(单行道)",
+      "clusterTitleColor": "#6D28D9"
+     },
+     "fillColor": "#F5F3FF",
+     "borderColor": "#C4B5FD",
+     "borderWidth": 2,
+     "borderDash": "dashed",
+     "borderRadius": 20,
+     "children": [
+      {
+       "type": "ellipse",
+       "id": "launch",
+       "text": "启动 开机/深链",
+       "width": 110,
+       "height": 56,
+       "fillColor": "#E2E8F0",
+       "borderColor": "#64748B",
+       "borderWidth": 2,
+       "fontSize": 13,
+       "textColor": "#334155"
+      },
+      {
+       "type": "diamond",
+       "id": "pan1",
+       "text": "网络可达?",
+       "width": 120,
+       "height": 72,
+       "fillColor": "#FEF3C7",
+       "borderColor": "#D97706",
+       "borderWidth": 2,
+       "fontSize": 13,
+       "textColor": "#92400E"
+      },
+      {
+       "type": "rect",
+       "id": "netbad",
+       "text": "10.1.2.3 不可达",
+       "width": 132,
+       "height": 48,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "vguide",
+       "text": "#v-guide 排查页 ①挑网②重检③存配置",
+       "width": 160,
+       "height": 56,
+       "fillColor": "#EFE9FC",
+       "borderColor": "#7C5CD6",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "netok",
+       "text": "可达",
+       "width": 100,
+       "height": 44,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "diamond",
+       "id": "pan2",
+       "text": "登录态?",
+       "width": 120,
+       "height": 72,
+       "fillColor": "#FEF3C7",
+       "borderColor": "#D97706",
+       "borderWidth": 2,
+       "fontSize": 13,
+       "textColor": "#92400E"
+      },
+      {
+       "type": "rect",
+       "id": "weidl",
+       "text": "未登录",
+       "width": 100,
+       "height": 44,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "yidl",
+       "text": "已登录·拉取账号",
+       "width": 140,
+       "height": 44,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "loginpg",
+       "text": "#登录页 v-ok/v-login合并·保留返回键",
+       "width": 180,
+       "height": 56,
+       "fillColor": "#EFE9FC",
+       "borderColor": "#7C5CD6",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      }
+     ]
+    },
+    {
+     "type": "frame",
+     "id": "g2",
+     "layout": "dagre",
+     "layoutOptions": {
+      "isCluster": true,
+      "clusterTitle": "📝 表单与验证阶梯",
+      "clusterTitleColor": "#1D4ED8"
+     },
+     "fillColor": "#EFF6FF",
+     "borderColor": "#93C5FD",
+     "borderWidth": 2,
+     "borderDash": "dashed",
+     "borderRadius": 20,
+     "children": [
+      {
+       "type": "rect",
+       "id": "submit",
+       "text": "提交表单",
+       "width": 132,
+       "height": 48,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "cfgmode",
+       "text": "#配置模式 只存凭据+只建业务任务",
+       "width": 170,
+       "height": 56,
+       "fillColor": "#EFE9FC",
+       "borderColor": "#7C5CD6",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "diamond",
+       "id": "bj",
+       "text": "后端判断 密码+状态码",
+       "width": 150,
+       "height": 88,
+       "fillColor": "#FEF3C7",
+       "borderColor": "#D97706",
+       "borderWidth": 2,
+       "fontSize": 13,
+       "textColor": "#92400E"
+      },
+      {
+       "type": "rect",
+       "id": "r_pwd",
+       "text": "密码不对",
+       "width": 110,
+       "height": 42,
+       "fillColor": "#FEE2E2",
+       "borderColor": "#DC2626",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "r_thr",
+       "text": "节流·等N秒 中性提示(拍板⑥)",
+       "width": 150,
+       "height": 48,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937",
+       "borderDash": "dashed"
+      },
+      {
+       "type": "rect",
+       "id": "r_op",
+       "text": "学号/运营商错",
+       "width": 130,
+       "height": 42,
+       "fillColor": "#FEE2E2",
+       "borderColor": "#DC2626",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "r_unreach",
+       "text": "连不上10.1.2.3",
+       "width": 140,
+       "height": 44,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "r_bind",
+       "text": "绑定受限",
+       "width": 110,
+       "height": 42,
+       "fillColor": "#FEE2E2",
+       "borderColor": "#DC2626",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "r_dev",
+       "text": "学号在别的设备",
+       "width": 140,
+       "height": 42,
+       "fillColor": "#FEE2E2",
+       "borderColor": "#DC2626",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "fb",
+       "text": "#反馈给登录页 状态栏显示",
+       "width": 150,
+       "height": 56,
+       "fillColor": "#EFE9FC",
+       "borderColor": "#7C5CD6",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "cylinder",
+       "id": "unvdb",
+       "text": "未验证库",
+       "width": 112,
+       "height": 56,
+       "fillColor": "#F0FDF4",
+       "borderColor": "#22C55E",
+       "borderWidth": 2,
+       "fontSize": 13,
+       "textColor": "#14532D"
+      },
+      {
+       "type": "cylinder",
+       "id": "db",
+       "text": "凭证库",
+       "width": 112,
+       "height": 56,
+       "fillColor": "#F0FDF4",
+       "borderColor": "#22C55E",
+       "borderWidth": 2,
+       "fontSize": 13,
+       "textColor": "#14532D"
+      },
+      {
+       "type": "rect",
+       "id": "create",
+       "text": "创建任务(配置模式只建业务)",
+       "width": 165,
+       "height": 52,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "mkverify",
+       "text": "验证器专用任务(先不管⑨)",
+       "width": 150,
+       "height": 48,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937",
+       "borderDash": "dashed"
+      },
+      {
+       "type": "rect",
+       "id": "v1",
+       "text": "验证器① 建成?+通知",
+       "width": 145,
+       "height": 52,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "v2",
+       "text": "验证器② 登上网?",
+       "width": 145,
+       "height": 52,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "vok",
+       "text": "任务完成·删任务",
+       "width": 140,
+       "height": 44,
+       "fillColor": "#DCFCE7",
+       "borderColor": "#16A34A",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "vfail",
+       "text": "任务登录失败",
+       "width": 130,
+       "height": 44,
+       "fillColor": "#FEE2E2",
+       "borderColor": "#DC2626",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "okpg",
+       "text": "#成功页 彩带=全有",
+       "width": 135,
+       "height": 48,
+       "fillColor": "#DCFCE7",
+       "borderColor": "#16A34A",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "intercept",
+       "text": "#拦截页 要求加白名单",
+       "width": 145,
+       "height": 48,
+       "fillColor": "#FEE2E2",
+       "borderColor": "#DC2626",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "re3",
+       "text": "重建失败3次→反馈/检测器",
+       "width": 175,
+       "height": 44,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      }
+     ]
+    },
+    {
+     "type": "frame",
+     "id": "g3",
+     "layout": "dagre",
+     "layoutOptions": {
+      "isCluster": true,
+      "clusterTitle": "🔄 日常链(静默探测)",
+      "clusterTitleColor": "#15803D"
+     },
+     "fillColor": "#F0FDF4",
+     "borderColor": "#86EFAC",
+     "borderWidth": 2,
+     "borderDash": "dashed",
+     "borderRadius": 20,
+     "children": [
+      {
+       "type": "rect",
+       "id": "silent",
+       "text": "静默探测 网/任务/日志/程序/库",
+       "width": 165,
+       "height": 56,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "fine",
+       "text": "一切正常",
+       "width": 110,
+       "height": 44,
+       "fillColor": "#DCFCE7",
+       "borderColor": "#16A34A",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "dailypg",
+       "text": "#日常页 横幅①②③在场",
+       "width": 150,
+       "height": 52,
+       "fillColor": "#EFE9FC",
+       "borderColor": "#7C5CD6",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "neton",
+       "text": "有网但没登录",
+       "width": 130,
+       "height": 44,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "bigB",
+       "text": "#大头状态页 蓝变红·网络断开(⑧)",
+       "width": 180,
+       "height": 56,
+       "fillColor": "#EFE9FC",
+       "borderColor": "#7C5CD6",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "probe5",
+       "text": "5s探测=10.1.2.3连通性(⑧)",
+       "width": 160,
+       "height": 48,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937",
+       "borderDash": "dashed"
+      },
+      {
+       "type": "rect",
+       "id": "part",
+       "text": "某环节有问题",
+       "width": 120,
+       "height": 44,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "vault",
+       "text": "凭证库问题",
+       "width": 110,
+       "height": 42,
+       "fillColor": "#FEE2E2",
+       "borderColor": "#DC2626",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "rebuild2",
+       "text": "自动重建×3",
+       "width": 110,
+       "height": 42,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "degrade",
+       "text": "降级凭证库系统",
+       "width": 130,
+       "height": 42,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "taskfail",
+       "text": "计划任务失效",
+       "width": 115,
+       "height": 42,
+       "fillColor": "#FEE2E2",
+       "borderColor": "#DC2626",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "intercept2",
+       "text": "#拦截页 重建直到正常",
+       "width": 135,
+       "height": 48,
+       "fillColor": "#FEE2E2",
+       "borderColor": "#DC2626",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "logskip",
+       "text": "日志:没登上但网通",
+       "width": 140,
+       "height": 44,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "autotest",
+       "text": "自动登录测试",
+       "width": 120,
+       "height": 44,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "diamond",
+       "id": "beret",
+       "text": "后端返回",
+       "width": 112,
+       "height": 68,
+       "fillColor": "#FEF3C7",
+       "borderColor": "#D97706",
+       "borderWidth": 2,
+       "fontSize": 13,
+       "textColor": "#92400E"
+      },
+      {
+       "type": "rect",
+       "id": "d_pwd",
+       "text": "密码不对",
+       "width": 105,
+       "height": 40,
+       "fillColor": "#FEE2E2",
+       "borderColor": "#DC2626",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "d_op",
+       "text": "学号/运营商错",
+       "width": 125,
+       "height": 40,
+       "fillColor": "#FEE2E2",
+       "borderColor": "#DC2626",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "d_bind",
+       "text": "绑定受限",
+       "width": 105,
+       "height": 40,
+       "fillColor": "#FEE2E2",
+       "borderColor": "#DC2626",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "d_dev",
+       "text": "学号在别设备",
+       "width": 125,
+       "height": 40,
+       "fillColor": "#FEE2E2",
+       "borderColor": "#DC2626",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "bigA",
+       "text": "#大头状态页 按返回状态·沮丧(⑦)",
+       "width": 180,
+       "height": 56,
+       "fillColor": "#EFE9FC",
+       "borderColor": "#7C5CD6",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "diamond",
+       "id": "swap",
+       "text": "更换账号?",
+       "width": 122,
+       "height": 70,
+       "fillColor": "#FEF3C7",
+       "borderColor": "#D97706",
+       "borderWidth": 2,
+       "fontSize": 13,
+       "textColor": "#92400E"
+      },
+      {
+       "type": "rect",
+       "id": "loginpg2",
+       "text": "#登录页 带返回键",
+       "width": 125,
+       "height": 48,
+       "fillColor": "#EFE9FC",
+       "borderColor": "#7C5CD6",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "chain",
+       "text": "走完整链路→成功页",
+       "width": 150,
+       "height": 44,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "noway",
+       "text": "当下连不上",
+       "width": 110,
+       "height": 42,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "advpg",
+       "text": "#高级设置页",
+       "width": 120,
+       "height": 44,
+       "fillColor": "#EFE9FC",
+       "borderColor": "#7C5CD6",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "timeedit",
+       "text": "改时间→自动走链路",
+       "width": 150,
+       "height": 44,
+       "fillColor": "#DBEAFE",
+       "borderColor": "#2563EB",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "fb2",
+       "text": "#问题反馈",
+       "width": 110,
+       "height": 44,
+       "fillColor": "#EFE9FC",
+       "borderColor": "#7C5CD6",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
+       "textColor": "#1F2937"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
