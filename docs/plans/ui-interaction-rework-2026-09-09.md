@@ -100,7 +100,7 @@
 
 ---
 
-## B. P0 行为正确性(5 项——用户路径上撒谎/吞反馈的洞)
+## B. P0 行为正确性(6 项——用户路径上撒谎/吞反馈/基准失真的洞)
 
 ### P0-1 flash 体系落地(挂靠 A1)
 - 位置:`quickLogin`、`renderMain`、`setAuto`。
@@ -123,19 +123,29 @@
   - `bootWait`(v-boot 等门页)不动——它本来就对。
 - 验收:`_setNet('waiting')` 分别打在主页/排查页/登录页,三处均不再出现「不可达」「像热点」字样;`_setNet('logged_in')` 后开门链路照旧进日常页。
 
+### P0-6 mock 契约对齐:「线上他人」已存凭据路径(09-09 二轮补验实锤)
+- 病灶:mock 与真后端在「线上是他人学号」的**已存凭据重登**路径上行为相反——
+  真后端([api.py:189-199](guigui/app/api.py#L189)):`logged_in` 时先 `chkstatus_uid` 核对,线上是他人 → **不报 already,改走真登录**(注释原文「别人的成功不冒领」);
+  mock([mock.js:146](guigui/app/static/dev/mock.js#L146)):`logged_in` 一律 `return OK({result:'already'})`,阶梯只在带 password 时走。
+  后果:前端在 mock 的 other/ladder_back 场景练的「主页重登 = already」在真机不存在(真机会真登/被拒/节流三态);mock 自称「可执行规范、两边逐字段一致」却停在旧版,后续所有前端验收都建立在错误基准上。
+- 修法:mock 的 `login` 无 password 分支对齐后端——other/ladder_back 场景 `logged_in` 时模拟 chkstatus 他人 → 走「注销他人 → 真登」阶梯(发 `login:progress` 事件,返回 success+attempts=1);线上是自己 → already(现状)。P0-2 的 already 文案修复不受影响(真后端 already 只在自己在线时发生,文案恰好准确)。
+- 纪律:这是把 mock 对齐既有后端行为,**契约文档不动、后端 0 行改动**;mock 头注的场景说明同步更新;state-gallery 若有帧依赖旧 already 行为需同步重拍。
+- 验收:scene=other 主页「立即重新登录」→ 等待行出现注销告知 → 真登成功;scene=daily(自己在线)→ already 文案「你已经在网上了,桂桂没动」。
+
 ### P0-4 `NOT_CONFIGURED` 静默跳转 + 防重(挂靠 A2)
 - 位置:`quickLogin` 的 `NOT_CONFIGURED` 分支(裸 `openDetail('v-login')`,零解释)。
 - 修法:跳转前 `showLoginErr('还没存过密码,先填一次')(拟稿)`;配合 A2 的 `minMs` 堵零延迟路径。
 - 验收:AC-2 双击样本;落地登录页带警告块解释。
 
-### P0-5 横幅①条件收口(挂靠 A7)
+### P0-5 横幅①条件收口(挂靠 A7;条件 09-09 二轮补验后修正)
 - 位置:`renderBanners`。
-- 修法:横幅①条件追加「当前非已在线」守卫;文案不动。
-- 验收:AC-7。
+- 修法:横幅①条件改为 **`verified===false && (lastNet && lastNet.state!=='logged_in' || 最近结果 outcome==='fail')`**。
+  ⚠️ 初版守卫「已在线即隐藏」太粗,二轮补验 scene=unverified(已在线+未验证+**今早真失败**)时被否——这时密码大概率真错,横幅①是有信息的,一刀切会错杀。精确语义:**「未验证且(不在网 或 最近失败过)」才显示**;「未验证+已在线+从没失败」(scene=ok / beforeopen 存入型)才静默。
+- 验收:AC-7;补 scene=unverified → 横幅①**在场**;scene=ok → 横幅①**不在场**。
 
 ---
 
-## C. P1 终态·文案·可达性(5 项)
+## C. P1 终态·文案·可达性(7 项)
 
 ### P1-1 拦截页加出口(拍板③)
 - 位置:`renderSuccess` 的 `!taskOk` 分支(`stageEnter` actions 数组)。
@@ -168,6 +178,16 @@
   5. dd 菜单 Escape 关闭 + 焦点还按钮;
   6. 视图 h1 补 `tabindex="-1"`,`show()` 完成后 focus(挂靠 A5)。
 - 验收:AC-4/5/6;读屏标签不再出现「小匠」。
+
+### P1-6 体检中断网:诊断结果过期(09-09 二轮补验实锤)
+- 病灶:scene=daily 进入 v-diag 体检,跑到一半 `_setNet('unreachable')` → 按统一路由拽去 v-guide(行为正确);但 `backFrom('v-guide')` 返回 v-diag 后,显示的仍是**断网前跑完的旧结果**(实测「①✓已连上 / ②✓10.1.2.3 可达」赫然在列)——此刻网明明断了,旧绿灯与 v-guide 的「不可达」跨视图互相拆台(A7 病的跨页版本)。根因:`backFrom` 不触发 `startDiag`(`openDetail` 才触发),`diagState` 无过期概念。
+- 修法:`net:state` 处理器在跳排查页前,若 `currentView()==='v-diag'` 则把 `diagState` 标脏(`diagState.stale=true`);`renderDiag` 见 stale 时步骤区灰化 + 结论区显示「网络刚变过,结果可能过期,重跑一次(拟稿)」,出口按钮换成「重新体检」(`startDiag`)。
+- 验收:体检中 `_setNet('unreachable')` → 去 v-guide;返回 v-diag → 见过期提示而非旧绿灯;点「重新体检」按新网态重跑(第①②步如实 fail)。
+
+### P1-7 拦截页标题口径(diag_task 路径)
+- 病灶:验证器 exit=task_blocked → 拦截页,标题「密码存好了,自动登录还差一步。」——但走这条路的用户密码**已验证**(diag_task 场景 verified=true),「存好了」口径歪。
+- 修法:拦截页标题按入口区分:提交密码路径=「密码存好了,自动登录还差一步。」(现状,准确);验证器路径=「密码没问题,自动登录还差一步。(拟稿)」。`showSuccess` 增一个来源参数或 `diagExit` 传 `title` 覆盖。
+- 验收:scene=diag_task 体检 → 拦截页标题不再说「密码存好了」;scene=blocked 首装路径标题不变。
 
 ---
 
@@ -202,7 +222,7 @@
 
 ## E. state-gallery 重拍清单 + 矩阵文档同步义务
 
-- **必重拍帧**:v-ok 全帧、v-login 全帧(D.1 表单合一);排查页帧 + **新增 waiting 态排查帧**(B-P0-3);拦截页帧(C-P1-1 两按钮);主页横幅帧(①消失条件、③新文案);「发送中」「必填空」帧(id 迁移)。
+- **必重拍帧**:v-ok 全帧、v-login 全帧(D.1 表单合一);排查页帧 + **新增 waiting 态排查帧**(B-P0-3);拦截页帧(C-P1-1 两按钮);主页横幅帧(①新显示条件、③新文案);「发送中」「必填空」帧(id 迁移);**新增体检过期帧**(P1-6,断网返回后灰化+重跑);**other/ladder_back 主页重登帧**(P0-6,阶梯告知)。
 - **新增故事**:「填表中收到断网:不跳页,状态行转 danger」(A3/AC-3)——画廊新增帧,证明豁免逻辑。
 - **矩阵文档**(`docs/prd/guigui-state-matrix.md`):
   1. 错误路由总表补 waiting 行(P0-3);
@@ -215,6 +235,7 @@
 
 1. **审计对账**:2026-09-09 审计 10 洞逐条对账关闭(P0-1~5 → 洞 1/2/3/4/8/9;P1-1~5 → 洞 5/6/7/9/10;A 章规范挂靠齐全)。
 2. **mock 全场景**:内置浏览器 21 个 scene 跑一遍,无新洞、无回归(重点:already 假成功、waiting 贯穿、填表豁免、双击防重)。
+2a. **事件路由格全走查**:对 `net:state` 四态 × 主要视图(v-main / v-form / v-guide / v-settings / v-log / v-feedback / v-diag / v-success / v-boot)逐格 `_setNet` 验证落点(P2-2 落地后按 ROUTE 表逐格对)。已代验格子见 I 章补验记录,未代验格(v-log / v-feedback / v-success 收 unreachable;各视图收 waiting)执行时补。
 3. **gallery 全帧**过目 + 必重拍帧更新;矩阵文档同步完成。
 4. **双击复测样本**:NOT_CONFIGURED 场景 login 调用 = 1;成功 flash ≥4s(AC-1/AC-2 数据化复测)。
 5. **读屏抽查**:bot aria 全部桂桂口吻;横幅 Tab 可达。
@@ -243,11 +264,46 @@
 | P1-2 时间前缀 | 明早(写死) | 明早/今天/今晚(按时刻) |
 | P1-3 SSID 当前标记 | (无) | 当前 · 连着 |
 | P1-4 横幅③ | 试了几次还没登上?完整排查 | 反复登录都被拒?完整排查 |
+| P1-6 体检过期提示 | (无) | 网络刚变过,结果可能过期,重跑一次 |
+| P1-7 拦截页标题(验证器路径) | 密码存好了,自动登录还差一步。 | 密码没问题,自动登录还差一步。 |
 | P1-5 bot aria | 小匠文档助手,待命 等 | 桂桂在待命/桂桂在想事/桂桂很开心/桂桂有点急/桂桂睡着了 |
 
 ---
 
+## I. 补验记录(2026-09-09 第二轮,交互链全走查)
+
+> 用户质询「交互链你真的全部验证过吗」后补跑。以下为**已实测走通**的链(执行时作回归基线);标注⚠的为本轮新发现、已入计划。
+
+| 链 | 场景 | 结果 |
+|---|---|---|
+| 首装在线+识别回填+空密码警告+保存终态 | ok | ✓(一轮) |
+| 主页重登 already 假成功+80ms 吞文案 | ok/daily | ✓(一轮)⚠P0-1/P0-2 |
+| 重登被拒→登录页→连败×2→横幅③→验证器→exit=login | streak | ✓(一轮) |
+| 断网→排查页→③保存配置→填表中网恢复就地更新→提交彩带 | down | ✓(一轮) |
+| 拦截页死胡同→重建放行彩带 | blocked | ✓(一轮) |
+| 等门→开门→日常页 | waiting | ✓(一轮)⚠P0-5(横幅①又在场) |
+| waiting 压成 down+排查页「像热点」误导 | daily+_setNet | ✓(一轮)⚠P0-3 |
+| 反馈必填→断网入队→立刻重发回填 | down | ✓(一轮) |
+| 设置时间钳制→「明早 23:00」 | daily | ✓(一轮)⚠P1-2 |
+| 主页重登 already(mock 旧基准) | other | ✓⚠P0-6(mock/后端偏离实锤) |
+| 阶梯翻车两幕:他人学号回填→注销他人→被拒「网先断着」→改对成功 | ladder_fail | ✓ |
+| 阶梯回滚:改密被拒「已用旧密码接回来」→网恢复 | ladder_back | ✓ |
+| 节流:等待行中性文案,不进密码警告 | throttled | ✓ |
+| bind 被拒:自助平台六字内联链接渲染 | bind | ✓ |
+| limit 被拒:教育文案 | limit | ✓ |
+| 锚前存入:重登如实「还没开门,密码先存着」 | beforeopen | ✓ |
+| 未验证+今早失败:横幅①在场(显示条件需精化) | unverified | ✓⚠P0-5 修正 |
+| 验证器任务败:exit=task_blocked→拦截页 | diag_task | ✓⚠P1-7 标题口径 |
+| 验证器程序败:出口按钮隐藏+就地结论 | diag_app | ✓ |
+| 反馈降级:submitted_degraded 按「收到」处理 | fbdg | ✓ |
+| master 开关联动:拦截态横幅②/关闭后消失 | blocked | ✓(「关闭后残留」经查后端是幽灵任务故意告警,非洞) |
+| 体检中断网:拽排查页正确;返回后旧结果过期 | daily+diag | ✓⚠P1-6 |
+| 挑网自动路由:guide→连网→v-login | down | ✓(一轮) |
+
+**未代验、执行时必须补**:v-log/v-feedback/v-success 收 unreachable 的落点;各视图收 waiting(除已验三格);bind 内联链接点击后新标签页打开(openSelfService);applyLaunch 深链(creds/settings);`log:appended` 在 v-log 页的追加。
+
 ## 建议执行顺序与 commit 粒度
+
 
 1. **第一批(P0,一个对话可完成)**:P0-1(A1 flash 体系)→ P0-2 → P0-5 → P0-3(waiting)→ P0-4(A2 minMs)→ P1-2/P1-3/P1-4(小文案)→ P1-1(拦截页)→ P1-5(可达性包)。每项一 commit;A8(VIEW_MS 单源)作为独立小项插在 P0 后。
 2. **第二批(P2,建议独立对话)**:P2-1 表单合一(最大,先截图存档)→ P2-2 路由数据化 → P2-3 store 收口;每项一 commit,画廊/矩阵同步随项走。
