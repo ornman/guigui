@@ -163,11 +163,11 @@ footer{position:fixed;left:0;right:0;bottom:0;z-index:25;padding:8px 22px;
         <button onclick="pushNet('logged_in','Campus-WiFi')">已登录</button>
         <button onclick="pushNet('not_logged_in','Campus-WiFi')">未登录(可达)</button>
         <button onclick="pushNet('unreachable','iphone17 pro max')">不可达(热点)</button>
-        <button onclick="pushNet('waiting',null)">等门(waiting)</button>
+        <button onclick="pushNet('waiting',null)">未就绪 waiting(≡不可达)</button>
       </div>
       <div class="note">经 mock._setNet 真改数据源并推 net:state:当前视图的路由
-        (v-login/v-ok/详情页断网直跳排查页、v-guide 自动分流、v-main 重渲、boot 等门开门)
-        全部走产品代码,顺带验收 2026-09-08 的路由统一。</div>
+        (v-login/v-ok/详情页断网直跳排查页、v-guide 自动分流、v-main 重渲)
+        全部走产品代码,顺带验收 2026-09-08 的路由统一;waiting 自 P0-3 起在映射层压平为不可达,行为应与「不可达」逐格一致。</div>
     </div>
     <div class="sops">
       <button onclick="reloadStoryPanel()">重载预览</button>
@@ -216,12 +216,8 @@ const WIFI_FAKE=[{ssid:'Campus-WiFi',signal:'strong'},{ssid:'Campus-5G',signal:'
 
 /* ═══ 陈列帧定义:每视图一卡,每帧 {label,scene,setup} ═══ */
 const PANELS=[
-{view:'v-boot',name:'开机仪式 / 等门',frames:[
+{view:'v-boot',name:'开机仪式',frames:[
   {label:'仪式 · 检查网络中',scene:'ok',setup:W=>bootPose(W,'桂桂伸了个懒腰,正在检查网络…','sleep',1)},
-  {label:'等门 bootWait(06:50 前)',scene:'waiting',setup:W=>{
-    W.document.body.classList.remove('setup');W.bootWait();
-    E(W,'boot-cap').innerHTML='校园网 06:50 才开门,桂桂在门口等着…<br><span style="font-size:11px;opacity:.7">每 30 秒看一次,开了就替你登好</span>';
-    W.show('v-boot');W.mood(Q(W,'#boot-bot'),'sleep')}},
   {label:'BRIDGE_MISSING(后端没绑上)',scene:'ok',setup:W=>bootPose(W,'桂桂连不上自己的后端(bridge missing)。请重启桂桂;反复出现请重装。','sad',1)},
 ]},
 {view:'v-ok',name:'首装 · 已连已登落地页',frames:[
@@ -283,7 +279,7 @@ const PANELS=[
     W.mood(Q(W,'#boot-bot-greet-main'),'happy');
     E(W,'main-lede').textContent='刚刚把网帮你接回来啦 ✓'}},
   {label:'门没开 stored(如实不撒花)',scene:'daily',setup:W=>{W.wakeProblem('out');
-    E(W,'main-lede').textContent='还没开门,密码先存着,开门自动登'}},
+    E(W,'main-lede').textContent='时间还没到,密码先存着,到点自动登'}},
   {label:'断网存配置回主页(down + ①横幅 · 场景5 终态)',scene:'daily',setup:W=>{W.wakeProblem('down');
     W.renderBanners({verified:false})}},
 ]},
@@ -370,10 +366,10 @@ const STORIES=[
   {t:'密码错',d:'reload 到 rejected 底座(此场景登录必被拒):输任意密码点「立即登录」→ wrong_password 被拒,密码不存。',scene:'rejected'},
   {t:'改对(示意)',d:'真机改对即成功;mock 的 rejected 底座永远拒,这里摆成功页示意终态。',scene:'rejected',setup:W=>W.showSuccess(true,null,true)},
 ]},
-{t:'S7a 门没开',s:'06:50 前提交 → stored 不撒花',steps:[
-  {t:'主页(密码已存)',d:'beforeopen 底座:密码已存未验证,门没开。',scene:'beforeopen'},
-  {t:'重登 → stored',d:'亲手:点「立即重新登录」→ 返回 stored(门没开,密码先存着)→ 文案「还没开门,密码先存着,开门自动登」(2026-09-07 前端补的如实分支,原先错当成功)。',scene:'beforeopen',free:'点主页「立即重新登录」'},
-  {t:'改密页提交',d:'走 高级设置 → 账号与密码 → 修改 → 提交新密码 → 保存配置终态页「配置已保存,校园网 06:50 开门后自动验证登录」(2026-09-08 终态收敛,锚前不再是成功页变体)。',scene:'beforeopen',free:'自己走一遍改密提交'},
+{t:'S7a 锚前存入',s:'时间没到先存密码 → stored 不撒花',steps:[
+  {t:'主页(密码已存)',d:'beforeopen 底座:密码已存未验证,时间还没到。',scene:'beforeopen'},
+  {t:'重登 → stored',d:'亲手:点「立即重新登录」→ 返回 stored(时间没到,密码先存着)→ 文案「时间还没到,密码先存着,到点自动登」(如实分支,不当成功;P0-3 起开门文案下线)。',scene:'beforeopen',free:'点主页「立即重新登录」'},
+  {t:'改密页提交',d:'走 高级设置 → 账号与密码 → 修改 → 提交新密码 → 保存配置终态页「配置已保存。时间还没到,桂桂先把密码收好,到点自动验证」(2026-09-08 终态收敛,锚前不再是成功页变体)。',scene:'beforeopen',free:'自己走一遍改密提交'},
 ]},
 {t:'S7b 节流',s:'太快了,服务器让等 10 秒',steps:[
   {t:'提交被节流',d:'throttled 底座落地登录页;输密码点登录:等待行「被节流了,服务器让等 10 秒,桂桂等一下接着试…」→ 信封 AUTH_REJECTED / throttled,中性展示(不进密码警告框,节流不是密码错)。',scene:'throttled',free:'填密码点「立即登录」,看等待行与最终提示'},
@@ -390,9 +386,9 @@ const STORIES=[
 {t:'S7e 桂桂睡觉',s:'总开关一关,自动化全停',steps:[
   {t:'睡觉态',d:'主页总开关关:bot 睡着,「好,我先歇着,想我了再开」;设置里 master 同步。亲手点开关也行。',scene:'daily',setup:W=>W.setAuto(false),free:'亲手点主页开关试试'},
 ]},
-{t:'S7f 等门',s:'刚开机网络栈未就绪',steps:[
-  {t:'bootWait',d:'waiting 底座:桂桂睡在门口等开门,「每 30 秒看一次」。mock 约 3.2s 后开门推事件自动进主页(想反复看就点「重载预览」)。',scene:'waiting'},
-  {t:'开门进主页',d:'事件到达:门开了(按实际网态落主页,不预写假绿,2026-09-07 修复)→ 日常页。',scene:'waiting'},
+{t:'S7f 未就绪',s:'刚开机网络栈还没起来',steps:[
+  {t:'视同不可达 → 排查页',d:'waiting 底座(P0-3:开门判断已全局删除,waiting 一律视同不可达):仪式后直接落 v-guide 排查页,与 down 场景同一副面孔。mock 约 3.2s 后推 logged_in,排查页自动回日常(想反复看就点「重载预览」)。',scene:'waiting'},
+  {t:'网好了 → 回日常',d:'事件到达:按实际网态落主页,不预写假绿。',scene:'waiting'},
 ]},
 {t:'S8 启动静默任务体检',s:'开机无感检查,被拦才亮横幅②',steps:[
   {t:'开机仪式(体检并行)',d:'diag_task 底座:网正常但定时任务不在岗。仪式期间并行跑 taskStatus(只读、秒回、2s 超时保护),用户全程无感 — 验证器铁律的另一半:只有只读检查才许静默,全量五步必须显式进 v-diag 才跑。',scene:'diag_task',setup:W=>bootPose(W,'桂桂伸了个懒腰,正在检查网络…','sleep',0)},

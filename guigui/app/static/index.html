@@ -669,8 +669,6 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
           <button class="preset" data-t="08:00">08:00</button>
         </div>
       </div>
-      <div class="micro-line">校园网 06:50 才开门</div>
-
       <div class="row"><div><div class="t">账号与密码</div></div>
         <button class="go" type="button" onclick="openDetail('v-login')">修改</button></div>
 
@@ -856,13 +854,12 @@ async function firstRun(){
     return
   }
   if(p.ok){
-    lastNet=p.data.net;
+    lastNet=normNet(p.data.net);
     configured=!!p.data.configured;
-    const s=p.data.net.state;
+    const s=lastNet.state;
     mainState=s==='logged_in'?'ok':(s==='not_logged_in'?'out':'down');
     if(configured){
       silentTaskCheck();   /* 仪式期间静默任务体检(只读秒回):被拦 → 主页横幅② */
-      if(s==='waiting'){setTimeout(bootWait,Math.max(0,700-el));return}   /* 等门:开门事件接手 */
       if(s==='unreachable'){
         /* 断网统一落 v-guide(原则 3):不再落主页 down;从 v-guide 返回后主页 down 态保留 */
         document.body.classList.remove('setup');
@@ -874,16 +871,7 @@ async function firstRun(){
   setTimeout(goSetup,Math.max(0,1500-el));
 }
 /* reinitBot 已废弃 — 两个 bot 各有独立 DOM,size 在 HTML 写死,不需要中途重建 SVG */
-/* 开机等网络:无典礼(每天开机都走),桂桂睡着在门口等,就绪直接落日常页 */
-function bootWait(){
-  mainState='ok';document.body.classList.remove('setup');
-  const b=$('boot-bot');
-  b.dataset.mood='sleep';b.classList.add('entering');
-  setTimeout(()=>{b.classList.remove('entering')},900);
-  $('boot-cap').innerHTML='校园网 06:50 才开门,桂桂在门口等着…<br><span style="font-size:11px;opacity:.7">每 30 秒看一次,开了就替你登好</span>';
-  show('v-boot');
-  /* 开门后端会推 net:state(契约 §3),事件监听接手进日常页 */
-}
+/* 开机等网络页 bootWait 已删(2026-09-10 拍板⑤):waiting 视同不可达,统一落 v-guide 排查页 */
 /* 启动静默任务体检(3.1):configured 才跑,与仪式并行、只读秒回;
    2s 超时保护 — 迟到的结果不追改,横幅由 schedule:changed / 下次启动对齐 */
 function silentTaskCheck(){
@@ -1032,7 +1020,7 @@ async function quickLogin(){
     if(r.data&&r.data.result==='stored'){
       /* 锚前存入:密码存了但没登上,不是成功,如实说 */
       mood(gb,'idle');
-      flashMainLede('还没开门,密码先存着,开门自动登');
+      flashMainLede('时间还没到,密码先存着,到点自动登');
       renderBannersRefresh();return}
     if(r.data&&r.data.result==='already'){
       /* 已经在线:如实说不冒领(P0-2)— 网不是这次点出来的,不切成功表情、mainState 不动 */
@@ -1105,7 +1093,7 @@ function renderSuccess(){
   if(!st.verified){
     /* 保存配置页(不撒彩带,bot idle 呼吸):客观无法当场验证就不冒充成功,按存入原因说人话 */
     const lede=st.reason==='unreachable'?'连上校园网后,桂桂自动执行登录。'
-      :(st.reason==='before_open'?'校园网 06:50 开门后,桂桂自动验证登录。'
+      :(st.reason==='before_open'?'时间还没到,桂桂先把密码收好,到点自动验证。'
       :'明早第一次自动登录会真验证,万一不对桂桂会提醒你。');
     stageEnter('idle',st.reason==='unreachable'?'配置保存成功!':'配置已保存。',lede,
       st.taskFixed?'定时任务已修好 ✓':null,[done],true,false);
@@ -1314,12 +1302,13 @@ document.querySelectorAll('#time-presets .preset').forEach(b=>b.addEventListener
     GG.api.saveConfig({trigger_time:currentTriggerTime});
   });
 });
-/* 后端事件(契约 §3):开门/网态变化重渲;外部调度变更同步开关。
+/* 后端事件(契约 §3):网态变化重渲;外部调度变更同步开关。
    2026-09-08 路由统一:断网(unreachable)只有 v-guide 一个落点 — 表单/详情/仪式
    任何视图收到都跳排查页(表单数据保留,回来还在);v-main 例外(主页有自己的
    down 态与「去排查」按钮),v-guide 本身就是落点。可达态各视图就地更新 */
 GG.on('net:state',e=>{
   if(!e||!e.state)return;
+  if(e.state==='waiting')e.state='unreachable';   /* P0-3:waiting 视同不可达,压平后再路由 */
   lastNet=Object.assign({},lastNet||{server:'10.1.2.3'},e);
   const view=currentView();
   if(e.state==='unreachable'){
@@ -1331,11 +1320,11 @@ GG.on('net:state',e=>{
   }
   if(view==='v-boot'&&configured){
     mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
-    $('boot-cap').textContent='门开了,桂桂进去了…';setTimeout(goDaily,900);return}
+    $('boot-cap').textContent='网络好了,桂桂来了…';setTimeout(goDaily,900);return}
   if(view==='v-guide'){
     if(e.state==='not_logged_in'){mainState='out';setTimeout(()=>{openDetail('v-login')},550);return}
     if(e.state==='logged_in'){mainState='ok';setTimeout(goDaily,550);return}
-    return}   /* waiting 等中间态:留在排查页,网态由上次可达信息兜底 */
+    return}   /* 不可达重复推:留在排查页,网态由上次可达信息兜底 */
   if(view==='v-main'){
     mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
     renderMain();renderMainData()}
@@ -1450,6 +1439,9 @@ async function openSelfService(btn,failText,origText){
 const SIGNAL_TXT={strong:'信号强',medium:'信号中',weak:'信号弱'};
 let lastNet=null,curCfg=null;
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+/* P0-3(拍板⑤):开门判断全局删除 — 后端 detect 四态保留,前端映射层把 waiting 压平为
+   unreachable(视同不可达,唯一落点 v-guide);netText/状态行/首装分流随之两态化(可达/不可达) */
+function normNet(n){return n&&n.state==='waiting'?Object.assign({},n,{state:'unreachable'}):n}
 function netText(n){return n&&n.state==='logged_in'?('已连上 '+n.ssid+' ✓'):(n&&n.state==='not_logged_in'?((n.ssid||'校园网')+' · 还没登录'):(((n&&n.server)||'10.1.2.3')+' · 连不上'))}
 function lastText(r){
   if(!r||r.outcome==='none')return '还没有记录';
@@ -1532,10 +1524,10 @@ async function reProbe(btn){
   const p=await GG.api.probe();
   if(btn)setBusy(btn,false);
   if(p.ok){
-    lastNet=p.data.net;
+    lastNet=normNet(p.data.net);
     if(p.data.net.state==='logged_in'){mainState='ok';goDaily();return}
     if(p.data.net.state==='not_logged_in'){mainState='out';openDetail('v-login');return}
-    /* unreachable / waiting:留在排查页,如实刷新 */
+    /* unreachable(waiting 已压平):留在排查页,如实刷新 */
   }
   renderGuide();
   if(btn){btn.textContent='还是连不上,再试一次';

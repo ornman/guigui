@@ -7,7 +7,7 @@
      ok        首装·已连已登(仪式 → v-ok)
      out       首装·连上未认证(仪式 → v-login)
      down      首装·不可达,当前网是热点「iphone17 pro max」(仪式 → v-guide)
-     waiting   日常·网络未就绪(bootWait 等门,约 3.2s 门开推 net:state)
+     waiting   日常·网络未就绪(P0-3:前端视同不可达落 v-guide;约 3.2s 后 mock 推 logged_in,排查页自动回日常)
      daily     日常·一切正常(直进 v-main)
      rejected  登录一律被拒 reason=wrong_password(QA 密码错误路径;网态同 out)
      bind      登录被 bind 拦 reason=bound(密码其实对;网态同 out)
