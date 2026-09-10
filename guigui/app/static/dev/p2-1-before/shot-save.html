@@ -1,0 +1,14 @@
+<!doctype html>
+<!-- P2-1 视觉存档辅助:headless 截「v-guide ③ 保存配置」语境的 v-login
+     (iframe 同源加载 index.html?scene=down,落地后 openDetail('v-login'),
+     origin=v-guide → 按钮=「保存配置」)。仅供本目录截图对照用,不进产品。 -->
+<meta charset="utf-8">
+<title>shot-save</title>
+<style>html,body{margin:0;height:100%;overflow:hidden}iframe{border:0;width:480px;height:760px}</style>
+<iframe id="f" src="../../index.html?dev=1&scene=down"></iframe>
+<script>
+const f=document.getElementById('f');
+f.addEventListener('load',()=>{setTimeout(()=>{
+  try{f.contentWindow.openDetail('v-form')}catch(e){}
+},4200)});
+</script>

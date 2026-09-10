@@ -166,7 +166,7 @@ footer{position:fixed;left:0;right:0;bottom:0;z-index:25;padding:8px 22px;
         <button onclick="pushNet('waiting',null)">未就绪 waiting(≡不可达)</button>
       </div>
       <div class="note">经 mock._setNet 真改数据源并推 net:state:当前视图的路由
-        (v-login/v-ok/详情页断网直跳排查页、v-guide 自动分流、v-main 重渲)
+        (v-form/详情页断网直跳排查页、v-guide 自动分流、v-main 重渲)
         全部走产品代码,顺带验收 2026-09-08 的路由统一;waiting 自 P0-3 起在映射层压平为不可达,行为应与「不可达」逐格一致。</div>
     </div>
     <div class="sops">
@@ -208,7 +208,7 @@ function busyPose(W,view,text){
   if(b)W.setBusy(b,true,text||'验证中…');
 }
 function okRejectPose(W,text,reason){
-  const warn=E(W,'pwd-warn');
+  const warn=E(W,'form-warn');
   W.rejectionText(warn.children[1],text,reason);
   warn.style.display='block';
 }
@@ -220,26 +220,24 @@ const PANELS=[
   {label:'仪式 · 检查网络中',scene:'ok',setup:W=>bootPose(W,'桂桂伸了个懒腰,正在检查网络…','sleep',1)},
   {label:'BRIDGE_MISSING(后端没绑上)',scene:'ok',setup:W=>bootPose(W,'桂桂连不上自己的后端(bridge missing)。请重启桂桂;反复出现请重装。','sad',1)},
 ]},
-{view:'v-ok',name:'首装 · 已连已登落地页',frames:[
-  {label:'默认(已连 + 学号识别)',scene:'ok',setup:W=>{}},
-  {label:'提交 · 验证中',scene:'ok',setup:W=>{notePose(W,'ok-note','正在验证密码,大概 5~15 秒…');busyPose(W,'v-ok')}},
-  {label:'提交 · 注销告知(线上是他人)',scene:'ok',setup:W=>{notePose(W,'ok-note','现在线上的是 6503…6503,验证时会先注销它,网络会断几秒');busyPose(W,'v-ok')}},
-  {label:'密码空 · 温柔提醒',scene:'ok',setup:W=>{const w=E(W,'pwd-warn');w.children[1].textContent='密码还没填呢';w.style.display='block'}},
-  {label:'被拒 · 密码不对',scene:'ok',setup:W=>okRejectPose(W,'密码不对,改一下再试','wrong_password')},
-  {label:'被拒 · 绑定受限(内联入口)',scene:'ok',setup:W=>okRejectPose(W,'密码是对的,但这个账号被绑在别处/受限 — 去自助服务平台看看绑定','bound')},
-  {label:'被拒 · 节流(中性提示)',scene:'ok',setup:W=>notePose(W,'ok-note','校园网侧让等 10 秒再试')},
-]},
-{view:'v-login',name:'登录表单(首装未登录 / 改密 / 保存配置共用)',frames:[
-  {label:'未登录落地(已连通)',scene:'out',setup:W=>{}},
-  {label:'被拒 · 密码不对',scene:'out',setup:W=>W.showLoginErr('密码不对,改一下再试','wrong_password')},
-  {label:'被拒 · 学号/运营商错',scene:'out',setup:W=>W.showLoginErr('学号或运营商选错了,核对一下再试','wrong_account')},
-  {label:'被拒 · 绑定受限',scene:'out',setup:W=>W.showLoginErr('密码是对的,但这个账号被绑在别处/受限 — 去自助服务平台看看绑定','bound')},
-  {label:'被拒 · 他设备在线',scene:'out',setup:W=>W.showLoginErr('这个学号已在别的设备上登录(比如在别处登过没下线),那边下线后桂桂会自动登好','limit_users')},
-  {label:'被拒 · 节流',scene:'out',setup:W=>notePose(W,'login-note','校园网侧让等 10 秒再试')},
-  {label:'提交中 · 注销他人会话',scene:'out',setup:W=>{notePose(W,'login-note','现在线上的是 6503…6503,验证时会先注销它,网络会断几秒');busyPose(W,'v-login')}},
-  {label:'场景4 · 注销后失败(网先断着)',scene:'out',setup:W=>W.showLoginErr('密码不对,改一下再试;网先断着,输对马上通','wrong_password')},
-  {label:'场景4b · 旧凭据已接回',scene:'out',setup:W=>W.showLoginErr('密码不对,改一下再试;已用旧密码把网接回来了,改对再点一次','wrong_password')},
-  {label:'v-guide ③ 路径(按钮=保存配置)',scene:'down',setup:W=>W.openDetail('v-login')},
+{view:'v-form',name:'表单页(P2-1 合一:首装落地 / 登录改密 / 保存配置一套 DOM,语境见帧名)',frames:[
+  {label:'firstRun · 默认(已连 + 学号识别)',scene:'ok',setup:W=>{}},
+  {label:'firstRun · 提交验证中',scene:'ok',setup:W=>{notePose(W,'form-note','正在验证密码,大概 5~15 秒…');busyPose(W,'v-form')}},
+  {label:'firstRun · 注销告知(线上是他人)',scene:'ok',setup:W=>{notePose(W,'form-note','现在线上的是 6503…6503,验证时会先注销它,网络会断几秒');busyPose(W,'v-form')}},
+  {label:'firstRun · 密码空温柔提醒',scene:'ok',setup:W=>{const w=E(W,'form-warn');w.children[1].textContent='密码还没填呢';w.style.display='block'}},
+  {label:'firstRun · 被拒密码不对',scene:'ok',setup:W=>okRejectPose(W,'密码不对,改一下再试','wrong_password')},
+  {label:'firstRun · 被拒绑定受限(内联入口)',scene:'ok',setup:W=>okRejectPose(W,'密码是对的,但这个账号被绑在别处/受限 — 去自助服务平台看看绑定','bound')},
+  {label:'firstRun · 被拒节流(中性提示)',scene:'ok',setup:W=>notePose(W,'form-note','校园网侧让等 10 秒再试')},
+  {label:'login · 未登录落地(已连通)',scene:'out',setup:W=>{}},
+  {label:'login · 被拒密码不对',scene:'out',setup:W=>W.showLoginErr('密码不对,改一下再试','wrong_password')},
+  {label:'login · 被拒学号/运营商错',scene:'out',setup:W=>W.showLoginErr('学号或运营商选错了,核对一下再试','wrong_account')},
+  {label:'login · 被拒绑定受限',scene:'out',setup:W=>W.showLoginErr('密码是对的,但这个账号被绑在别处/受限 — 去自助服务平台看看绑定','bound')},
+  {label:'login · 被拒他设备在线',scene:'out',setup:W=>W.showLoginErr('这个学号已在别的设备上登录(比如在别处登过没下线),那边下线后桂桂会自动登好','limit_users')},
+  {label:'login · 被拒节流',scene:'out',setup:W=>notePose(W,'form-note','校园网侧让等 10 秒再试')},
+  {label:'login · 提交中注销他人会话',scene:'out',setup:W=>{notePose(W,'form-note','现在线上的是 6503…6503,验证时会先注销它,网络会断几秒');busyPose(W,'v-form')}},
+  {label:'login · 场景4注销后失败(网先断着)',scene:'out',setup:W=>W.showLoginErr('密码不对,改一下再试;网先断着,输对马上通','wrong_password')},
+  {label:'login · 场景4b旧凭据已接回',scene:'out',setup:W=>W.showLoginErr('密码不对,改一下再试;已用旧密码把网接回来了,改对再点一次','wrong_password')},
+  {label:'save · v-guide ③ 路径(按钮=保存配置)',scene:'down',setup:W=>W.openDetail('v-form')},
 ]},
 {view:'v-success',name:'终态页(彩带 / 保存配置 / 拦截)',frames:[
   {label:'彩带(真验证 + 任务在岗)',scene:'daily',setup:W=>W.showSuccess(true,null,true)},
@@ -267,12 +265,12 @@ const PANELS=[
     const b=Q(W,'#main-banners .banner span');if(b)b.textContent='没建成,再试一次'}},
   {label:'横幅③ 再登连败 ≥2(文案拟稿)',scene:'streak',setup:W=>{(async()=>{
     /* 两连败走产品真路径(计数器只能由 quickLogin 改);步间等 500ms:
-       show() 的 .on 有 250ms 延迟,紧跟 backFrom 会被 cur===next 吞掉,收尾错留 v-login */
+       show() 的 .on 有 250ms 延迟,紧跟 backFrom 会被 cur===next 吞掉,收尾错留 v-form */
     const wait=ms=>new Promise(r=>setTimeout(r,ms));
     await W.quickLogin();await wait(500);   /* 失败 1:跳改密页预填警告 */
-    W.backFrom('v-login');await wait(500);  /* 返回主页(1 次失败不出横幅) */
+    W.backFrom('v-form');await wait(500);  /* 返回主页(1 次失败不出横幅) */
     await W.quickLogin();await wait(500);   /* 失败 2:计数 ≥2 */
-    W.backFrom('v-login');await wait(500);  /* 返回主页,横幅③ 在场 */
+    W.backFrom('v-form');await wait(500);  /* 返回主页,横幅③ 在场 */
   })()}},
   {label:'重登中(busy 防重复提交)',scene:'daily',setup:W=>W.setBusy(E(W,'main-btn'),true,'登录中…')},
   {label:'重登成功(就地反馈)',scene:'daily',setup:W=>{W.wakeProblem('out');
@@ -330,30 +328,30 @@ const PANELS=[
 const STORIES=[
 {t:'S1 首装一帆风顺',s:'可达+已登录 → 提交 → 彩带',steps:[
   {t:'开机仪式',d:'probe 期间桂桂伸懒腰,约 1.5s 后按网态分流(此处摆拍定格在仪式帧)。',scene:'ok',setup:W=>bootPose(W,'桂桂伸了个懒腰,正在检查网络…','sleep',1)},
-  {t:'落地 v-ok',d:'可达+已登录 → 裸表单落地;学号由 identify(chkstatus)自动识别回填,状态行「已连上 · 学号已识别 ✓」。',scene:'ok'},
-  {t:'提交 · 验证中',d:'密码必填,提交期间按钮置灰转圈 + 等待行说明,防并发重复提交。',scene:'ok',setup:W=>{notePose(W,'ok-note','正在验证密码,大概 5~15 秒…');busyPose(W,'v-ok')}},
+  {t:'落地 v-form(firstRun)',d:'可达+已登录 → 裸表单落地(P2-1 合一后首装语境);学号由 identify(chkstatus)自动识别回填,状态行「已连上 · 学号已识别 ✓」。',scene:'ok'},
+  {t:'提交 · 验证中',d:'密码必填,提交期间按钮置灰转圈 + 等待行说明,防并发重复提交。',scene:'ok',setup:W=>{notePose(W,'form-note','正在验证密码,大概 5~15 秒…');busyPose(W,'v-form')}},
   {t:'成功页(彩带)',d:'真验证通过:四行文案逐行浮入 + 彩带三波。亲手路径:回第 2 步填任意密码点「开启每日自动登录」也会走到这。',scene:'ok',setup:W=>W.showSuccess(true,null,true)},
 ]},
 {t:'S2 首装未登录',s:'可达+没登录 → 填错被拒 → 改对成功',steps:[
-  {t:'落地 v-login',d:'可达+没登录:副标题「还没登录,填一次」,状态行只报连通性(已连通)。',scene:'out'},
+  {t:'落地 v-form(login)',d:'可达+没登录:副标题「还没登录,填一次」,状态行只报连通性(已连通)。',scene:'out'},
   {t:'密码错被拒',d:'AUTH_REJECTED / wrong_password:暖色错误行直显后端文案,密码不入库(凭证神圣)。',scene:'out',setup:W=>W.showLoginErr('密码不对,改一下再试','wrong_password')},
   {t:'改对 → 成功',d:'亲手:输任意非空密码(mock 不校验)点「立即登录」→ 庆祝页彩带。',scene:'out',free:'在表单里随便填个密码,点「立即登录」'},
 ]},
 {t:'S3 首装不可达',s:'热点排查 → 挑网 → 自动跳登录',steps:[
   {t:'落地 v-guide',d:'不可达:当前连的是热点「iphone17 pro max」,桂桂列出扫描到的校园网。',scene:'down'},
   {t:'挑网连接',d:'亲手:点列表里的 Campus-WiFi(mock 1.8s 连接)→ net:state 事件 → 排查页自动跳登录页(真实事件路由)。',scene:'down',free:'点 wifi 列表里的 Campus-WiFi'},
-  {t:'登录页等填',d:'连上后落在 v-login,状态行「已连通」;填资料登录即可(下一步)。',scene:'down'},
+  {t:'登录页等填',d:'连上后落在 v-form,状态行「已连通」;填资料登录即可(下一步)。',scene:'down'},
   {t:'填资料登录',d:'亲手:填学号密码点「立即登录」→ mock(连上后 not_logged_in)一次登好 → 彩带。',scene:'down',free:'填完点「立即登录」'},
 ]},
 {t:'S4 阶梯翻车(场景4)',s:'注销他人会话 → 真登失败 → 网先断着',steps:[
-  {t:'落地 v-ok(线上是他人)',d:'全屋共享会话:chkstatus 抓回的其实是室友学号,照常预填(误抓由登录被拒自纠)。',scene:'ladder_fail'},
-  {t:'提交 · 注销告知',d:'验证阶梯会先注销线上会话,等待行如实注明是谁在线、网络会断几秒。',scene:'ladder_fail',setup:W=>{notePose(W,'ok-note','现在线上的是 6503…6503,验证时会先注销它,网络会断几秒');busyPose(W,'v-ok')}},
+  {t:'落地 v-form(线上是他人)',d:'全屋共享会话:chkstatus 抓回的其实是室友学号,照常预填(误抓由登录被拒自纠)。',scene:'ladder_fail'},
+  {t:'提交 · 注销告知',d:'验证阶梯会先注销线上会话,等待行如实注明是谁在线、网络会断几秒。',scene:'ladder_fail',setup:W=>{notePose(W,'form-note','现在线上的是 6503…6503,验证时会先注销它,网络会断几秒');busyPose(W,'v-form')}},
   {t:'被拒 · 网先断着',d:'亲手:填任意密码点「开启每日自动登录」→ 注销(约 1.4s)→ 真登被拒;首装没有旧凭据可回滚,信封如实说「网先断着,输对马上通」。',scene:'ladder_fail',free:'填密码点「开启每日自动登录」,等结果'},
-  {t:'状态行如实',d:'此时网已翻为未登录(服务器仍可达),若回 v-ok 状态行保持「已连上」(连通性与登录态分开报)。',scene:'ladder_fail'},
+  {t:'状态行如实',d:'此时网已翻为未登录(服务器仍可达),若回 v-form 状态行保持「已连上」(连通性与登录态分开报)。',scene:'ladder_fail'},
   {t:'输对再点 → 成功',d:'第二幕:网络已在 not_logged_in,走正常真登路径,一次登好(彩带)。',scene:'ladder_fail',free:'再点一次「开启每日自动登录」'},
 ]},
 {t:'S5 登录页断网(场景5)',s:'填一半切网 → 直跳排查 → 保存配置终态',steps:[
-  {t:'落地 v-login',d:'可达+没登录,正常填表。',scene:'out'},
+  {t:'落地 v-form',d:'可达+没登录,正常填表。',scene:'out'},
   {t:'用户切网',d:'亲手:点右下网络切换器「不可达(热点)」→ 登录页停留时断网,直接跳排查页(2026-09-08 路由统一,原先只刷状态行;表单数据保留,回来还在)。',scene:'out',free:'点「网络状态切换器」里的「不可达(热点)」'},
   {t:'③ 先保存配置',d:'亲手:点排查页 ③「先保存配置,连上后桂桂自动登录」→ 回到登录页,表单还在,提交按钮变成「保存配置」。',scene:'out',free:'点 ③ 回登录页,看按钮文案'},
   {t:'提交 → 保存配置终态',d:'亲手:填上密码点「保存配置」→ 不可达但后端已把密码存了 → 保存配置终态页「配置保存成功!连上校园网后自动执行登录」,不撒彩带。',scene:'out',free:'填个密码点「保存配置」'},

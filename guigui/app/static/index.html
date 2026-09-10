@@ -467,7 +467,7 @@ body.backdrop-black .taskbar{display:none}
   .s-line{opacity:1!important;transform:none!important}
   .v-success-stage{opacity:1!important}
   .bot-success{opacity:1!important}
-  #boot-bot,#boot-bot-greet-ok,#boot-bot-greet-main,#boot-bot-greet-login{animation:none !important;opacity:1!important;transform:none!important}
+  #boot-bot,#boot-bot-greet-form,#boot-bot-greet-main{animation:none !important;opacity:1!important;transform:none!important}
 }
 </style>
 <style id="app-overrides">
@@ -516,16 +516,20 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div class="boot-cap" id="boot-cap">桂桂伸了个懒腰,正在检查网络…</div>
     </div>
 
-    <!-- 首次配置页:一键开启,密码事后温柔补 -->
-    <div class="v" id="v-ok">
+    <!-- 表单页(P2-1 合一:首装落地 / 日常登录 / v-guide ③ 保存配置共用一套 DOM):
+         标题/副标题/按钮文案/状态行口径由 formMode(ctx) 按 formCtx ∈ {firstRun, login, save} 派生;
+         返回键=来路栈(首装期 body.setup 由 CSS 隐藏);换学号确认框已删(2026-09-08),
+         密码迁移静默执行,验证不过当场自纠;提交走同一条验证阶梯 submitLadder() -->
+    <div class="v" id="v-form">
+      <button class="back" onclick="backFrom('v-form')">‹ 返回</button>
       <div class="greet">
-        <div class="bot bot-greet" id="boot-bot-greet-ok" data-state="happy" data-size="58"></div>
+        <div class="bot bot-greet" id="boot-bot-greet-form" data-state="happy" data-size="58"></div>
         <div>
-          <h1 class="g">早上好。</h1>
-          <p class="tagline">校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好</p>
+          <h1 id="form-title" class="g">早上好。</h1>
+          <p id="form-lede" class="tagline">校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好</p>
         </div>
       </div>
-      <div class="status ok"><span class="dot"></span><span id="ok-status">…</span></div>
+      <div class="status ok" id="form-status-bar"><span class="dot"></span><span id="form-status">…</span></div>
       <div class="f"><label>学号</label>
         <div class="sid-row"><input id="f-sid" value="" placeholder="请输入学号" autocomplete="username">
         <div class="dd" id="op-dd"><button type="button" class="dd-btn"><span class="dd-label">校园用户</span><span class="car">▼</span></button>
@@ -543,43 +547,9 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
             <svg class="i-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
             <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><path d="M4 4l16 16"/></svg>
           </button></div>
-        <div class="pwd-warn" id="pwd-warn" style="display:none"><span>⚠</span><span>密码还没填呢</span></div></div>
-      <div class="submit-note" id="ok-note" style="display:none"></div>
-      <button class="btn" onclick="enableDaily()">开启每日自动登录</button>
-    </div>
-
-    <!-- 登录表单(首装未登录落地 / 日常改密 / v-guide ③ 保存配置共用):提交走同一验证阶梯;
-         换学号确认框已删(2026-09-08),密码迁移静默执行,验证不过当场自纠 -->
-    <div class="v" id="v-login">
-      <button class="back" onclick="backFrom('v-login')">‹ 返回</button>
-      <div class="greet">
-        <div class="bot bot-greet" id="boot-bot-greet-login" data-state="happy" data-size="58"></div>
-        <div>
-          <h1 style="font-size:22px">登录校园网。</h1>
-          <p class="lede">还没登录,填一次,以后每天都是桂桂的事:</p>
-        </div>
-      </div>
-      <div class="status warn"><span class="dot"></span><span id="login-status">…</span></div>
-      <div class="f"><label>学号</label>
-        <div class="sid-row"><input id="f-sid-login" value="" placeholder="请输入学号" autocomplete="username">
-        <div class="dd" id="op-dd-login"><button type="button" class="dd-btn"><span class="dd-label">校园用户</span><span class="car">▼</span></button>
-          <div class="dd-menu">
-            <button type="button" class="on" data-op="校园用户">校园用户 <span class="ck">✓</span></button>
-            <button type="button" data-op="校园电信">校园电信 <span class="ck">✓</span></button>
-            <button type="button" data-op="校园联通">校园联通 <span class="ck">✓</span></button>
-            <button type="button" data-op="中国移动">中国移动 <span class="ck">✓</span></button>
-            <button type="button" data-op="中国广电">中国广电 <span class="ck">✓</span></button>
-            <button type="button" data-op="校园其他">校园其他 <span class="ck">✓</span></button>
-          </div></div></div></div>
-      <div class="f"><label>密码</label>
-        <div class="pw-wrap"><input type="password" id="f-pwd-login" value="" placeholder="请输入密码" autocomplete="new-password">
-          <button type="button" class="pw-eye" onclick="togglePw('f-pwd-login',this)" title="显示 / 隐藏密码">
-            <svg class="i-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
-            <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><path d="M4 4l16 16"/></svg>
-          </button></div>
-        <div class="pwd-warn" id="login-warn" style="display:none"><span>⚠</span><span id="login-warn-text"></span></div></div>
-      <div class="submit-note" id="login-note" style="display:none"></div>
-      <button class="btn" id="login-btn" onclick="loginNow()">立即登录</button>
+        <div class="pwd-warn" id="form-warn" style="display:none"><span>⚠</span><span id="form-warn-text"></span></div></div>
+      <div class="submit-note" id="form-note" style="display:none"></div>
+      <button class="btn" id="form-btn" onclick="submitLadder()">开启每日自动登录</button>
     </div>
 
     <!-- 终态页(彩带 / 保存配置 / 拦截 / 反馈两态共用舞台)— bot 弹入 + 文字逐行浮入 + 卡片光晕;
@@ -610,7 +580,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div id="guide-wifi"></div>
       <div class="micro-line" style="margin-top:10px">② 已是校园网仍不通?可能维护中</div>
       <button class="btn quiet" id="guide-reprobe" onclick="reProbe(this)" style="margin-top:6px">重新检测</button>
-      <button class="link" onclick="openDetail('v-login')">③ 先保存配置,连上后桂桂自动登录</button>
+      <button class="link" onclick="openDetail('v-form')">③ 先保存配置,连上后桂桂自动登录</button>
     </div>
 
     <!-- 日常主页:体检卡(bot 在 .greet 内 flex 第一位) -->
@@ -673,7 +643,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
         </div>
       </div>
       <div class="row"><div><div class="t">账号与密码</div></div>
-        <button class="go" type="button" onclick="openDetail('v-login')">修改</button></div>
+        <button class="go" type="button" onclick="openDetail('v-form')">修改</button></div>
 
       <div class="tiny-label">补登录</div>
       <div class="row"><div><div class="t">开机时补登录</div></div>
@@ -765,7 +735,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
 <script>
 const win=document.getElementById('win');
 const $=id=>document.getElementById(id);
-const views=['v-boot','v-ok','v-login','v-success','v-guide','v-main','v-settings','v-log','v-feedback','v-diag'];
+const views=['v-boot','v-form','v-success','v-guide','v-main','v-settings','v-log','v-feedback','v-diag'];
 /* 主页日志钉底保留条数:全天历史走 v-log;过多会顶飞「历史日志 →」 */
 const MAIN_LOG_KEEP=5;
 /* A8 动画时序单源:视图转场 250ms 唯一源 — JS 定时常量 + 注入 CSS 变量,
@@ -851,7 +821,7 @@ function show(id){
   }else{next.classList.add('on')}
 }
 /* 来路栈:首次进入时记录,返回后清除(报告 5.5);不再每次覆盖 */
-function openDetail(id){if(!(id in origin))origin[id]=currentView();show(id);if(id==='v-settings')loadSettings();if(id==='v-log')loadLogs();if(id==='v-guide')renderGuide();if(id==='v-login')fillLoginLanding();if(id==='v-feedback')loadFeedback();if(id==='v-diag')startDiag()}
+function openDetail(id){if(!(id in origin))origin[id]=currentView();show(id);if(id==='v-settings')loadSettings();if(id==='v-log')loadLogs();if(id==='v-guide')renderGuide();if(id==='v-form')fillLoginLanding();if(id==='v-feedback')loadFeedback();if(id==='v-diag')startDiag()}
 function backFrom(id){const dest=origin[id]||'v-main';delete origin[id];if(dest==='v-main'){renderMain();renderMainData()}show(dest);greet();document.body.classList.remove('setup')}
 function greetText(){const h=new Date().getHours();return h<11?'早上好':(h<18?'下午好':'晚上好')}
 function greet(){const g=greetText()+'。';
@@ -915,13 +885,12 @@ function applyLaunch(){
   const L=window.__guigui_launch;
   if(!L)return;
   try{delete window.__guigui_launch}catch(e){window.__guigui_launch=undefined}
-  if(L==='creds')openDetail('v-login');
+  if(L==='creds')openDetail('v-form');
   else if(L==='settings')openDetail('v-settings')
 }
 function goSetup(){
-  if(mainState==='out')show('v-login');
-  else if(mainState==='down')show('v-guide');
-  else show('v-ok');
+  if(mainState==='down')show('v-guide');
+  else{formMode(mainState==='out'?'login':'firstRun');show('v-form')}
   greet();
   fillLanding();
   /* 不再做 .centered/.dock-in 归位动画 — 目标视图的 greet-bot 已在 .greet 内自然显示
@@ -1003,11 +972,13 @@ function setBusy(btn,on,text,minMs){
       if(btn.dataset.orig!==undefined)btn.textContent=btn.dataset.orig};
     if(rest>0)btn._busyTo=setTimeout(finish,rest);else finish()}
 }
-/* 提交等待行(4.1.2):验证中/注销告知/线上他人学号,由 login:progress 事件驱动 */
-function hideSubmitNotes(){['ok-note','login-note'].forEach(id=>{const n=$(id);if(n)n.style.display='none'})}
+/* 提交等待行(4.1.2):验证中/注销告知/线上他人学号,由 login:progress 事件驱动;
+   P2-1 合一后唯一等待行 #form-note(仅表单页在场时展示) */
+function hideSubmitNotes(){const n=$('form-note');if(n)n.style.display='none'}
 GG.on('login:progress',e=>{
   if(!e||!e.phase)return;
-  const note=document.querySelector('#v-ok.on')?$('ok-note'):(document.querySelector('#v-login.on')?$('login-note'):null);
+  if(currentView()!=='v-form')return;
+  const note=$('form-note');
   if(!note)return;
   if(e.phase==='probe'){note.style.display='flex';note.textContent='正在验证密码,大概 5~15 秒…'}
   else if(e.phase==='logging_out'){note.style.display='flex';
@@ -1020,15 +991,15 @@ GG.on('login:progress',e=>{
     note.textContent=e.waitsec?('被节流了,服务器让等 '+e.waitsec+' 秒,桂桂等一下接着试…'):'被节流了,桂桂等一下接着试…'}
 });
 /* 运营商下拉:菜单开合/勾选走通用 .dd 布线(无 data-cfg-key 即不落盘,仅表单状态);
-   这里只负责读写当前选中项(登录用户名 = 学号+后缀) */
-function pickedOperator(sel){
-  const dd=document.querySelector(sel||'#op-dd');
+   这里只负责读写当前选中项(登录用户名 = 学号+后缀);P2-1 合一后表单唯一,去 selector 参数 */
+function pickedOperator(){
+  const dd=document.querySelector('#op-dd');
   if(!dd)return '校园用户';
   const on=dd.querySelector('.dd-menu button.on');
   return (on&&on.dataset.op)||'校园用户';
 }
-function setOperatorPick(sel,op){
-  const dd=document.querySelector(sel);
+function setOperatorPick(op){
+  const dd=document.querySelector('#op-dd');
   if(!dd)return;
   dd.querySelectorAll('.dd-menu button').forEach(b=>b.classList.toggle('on',b.dataset.op===op));
   const on=dd.querySelector('.dd-menu button.on');
@@ -1070,12 +1041,12 @@ async function quickLogin(){
   if(r.code==='AUTH_REJECTED'){
     /* 被拒=凭据问题:跳改密页(带返回),警告块预填结论;连续 ≥2 次出横幅③(错误路由总表) */
     loginFailStreak++;renderBannersRefresh();
-    openDetail('v-login');
+    openDetail('v-form');
     showLoginErr(r.message||'密码好像不对',r.reason);return}
   if(r.code==='NOT_CONFIGURED'){
     /* P0-4:解释跳转 — 裸跳零解释,先给警告块再进登录页 */
     showLoginErr(r.message||'还没存过密码,先填一次');
-    openDetail('v-login');return}
+    openDetail('v-form');return}
   else if(r.code==='NET_UNREACHABLE'){openDetail('v-guide')}
   else{
     loginFailStreak++;renderBannersRefresh();
@@ -1153,55 +1124,40 @@ async function rebuildFromSuccess(btn){
   btn.textContent='没建成,再试一次';
   setTimeout(()=>{if(btn.isConnected&&!btn.classList.contains('busy'))btn.textContent='重建定时任务'},2600);
 }
-/* 交钥匙即开启:密码必填,为空只给一句温柔提醒;等待态防重复提交(AC-11) */
-async function enableDaily(){
-  const btn=document.querySelector('#v-ok .btn');
-  const pwd=$('f-pwd').value.trim();
-  const warn=$('pwd-warn'),warnTxt=warn.children[1];   /* 固定取文案 span;bind 链接追加在其内部,勿用 lastElementChild */
-  if(!pwd){warnTxt.textContent='密码还没填呢';warn.style.display='block';return}
-  setBusy(btn,true,'验证中…');
-  await GG.api.saveConfig({trigger_time:currentTriggerTime});
-  const r=await GG.api.login({sid:$('f-sid').value.trim()||undefined,password:pwd,operator:pickedOperator('#op-dd')});
-  setBusy(btn,false);hideSubmitNotes();
-  if(r.ok){configured=true;hasPwd=true;showSuccess(r.data.verified===true,r.data.reason,r.data.task_ok);return}
-  if(r.code==='AUTH_REJECTED'){
-    if(r.reason==='throttled'){
-      /* 节流≠密码错(P1-6):中性提示「稍后再试」,不进密码警告框不吓人 */
-      const n=$('ok-note');n.textContent=r.message||'登录太频繁,稍后再试';n.style.display='flex';return}
-    rejectionText(warnTxt,r.message||'密码被服务器拒绝了,核对一下再试',r.reason);warn.style.display='block';return}
-  if(r.code==='NET_UNREACHABLE'){
-    /* 提交密码中途断网:后端已把密码存了(未验证)+任务就位 — 客观无法当场验证,
-       走「保存配置」终态页(不撒彩带);回主页 down 态引导排查,横幅①引导补验 */
-    configured=true;hasPwd=true;mainState='down';
-    showSuccess(false,'unreachable',true);return}
-  /* INTERNAL / BRIDGE_MISSING 等:就地报后端原话,不静默(按钮恢复却什么都不说=黑洞) */
-  warnTxt.textContent=r.message||'出了点问题,再试一次';warn.style.display='block';
-}
-/* 改密页提交(首装未登录/日常改凭据/v-guide ③ 保存配置共用):换学号不再确认,
-   密码迁移静默执行,验证不过当场自纠(2026-09-08 拍板删确认框) */
-async function loginNow(){
-  $('login-warn').style.display='none';
-  const btn=$('login-btn');
-  const fromGuide=origin['v-login']==='v-guide';
-  const sidVal=$('f-sid-login').value.trim();
-  const pwdVal=$('f-pwd-login').value;
-  setBusy(btn,true,fromGuide?'保存中…':'验证中…');
-  const r=await GG.api.login({sid:sidVal||undefined,password:pwdVal||undefined,operator:pickedOperator('#op-dd-login')});
+/* P2-1 提交阶梯合一:首装(firstRun:密码必填 + 先落触发时间)/ 登录(login)/
+   保存配置(save)共用一条验证阶梯 —
+   throttled 中性提示(节流≠密码错,不进警告框)/ AUTH_REJECTED 警告块直显后端文案
+   (bind 内联入口由 rejectionText 织入)/ NET_UNREACHABLE 提交过密码走「保存配置」
+   终态页、空密码只跳排查页 / INTERNAL 等就地报后端原话不静默 */
+async function submitLadder(){
+  const ctx=formCtx;
+  const btn=$('form-btn');
+  const sidVal=$('f-sid').value.trim();
+  const rawPwd=$('f-pwd').value;
+  const pwd=ctx==='firstRun'?rawPwd.trim():rawPwd;   /* 首装沿旧例 trim 后提交 */
+  if(ctx==='firstRun'&&!pwd){   /* 密码必填只在首装语境(PRD:裸表单一页交钥匙),温柔提醒 */
+    $('form-warn-text').textContent='密码还没填呢';$('form-warn').style.display='block';return}
+  $('form-warn').style.display='none';
+  setBusy(btn,true,ctx==='save'?'保存中…':'验证中…');
+  if(ctx==='firstRun')await GG.api.saveConfig({trigger_time:currentTriggerTime});
+  const r=await GG.api.login({sid:sidVal||undefined,password:ctx==='firstRun'?pwd:(rawPwd||undefined),operator:pickedOperator()});
   setBusy(btn,false);hideSubmitNotes();
   if(r.ok){configured=true;hasPwd=true;loginFailStreak=0;
     showSuccess(r.data.verified===true,r.data.reason,r.data.task_ok);renderBannersRefresh();return}
   if(r.code==='AUTH_REJECTED'){
     if(r.reason==='throttled'){
-      const n=$('login-note');n.textContent=r.message||'登录太频繁,稍后再试';n.style.display='flex';return}
-    showLoginErr(r.message||'登录被拒',r.reason);return}
+      /* 节流≠密码错(P1-6):中性提示「稍后再试」,不进密码警告框不吓人 */
+      const n=$('form-note');n.textContent=r.message||'登录太频繁,稍后再试';n.style.display='flex';return}
+    showLoginErr(r.message||'密码被服务器拒绝了,核对一下再试',r.reason);return}
   if(r.code==='NET_UNREACHABLE'){
-    /* 提交了密码的断网:后端已存(未验证)→「保存配置」终态页;没提交密码只跳排查页。
+    /* 提交了密码的断网:后端已存(未验证)+任务就位 →「保存配置」终态页(不撒彩带,
+       回主页 down 态引导排查,横幅①引导补验);没提交密码只跳排查页。
        mainState 一并记 down,返回主页如实渲染 */
     mainState='down';
-    if(pwdVal){configured=true;hasPwd=true;showSuccess(false,'unreachable',true)}
+    if(pwd){configured=true;hasPwd=true;showSuccess(false,'unreachable',true)}
     else openDetail('v-guide');
     return}
-  /* INTERNAL / BRIDGE_MISSING 等:就地表后端原话,不静默 */
+  /* INTERNAL / BRIDGE_MISSING 等:就地报后端原话,不静默(按钮恢复却什么都不说=黑洞) */
   showLoginErr(r.message||'出了点问题,再试一次');
 }
 /* 登录被拒:与首装密码空同一警告组件同位置(B 基准,密码框下方暖色块);
@@ -1231,7 +1187,7 @@ function rejectionText(el,text,reason){
   el.appendChild(a);
   el.append(document.createTextNode(text.slice(i+6)));
 }
-function showLoginErr(text,reason){rejectionText($('login-warn-text'),text,reason);$('login-warn').style.display='block'}
+function showLoginErr(text,reason){rejectionText($('form-warn-text'),text,reason);$('form-warn').style.display='block'}
 async function pickWifi(el){
   if(el.classList.contains('busy'))return;   /* A2:防连点(pointer-events 只挡真实指针,程序调用走这里) */
   el.classList.add('on');
@@ -1240,7 +1196,7 @@ async function pickWifi(el){
   const r=await GG.api.connectWifi({ssid:ssid});
   el.classList.remove('busy');
   if(!r.ok){el.classList.remove('on');return}
-  /* 连上后 net:state 事件负责路由(未认证 → v-login) */
+  /* 连上后 net:state 事件负责路由(未认证 → v-form) */
 }
 /* 庆祝粒子:canvas-confetti 颜文字模式;画布在卡片内,vendor 本地加载(不依赖网络) */
 /* 庆祝粒子:canvas-confetti 颜文字模式,3 波分散在 1.1s 内 */
@@ -1358,7 +1314,7 @@ GG.on('net:state',e=>{
     if(view==='v-guide')return;                    /* 重复推:排查页正是此态 */
     if(view==='v-main'){renderMain();renderMainData();return}
     if(view==='v-boot'){setTimeout(()=>{show('v-guide');renderGuide()},550);return}
-    openDetail('v-guide');return                   /* v-login/v-ok/v-success/详情页:跳排查页 */
+    openDetail('v-guide');return                   /* v-form/v-success/详情页:跳排查页 */
   }
   if(view==='v-boot'&&configured){
     mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
@@ -1372,12 +1328,11 @@ GG.on('net:state',e=>{
   if(view==='v-main'){
     mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
     renderMain();renderMainData()}
-  else if(view==='v-login'||view==='v-ok'){
+  else if(view==='v-form'){
     /* 表单页停留:状态行实时跟真;mainState 顺手记对 — 返回主页时 renderMain
        才不会拿旧网态渲染(否则 out 标题配 down 数据的混搭) */
     mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
-    if(view==='v-login')syncLoginStatusLine();
-    else syncOkStatusLine()}
+    syncFormStatus()}
 });
 GG.on('schedule:changed',e=>{
   if(e&&typeof e.master==='boolean')setAuto(e.master);
@@ -1399,7 +1354,7 @@ function renderBanners(rec){
      今早真失败(unverified 场景)时密码大概率真错,横幅①有信息,不一刀切隐藏 */
   const online=lastNet&&lastNet.state==='logged_in';
   if(configured&&rec&&rec.verified===false&&(!online||rec.outcome==='fail'))
-    h+='<div class="banner" onclick="openDetail(\'v-login\')"><span>密码还没验证过,去改一下</span><span class="arr">›</span></div>';
+    h+='<div class="banner" onclick="openDetail(\'v-form\')"><span>密码还没验证过,去改一下</span><span class="arr">›</span></div>';
   if(configured&&taskBlocked)
     h+='<div class="banner banner-task" onclick="rebuildTaskBanner()"><span>自动登录还没生效,点此重建</span><span class="arr">›</span></div>';
   if(configured&&loginFailStreak>=2)
@@ -1461,7 +1416,7 @@ function diagExit(){
   const ex=diagState?diagState.exit:null;
   if(ex==='login'){
     const s=(diagState.steps&&diagState.steps.credential)||{};
-    openDetail('v-login');
+    openDetail('v-form');
     showLoginErr(s.detail||'凭据有问题,改一下再试',s.reason);
     return}
   if(ex==='task_blocked'){showSuccess(true,null,false);return}
@@ -1524,51 +1479,65 @@ function renderWifiList(box,networks,opts){
 }
 /* 学号旁注(契约 1.4.1 引入)已于 1.4.3 撤销 — 用户拍板:这行文字没必要,
    误抓由登录被拒(wrong_account 文案)自纠;identify 回填行为本身不变 */
-/* 登录页状态行:只报连通性(登录状态归副标题说);说认证服务器而不说 SSID —
-   SSID 在热点场景是"iphone17 pro max"这类噪声,不帮用户判断。
-   独立成函数:net:state 事件在 v-login 停留期间实时刷新(场景:填一半切网) */
-function syncLoginStatusLine(){
-  const net=lastNet||{};
-  const up=net.state!=='unreachable';
-  const bar=$('login-status').parentElement;
-  bar.className='status '+(up?'ok':'danger');
-  $('login-status').textContent=NET_TXT[up?'up':'down'](net.server);
+/* P2-1 表单合一:一套 DOM 三语境,formMode(ctx) 是唯一头部写入点 —
+   firstRun(首装已连已登:问候标题+tagline)/ login(登录:登录校园网+lede,只报连通性,
+   说认证服务器而不说 SSID — 热点场景 SSID 是噪声)/ save(v-guide ③ 保存配置) */
+let formCtx='login';
+function formMode(ctx){
+  formCtx=ctx;
+  const h1=$('form-title'),lede=$('form-lede');
+  if(ctx==='firstRun'){
+    h1.className='g';h1.style.fontSize='';h1.textContent=greetText()+'。';
+    lede.className='tagline';
+    lede.innerHTML='校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好';
+  }else{
+    h1.className='';h1.style.fontSize='22px';h1.textContent='登录校园网。';
+    lede.className='lede';
+    lede.textContent='还没登录,填一次,以后每天都是桂桂的事:';
+  }
+  $('form-btn').textContent=ctx==='firstRun'?'开启每日自动登录':(ctx==='save'?'保存配置':'立即登录');
 }
-/* 首装页状态行:掉线(不可达)转 danger 如实说;恢复时回基线文案
-   (学号识别 ✓ 由 fillLanding 异步补,这里不抢) */
-function syncOkStatusLine(){
+/* 表单页状态行(唯一实现):login/save 只报连通性(NET_TXT.up/down);
+   firstRun 报已连/掉线 danger 如实说,恢复回基线(学号识别 ✓ 由 fillLanding
+   异步补,这里不抢)。net:state 停留期间实时刷新(场景:填一半切网) */
+function syncFormStatus(){
   const net=lastNet||{};
-  const bar=$('ok-status').parentElement;
-  if(net.state==='unreachable'){
+  const bar=$('form-status-bar');
+  if(formCtx!=='firstRun'){
+    const up=net.state!=='unreachable';
+    bar.className='status '+(up?'ok':'danger');
+    $('form-status').textContent=NET_TXT[up?'up':'down'](net.server);
+  }else if(net.state==='unreachable'){
     bar.className='status danger';
-    $('ok-status').textContent=NET_TXT.down(net.server)}
+    $('form-status').textContent=NET_TXT.down(net.server)}
   else if(bar.classList.contains('danger')){
     bar.className='status ok';
-    $('ok-status').textContent=(net.ssid||'校园网')+' · 已连上'}
+    $('form-status').textContent=(net.ssid||'校园网')+' · 已连上'}
 }
+/* 表单页落地(openDetail 路径,首装 out 由 fillLanding 走到这里):
+   语境由来路决定 — v-guide ③=save,其余=login;identify 回填学号(仅空时),
+   运营商下拉按已存选择回填 */
 async function fillLoginLanding(){
-  syncLoginStatusLine();
-  /* 来源区分(3.3):v-guide ③「先保存配置」路径按钮=「保存配置」;普通路径=「立即登录」 */
-  $('login-btn').textContent=origin['v-login']==='v-guide'?'保存配置':'立即登录';
+  formMode(origin['v-form']==='v-guide'?'save':'login');
+  syncFormStatus();
   const id=await GG.api.identify();
-  if(id.ok&&id.data.uid&&!$('f-sid-login').value){$('f-sid-login').value=id.data.uid}
+  if(id.ok&&id.data.uid&&!$('f-sid').value){$('f-sid').value=id.data.uid}
   const c=await GG.api.getConfig();   /* 运营商下拉按已存选择回填 */
-  if(c.ok&&c.data.operator)setOperatorPick('#op-dd-login',c.data.operator);
+  if(c.ok&&c.data.operator)setOperatorPick(c.data.operator);
 }
 async function fillLanding(){
-  const net=lastNet||{};
-  if(mainState==='ok'){
-    $('ok-status').textContent=(net.ssid||'校园网')+' · 已连上';
+  if(mainState==='down'){renderGuide();return}
+  if(formCtx==='firstRun'){
+    /* 首装已连已登:状态行报已连,identify(chkstatus)识别学号回填 */
+    const net=lastNet||{};
+    $('form-status-bar').className='status ok';
+    $('form-status').textContent=(net.ssid||'校园网')+' · 已连上';
     const id=await GG.api.identify();
     if(id.ok&&id.data.uid){
       const f=$('f-sid');if(!f.value)f.value=id.data.uid;
-      $('ok-status').textContent=(net.ssid||'校园网')+' · 已连上 · 学号已识别 ✓';
+      $('form-status').textContent=(net.ssid||'校园网')+' · 已连上 · 学号已识别 ✓';
     }
-  }else if(mainState==='out'){
-    fillLoginLanding();
-  }else if(mainState==='down'){
-    renderGuide();
-  }
+  }else{fillLoginLanding()}
 }
 async function renderGuide(){
   const net=lastNet||{};
@@ -1585,7 +1554,7 @@ async function reProbe(btn){
   if(p.ok){
     lastNet=normNet(p.data.net);
     if(p.data.net.state==='logged_in'){mainState='ok';goDaily();return}
-    if(p.data.net.state==='not_logged_in'){mainState='out';openDetail('v-login');return}
+    if(p.data.net.state==='not_logged_in'){mainState='out';openDetail('v-form');return}
     /* unreachable(waiting 已压平):留在排查页,如实刷新 */
   }
   renderGuide();

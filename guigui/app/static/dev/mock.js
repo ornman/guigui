@@ -4,8 +4,8 @@
    联调时两边对同一场景的返回必须逐字段一致。
 
    场景:URL ?scene=…(localStorage 记忆,默认 ok)
-     ok        首装·已连已登(仪式 → v-ok)
-     out       首装·连上未认证(仪式 → v-login)
+     ok        首装·已连已登(仪式 → v-form·firstRun 语境)
+     out       首装·连上未认证(仪式 → v-form·login 语境)
      down      首装·不可达,当前网是热点「iphone17 pro max」(仪式 → v-guide)
      waiting   日常·网络未就绪(P0-3:前端视同不可达落 v-guide;约 3.2s 后 mock 推 logged_in,排查页自动回日常)
      daily     日常·一切正常(直进 v-main)
