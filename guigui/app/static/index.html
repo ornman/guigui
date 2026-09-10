@@ -919,6 +919,23 @@ function goDaily(){
   document.body.classList.remove('setup');
   renderMain();renderMainData();show('v-main');greet();
 }
+/* A1 反馈生命周期:lede 只分基线态与瞬时反馈(flash)两类。
+   flashMainLede = 瞬时反馈唯一入口(默认 4s,后到覆盖先到,到期自动回基线);
+   基线写入必须走 baselineLede — flash 未过期时基线让位,否则成功反馈会被
+   renderMainData→setAuto 的数据回填在百毫秒内吃掉(实测 82ms 出现/162ms 被吞) */
+let flashUntil=0,flashTimer=null;
+function flashMainLede(text,ms){
+  const t=ms||4000;
+  $('main-lede').textContent=text;
+  flashUntil=Date.now()+t;
+  if(flashTimer)clearTimeout(flashTimer);
+  flashTimer=setTimeout(()=>{flashUntil=0;flashTimer=null;
+    if($('v-main').classList.contains('on'))renderMain()},t);
+}
+function baselineLede(text){
+  if(Date.now()<flashUntil)return;
+  $('main-lede').textContent=text;
+}
 /* 状态即标题:出问题时,页面最大的字直接说这件事(不靠装饰条) */
 function renderMain(){
   const gb=document.querySelector('#boot-bot-greet-main');
@@ -931,13 +948,13 @@ function renderMain(){
   st.className='status '+(mainState==='down'?'danger':'warn');
   $('main-status-text').textContent=mainState==='out'?'校园网 · 刚刚掉线了':'认证服务器 · 不可达';
   if(mainState==='ok'){mood(gb,'idle');
-    $('main-lede').textContent='网的事交给我,你放心忙~';
+    baselineLede('网的事交给我,你放心忙~');
     $('main-net').textContent=netText(lastNet);$('main-btn').textContent='立即重新登录'}
   else if(mainState==='out'){mood(gb,'sad');
-    $('main-lede').textContent='刚才网断了一下,别担心,登一下就回来。';
+    baselineLede('刚才网断了一下,别担心,登一下就回来。');
     $('main-net').textContent='校园网 · 还没登录';$('main-btn').textContent='再登一次'}
   else{mood(gb,'cry');
-    $('main-lede').textContent='现在够不着校园网,我陪你查查看。';
+    baselineLede('现在够不着校园网,我陪你查查看。');
     $('main-net').textContent=((lastNet&&lastNet.server)||'10.1.2.3')+' · 连不上';$('main-btn').textContent='去排查'}
 }
 function wakeProblem(kind){mainState=kind;goDaily()}
@@ -948,7 +965,7 @@ function setAuto(on){
   if(d)d.textContent=on?'明早 '+currentTriggerTime+' 替你登 · 提前 30 分钟开始试':'已关 · 想让我开工随时说';
   if($('v-main').classList.contains('on')){
     mood(document.querySelector('#boot-bot-greet-main'),on?'idle':'sleep');
-    $('main-lede').textContent=on?'网的事交给我,你放心忙~':'好,我先歇着,想我了再开。';
+    baselineLede(on?'网的事交给我,你放心忙~':'好,我先歇着,想我了再开。');
   }
 }
 function toggleAuto(){const on=!$('sw-auto').classList.contains('on');setAuto(on);GG.api.masterToggle(on)}
@@ -1013,14 +1030,16 @@ async function quickLogin(){
   if(r.ok){
     loginFailStreak=0;   /* 成功清零(横幅③随消) */
     if(r.data&&r.data.result==='stored'){
-      /* 锚前存入(门没开):密码存了但没登上,不是成功,如实说 */
+      /* 锚前存入:密码存了但没登上,不是成功,如实说 */
       mood(gb,'idle');
-      $('main-lede').textContent='还没开门,密码先存着,开门自动登';
+      flashMainLede('还没开门,密码先存着,开门自动登');
       renderBannersRefresh();return}
-    /* 真成功:状态归位再叠成功反馈,否则标题还挂着「刚才掉线了」配成功文案的混搭 */
-    mainState='ok';renderMain();renderMainData();
+    /* 真成功:先挂 flash 再回基线渲染 — renderMain/setAuto 的基线写入会让位(A1),
+       否则标题/数据回填会把成功文案在百毫秒内吃掉 */
+    mainState='ok';
+    flashMainLede('刚刚把网帮你接回来啦 ✓');
+    renderMain();renderMainData();
     mood(gb,'happy');
-    $('main-lede').textContent='刚刚把网帮你接回来啦 ✓';
     renderBannersRefresh();return}
   if(r.code==='AUTH_REJECTED'){
     /* 被拒=凭据问题:跳改密页(带返回),警告块预填结论;连续 ≥2 次出横幅③(错误路由总表) */
@@ -1031,7 +1050,7 @@ async function quickLogin(){
   else if(r.code==='NET_UNREACHABLE'){openDetail('v-guide')}
   else{
     loginFailStreak++;renderBannersRefresh();
-    $('main-lede').textContent=r.message||'出了点问题,再试一次'}
+    flashMainLede(r.message||'出了点问题,再试一次')}
 }
 /* 流程动作 */
 /* 终态舞台(3.4/3.7):成功三态(彩带/保存配置/拦截)+ 反馈两态共用同一舞台;
