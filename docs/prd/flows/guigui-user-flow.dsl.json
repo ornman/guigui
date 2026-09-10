@@ -240,16 +240,6 @@
       "非首装"
      ],
      [
-      "noway",
-      "vguide",
-      ""
-     ],
-     [
-      "chain",
-      "okpg",
-      "到达"
-     ],
-     [
       "silent",
       "dailypg",
       "全绿·全部正常"
@@ -287,22 +277,12 @@
      [
       "bigpage",
       "L1",
-      "每5s·实时状态行"
+      "每5s·实时状态行(常驻)"
      ],
      [
       "L1",
       "L2",
       "通了"
-     ],
-     [
-      "L1",
-      "noway",
-      "还不通"
-     ],
-     [
-      "noway",
-      "L1",
-      "每5s重试"
      ],
      [
       "L2",
@@ -312,7 +292,7 @@
      [
       "L2",
       "bigpage",
-      "未登录·亮状态"
+      "未登录·系统调起状态页"
      ],
      [
       "bigpage",
@@ -386,18 +366,8 @@
      ],
      [
       "bigpage",
-      "loginpg2",
-      "去登录页改"
-     ],
-     [
-      "bigpage",
       "swap",
       "换账号?"
-     ],
-     [
-      "swap",
-      "loginpg2",
-      "换"
      ],
      [
       "swap",
@@ -408,11 +378,6 @@
       "bigpage",
       "dailypg",
       "带横幅返回"
-     ],
-     [
-      "loginpg2",
-      "chain",
-      ""
      ],
      [
       "silent",
@@ -533,6 +498,36 @@
       "vdo",
       "vb1",
       "验证失败·横幅①提醒去改"
+     ],
+     [
+      "bigpage",
+      "loginpg",
+      "去登录页改"
+     ],
+     [
+      "swap",
+      "loginpg",
+      "换"
+     ],
+     [
+      "bigpage",
+      "vguide",
+      "网侧排查(主动)"
+     ],
+     [
+      "L1",
+      "bigpage",
+      "还不通·系统调起(等网)"
+     ],
+     [
+      "beret",
+      "dailypg",
+      "成功·全部正常"
+     ],
+     [
+      "vb1",
+      "loginpg",
+      "点击·去改"
      ]
     ]
    },
@@ -656,7 +651,7 @@
       {
        "type": "rect",
        "id": "loginpg",
-       "text": "#登录页 v-ok/v-login合并·保留返回键",
+       "text": "#登录页(共用) v-ok/v-login合并·保留返回键·来路栈",
        "width": 180,
        "height": 56,
        "fillColor": "#EFE9FC",
@@ -712,7 +707,7 @@
       {
        "type": "diamond",
        "id": "bj",
-       "text": "后端判断 密码+状态码",
+       "text": "🅛后端判断 密码+状态码",
        "width": 150,
        "height": 88,
        "fillColor": "#FEF3C7",
@@ -958,7 +953,7 @@
       {
        "type": "diamond",
        "id": "vdo",
-       "text": "真登验证",
+       "text": "🔑真登验证(自适应)",
        "width": 150,
        "height": 88,
        "fillColor": "#FEF3C7",
@@ -1030,7 +1025,7 @@
        "layout": "dagre",
        "layoutOptions": {
         "isCluster": true,
-        "clusterTitle": "📡 探测机制·全局生效(唯一挂载=状态页)",
+        "clusterTitle": "📡 探测机制·后台常驻(全局;唯一显示面板=状态页)",
         "clusterTitleColor": "#1D4ED8"
        },
        "fillColor": "#EFF6FF",
@@ -1042,7 +1037,7 @@
         {
          "type": "rect",
          "id": "L1",
-         "text": "L1 连通性:每5s→10.1.2.3(写死)",
+         "text": "📡L1 连通性:每5s→10.1.2.3(后台常驻)",
          "width": 180,
          "height": 48,
          "fillColor": "#DBEAFE",
@@ -1055,22 +1050,9 @@
         {
          "type": "rect",
          "id": "L2",
-         "text": "L2 登录态:chkstatus",
+         "text": "📡L2 登录态:chkstatus",
          "width": 160,
          "height": 48,
-         "fillColor": "#DBEAFE",
-         "borderColor": "#2563EB",
-         "borderWidth": 2,
-         "borderRadius": 10,
-         "fontSize": 13,
-         "textColor": "#1F2937"
-        },
-        {
-         "type": "rect",
-         "id": "noway",
-         "text": "还不通·等网(每5s重试)",
-         "width": 150,
-         "height": 44,
          "fillColor": "#DBEAFE",
          "borderColor": "#2563EB",
          "borderWidth": 2,
@@ -1098,7 +1080,7 @@
         {
          "type": "diamond",
          "id": "silent",
-         "text": "静默巡检:网/任务/日志/程序/库",
+         "text": "静默巡检:网(=📡)/任务/日志/程序/库",
          "width": 170,
          "height": 84,
          "fillColor": "#FEF3C7",
@@ -1192,7 +1174,7 @@
         {
          "type": "rect",
          "id": "quicklogin",
-         "text": "快登:存库凭据·真登",
+         "text": "🔑快登:存库凭据",
          "width": 150,
          "height": 44,
          "fillColor": "#DBEAFE",
@@ -1205,7 +1187,7 @@
         {
          "type": "rect",
          "id": "autotest",
-         "text": "真登测试(矛盾态·进入检测)",
+         "text": "🔑检验·进入检测(自适应:未登录真登/已登录对账)",
          "width": 165,
          "height": 44,
          "fillColor": "#DBEAFE",
@@ -1218,7 +1200,7 @@
         {
          "type": "diamond",
          "id": "beret",
-         "text": "后端返回(五态)",
+         "text": "🅛后端返回(五态)",
          "width": 120,
          "height": 72,
          "fillColor": "#FEF3C7",
@@ -1303,32 +1285,6 @@
          "borderWidth": 2,
          "fontSize": 13,
          "textColor": "#92400E"
-        },
-        {
-         "type": "rect",
-         "id": "loginpg2",
-         "text": "#登录页 带返回键",
-         "width": 125,
-         "height": 48,
-         "fillColor": "#EFE9FC",
-         "borderColor": "#7C5CD6",
-         "borderWidth": 2,
-         "borderRadius": 10,
-         "fontSize": 13,
-         "textColor": "#1F2937"
-        },
-        {
-         "type": "rect",
-         "id": "chain",
-         "text": "走完整链路→成功页",
-         "width": 150,
-         "height": 44,
-         "fillColor": "#DBEAFE",
-         "borderColor": "#2563EB",
-         "borderWidth": 2,
-         "borderRadius": 10,
-         "fontSize": 13,
-         "textColor": "#1F2937"
         }
        ]
       },
@@ -1476,6 +1432,75 @@
          "textColor": "#1F2937"
         }
        ]
+      }
+     ]
+    },
+    {
+     "type": "frame",
+     "id": "legend",
+     "layout": "dagre",
+     "layoutOptions": {
+      "isCluster": true,
+      "clusterTitle": "♻️ 复用映射(实现各一份,勿复制粘贴)",
+      "clusterTitleColor": "#334155"
+     },
+     "fillColor": "#F8FAFC",
+     "borderColor": "#94A3B8",
+     "borderWidth": 2,
+     "borderDash": "dashed",
+     "borderRadius": 16,
+     "children": [
+      {
+       "type": "rect",
+       "id": "lg1",
+       "text": "🅛 后端登录五态机:g2.后端判断 与 g3.后端返回 同一实现(首装表单/快登/检测共用)",
+       "width": 250,
+       "height": 56,
+       "fillColor": "#F8FAFC",
+       "borderColor": "#64748B",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 12,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "lg2",
+       "text": "🔑 存库凭据登录服务:快登/检验/真登验证同一实现·自适应:未登录→真登;已登录→对账",
+       "width": 250,
+       "height": 64,
+       "fillColor": "#F8FAFC",
+       "borderColor": "#64748B",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 12,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "lg3",
+       "text": "📄 登录页:首装与日常共用(带返回键·来路栈)",
+       "width": 250,
+       "height": 56,
+       "fillColor": "#F8FAFC",
+       "borderColor": "#64748B",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 12,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "lg4",
+       "text": "📡 L1/L2 探测:全局一份·后台常驻;巡检『网』维度即其结果",
+       "width": 250,
+       "height": 56,
+       "fillColor": "#F8FAFC",
+       "borderColor": "#64748B",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 12,
+       "textColor": "#1F2937"
       }
      ]
     }
