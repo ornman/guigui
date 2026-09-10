@@ -92,7 +92,7 @@ body{
 .log::-webkit-scrollbar-thumb{border-radius:99px;background:oklch(97% 0.005 295 / 0.25)}
 .v{display:none;animation:fadein .3s ease-out}
 .v.on{display:block}
-.v.leaving{animation:fadeout .25s ease-in forwards}
+.v.leaving{animation:fadeout .25s ease-in forwards;pointer-events:none}  /* A2:转场窗口内旧视图不可点,防连点穿页 */
 @keyframes fadeout{from{opacity:1}to{opacity:0}}
 /* 日常页:一屏装下不靠滚动 — 日志框是唯一弹性区,问题状态(顶部多横幅)时
    它自己收缩(条目区内滚),「历史日志 →」和按钮永远在屏内 */
@@ -402,6 +402,8 @@ input[type=password]::-ms-clear{display:none}
   border:1px solid oklch(60% 0.01 295 / 0.28);border-radius:12px;
   background:oklch(100% 0 0 / 0.55);cursor:pointer;transition:border-color .15s}
 .ssid:hover{border-color:var(--accent-2)}
+.ssid.busy{pointer-events:none;opacity:.62}   /* A2:挑网连接期间防连点 */
+.banner.busy{pointer-events:none;opacity:.75} /* A2:横幅②重建期间防连点 */
 .ssid.on{border-color:transparent;box-shadow:0 0 0 3px var(--accent-soft)}
 .ssid::before{content:"";position:absolute;inset:-1px;border-radius:inherit;
   padding:1.5px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
@@ -962,13 +964,21 @@ function togglePw(id,btn){
   const inp=$(id);const showPw=inp.type==='password';
   inp.type=showPw?'text':'password';btn.classList.toggle('off',!showPw);
 }
-/* 按钮等待态(AC-11):发网络请求期间置灰禁用+旋转+换文案,防重复提交 */
-function setBusy(btn,on,text){
+/* 按钮等待态(AC-11/A2):发网络请求期间置灰禁用+旋转+换文案,防重复提交;
+   minMs=400 时间下限(恢复时实际 busy 不足则补足)— 防重是逻辑保证,不赌网络延迟
+   (NOT_CONFIGURED 路径 mock 零延迟返回,没有下限时双击=调两次) */
+function setBusy(btn,on,text,minMs){
   if(!btn)return;
-  if(on){btn.dataset.orig=btn.textContent;btn.classList.add('busy');btn.disabled=true;
+  if(on){
+    if(btn._busyTo)clearTimeout(btn._busyTo);
+    btn.dataset.t0=String(Date.now());
+    btn.dataset.orig=btn.textContent;btn.classList.add('busy');btn.disabled=true;
     btn.textContent=text||'验证中…'}
-  else{btn.classList.remove('busy');btn.disabled=false;
-    if(btn.dataset.orig!==undefined)btn.textContent=btn.dataset.orig}
+  else{
+    const rest=(parseInt(btn.dataset.t0,10)||0)+(minMs==null?400:minMs)-Date.now();
+    const finish=()=>{btn.classList.remove('busy');btn.disabled=false;
+      if(btn.dataset.orig!==undefined)btn.textContent=btn.dataset.orig};
+    if(rest>0)btn._busyTo=setTimeout(finish,rest);else finish()}
 }
 /* 提交等待行(4.1.2):验证中/注销告知/线上他人学号,由 login:progress 事件驱动 */
 function hideSubmitNotes(){['ok-note','login-note'].forEach(id=>{const n=$(id);if(n)n.style.display='none'})}
@@ -1039,7 +1049,10 @@ async function quickLogin(){
     loginFailStreak++;renderBannersRefresh();
     openDetail('v-login');
     showLoginErr(r.message||'密码好像不对',r.reason);return}
-  if(r.code==='NOT_CONFIGURED'){openDetail('v-login')}
+  if(r.code==='NOT_CONFIGURED'){
+    /* P0-4:解释跳转 — 裸跳零解释,先给警告块再进登录页 */
+    showLoginErr(r.message||'还没存过密码,先填一次');
+    openDetail('v-login');return}
   else if(r.code==='NET_UNREACHABLE'){openDetail('v-guide')}
   else{
     loginFailStreak++;renderBannersRefresh();
@@ -1194,9 +1207,12 @@ function rejectionText(el,text,reason){
 }
 function showLoginErr(text,reason){rejectionText($('login-warn-text'),text,reason);$('login-warn').style.display='block'}
 async function pickWifi(el){
+  if(el.classList.contains('busy'))return;   /* A2:防连点(pointer-events 只挡真实指针,程序调用走这里) */
   el.classList.add('on');
   const ssid=el.querySelector('.n').textContent;
+  el.classList.add('busy');   /* A2:连接期间防连点(列表项非按钮,同样要有忙碌闸) */
   const r=await GG.api.connectWifi({ssid:ssid});
+  el.classList.remove('busy');
   if(!r.ok){el.classList.remove('on');return}
   /* 连上后 net:state 事件负责路由(未认证 → v-login) */
 }
@@ -1362,11 +1378,14 @@ function renderBanners(rec){
     h+='<div class="banner" onclick="openDetail(\'v-diag\')"><span>试了几次还没登上?完整排查</span><span class="arr">›</span></div>';
   box.innerHTML=h;
 }
-/* 横幅②就地重建(带 busy);失败变「没建成,再试一次」,成功横幅消失 */
+/* 横幅②就地重建(带 busy,A2:重建期间不可再点);失败变「没建成,再试一次」,成功横幅消失 */
 async function rebuildTaskBanner(){
   const el=document.querySelector('#main-banners .banner-task');if(!el)return;
+  if(el.classList.contains('busy'))return;   /* A2:重建期间防连点 */
+  el.classList.add('busy');
   el.innerHTML='<span>重建中…</span><span class="arr"></span>';
   const r=await GG.api.rebuildTask();
+  el.classList.remove('busy');
   if(r.ok&&r.data.ok){setTaskBlocked(false);return}
   el.innerHTML='<span>没建成,再试一次</span><span class="arr">›</span>';
 }
