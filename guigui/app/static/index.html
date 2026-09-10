@@ -742,19 +742,35 @@ const MAIN_LOG_KEEP=5;
    改一处,JS(show)/CSS(fadein/fadeout)/画廊摆拍铁律(emit 延后 VIEW_MS)三处随动 */
 const VIEW_MS=250;
 document.documentElement.style.setProperty('--view-ms',VIEW_MS+'ms');
-let mainState='ok',configured=false,hasPwd=false;
 const origin={};   /* 详情视图来路:返回必回原处 */
-/* 触发时间:从 v-settings 时间输入/药丸同步,主页 desc 与庆祝页 lede 都读这个值(报告 1.4) */
-let currentTriggerTime='07:00';
+/* P2-3 store 收口:13 个散全局(mainState/configured/hasPwd/lastNet/curCfg/taskBlocked/
+   loginFailStreak/successState/fbKind/fbDraft/diagState/currentTriggerTime/flashUntil)
+   + 同类后补(formCtx/flashTimer/gazeHandle)收进单一 S;函数保持全局(画廊白名单依赖)。
+   字段语义注记:currentTriggerTime 从 v-settings 时间输入/药丸同步,主页 desc 与庆祝页
+   lede 都读这个值(报告 1.4);lastNet 一律经 normNet/事件入口压平 waiting(P0-3) */
+const S={
+  mainState:'ok',                 /* ok/out/down 主页三态(netToMain 唯一压缩点) */
+  configured:false,hasPwd:false,
+  currentTriggerTime:'07:00',
+  flashUntil:0,flashTimer:null,   /* A1 瞬时反馈:过期时刻 + 归位定时器 */
+  successState:{verified:true,reason:null,taskOk:true},
+  taskBlocked:false,              /* 横幅②数据源,四路汇聚 setTaskBlocked */
+  loginFailStreak:0,              /* 「再登一次」连败计数:成功清零,≥2 → 横幅③ */
+  diagState:null,                 /* 验证器五步上屏状态,diag:progress 逐拍更新 */
+  lastNet:null,curCfg:null,
+  formCtx:'login',                /* P2-1 表单语境:firstRun/login/save */
+  fbKind:'problem',fbDraft:null,  /* 反馈分类 + 发出前草稿快照(queued 重发回填) */
+  gazeHandle:null                 /* 随机注视定时器句柄(非业务状态,入 S 让顶格 let 清零) */
+};
 function formatTriggerTime(h,m){return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
 function renderTriggerTime(){
   const h=parseInt($('ct-h').value,10),m=parseInt($('ct-m').value,10);
-  if(!isNaN(h)&&!isNaN(m))currentTriggerTime=formatTriggerTime(h,m);
+  if(!isNaN(h)&&!isNaN(m))S.currentTriggerTime=formatTriggerTime(h,m);
 }
 /* P1-2:时间前缀按当前时刻派生(明早写死对傍晚配置是谎话)—
    目标时刻仍在今天前面:今天(<18点)/今晚(≥18点);已经过了:明早 */
 function triggerPrefix(){
-  const p=currentTriggerTime.split(':');
+  const p=S.currentTriggerTime.split(':');
   const now=new Date();
   const target=new Date(now.getFullYear(),now.getMonth(),now.getDate(),parseInt(p[0],10),parseInt(p[1],10));
   if(now<target)return now.getHours()<18?'今天':'今晚';
@@ -849,11 +865,11 @@ async function firstRun(){
     return
   }
   if(p.ok){
-    lastNet=normNet(p.data.net);
-    configured=!!p.data.configured;
-    const s=lastNet.state;
-    mainState=netToMain(s);
-    if(configured){
+    S.lastNet=normNet(p.data.net);
+    S.configured=!!p.data.configured;
+    const s=S.lastNet.state;
+    S.mainState=netToMain(s);
+    if(S.configured){
       silentTaskCheck();   /* 仪式期间静默任务体检(只读秒回):被拦 → 主页横幅② */
       if(s==='unreachable'){
         /* 断网统一落 v-guide(原则 3):不再落主页 down;从 v-guide 返回后主页 down 态保留 */
@@ -861,8 +877,8 @@ async function firstRun(){
         setTimeout(()=>{show('v-guide');renderGuide()},Math.max(0,1500-el));return}
       setTimeout(()=>{goDaily();applyLaunch()},Math.max(0,1500-el));return
     }
-  }else{mainState='down'}
-  setTimeout(()=>{mood(b,mainState==='ok'?'idle':(mainState==='out'?'sad':'cry'))},Math.max(0,700-el));
+  }else{S.mainState='down'}
+  setTimeout(()=>{mood(b,S.mainState==='ok'?'idle':(S.mainState==='out'?'sad':'cry'))},Math.max(0,700-el));
   setTimeout(goSetup,Math.max(0,1500-el));
 }
 /* reinitBot 已废弃 — 两个 bot 各有独立 DOM,size 在 HTML 写死,不需要中途重建 SVG */
@@ -889,8 +905,8 @@ function applyLaunch(){
   else if(L==='settings')openDetail('v-settings')
 }
 function goSetup(){
-  if(mainState==='down')show('v-guide');
-  else{formMode(mainState==='out'?'login':'firstRun');show('v-form')}
+  if(S.mainState==='down')show('v-guide');
+  else{formMode(S.mainState==='out'?'login':'firstRun');show('v-form')}
   greet();
   fillLanding();
   /* 不再做 .centered/.dock-in 归位动画 — 目标视图的 greet-bot 已在 .greet 内自然显示
@@ -905,46 +921,45 @@ function goDaily(){
    flashMainLede = 瞬时反馈唯一入口(默认 4s,后到覆盖先到,到期自动回基线);
    基线写入必须走 baselineLede — flash 未过期时基线让位,否则成功反馈会被
    renderMainData→setAuto 的数据回填在百毫秒内吃掉(实测 82ms 出现/162ms 被吞) */
-let flashUntil=0,flashTimer=null;
 function flashMainLede(text,ms){
   const t=ms||4000;
   $('main-lede').textContent=text;
-  flashUntil=Date.now()+t;
-  if(flashTimer)clearTimeout(flashTimer);
-  flashTimer=setTimeout(()=>{flashUntil=0;flashTimer=null;
+  S.flashUntil=Date.now()+t;
+  if(S.flashTimer)clearTimeout(S.flashTimer);
+  S.flashTimer=setTimeout(()=>{S.flashUntil=0;S.flashTimer=null;
     if($('v-main').classList.contains('on'))renderMain()},t);
 }
 function baselineLede(text){
-  if(Date.now()<flashUntil)return;
+  if(Date.now()<S.flashUntil)return;
   $('main-lede').textContent=text;
 }
 /* 状态即标题:出问题时,页面最大的字直接说这件事(不靠装饰条) */
 function renderMain(){
   const gb=document.querySelector('#boot-bot-greet-main');
   const vm=$('v-main');
-  vm.classList.toggle('st-warn',mainState==='out');
-  vm.classList.toggle('st-down',mainState==='down');
-  $('main-h1').textContent=mainState==='out'?'呜,刚才掉线了。':(mainState==='down'?'现在连不上校园网。':greetText()+'。');
+  vm.classList.toggle('st-warn',S.mainState==='out');
+  vm.classList.toggle('st-down',S.mainState==='down');
+  $('main-h1').textContent=S.mainState==='out'?'呜,刚才掉线了。':(S.mainState==='down'?'现在连不上校园网。':greetText()+'。');
   const st=$('main-status');
-  st.style.display=mainState==='ok'?'none':'flex';
-  st.className='status '+(mainState==='down'?'danger':'warn');
-  $('main-status-text').textContent=mainState==='out'?'校园网 · 刚刚掉线了':'认证服务器 · 不可达';
-  if(mainState==='ok'){mood(gb,'idle');
+  st.style.display=S.mainState==='ok'?'none':'flex';
+  st.className='status '+(S.mainState==='down'?'danger':'warn');
+  $('main-status-text').textContent=S.mainState==='out'?'校园网 · 刚刚掉线了':'认证服务器 · 不可达';
+  if(S.mainState==='ok'){mood(gb,'idle');
     baselineLede('网的事交给我,你放心忙~');
-    $('main-net').textContent=netText(lastNet);$('main-btn').textContent='立即重新登录'}
-  else if(mainState==='out'){mood(gb,'sad');
+    $('main-net').textContent=netText(S.lastNet);$('main-btn').textContent='立即重新登录'}
+  else if(S.mainState==='out'){mood(gb,'sad');
     baselineLede('刚才网断了一下,别担心,登一下就回来。');
     $('main-net').textContent='校园网 · 还没登录';$('main-btn').textContent='再登一次'}
   else{mood(gb,'cry');
     baselineLede('现在够不着校园网,我陪你查查看。');
-    $('main-net').textContent=NET_TXT.down(lastNet&&lastNet.server);$('main-btn').textContent='去排查'}
+    $('main-net').textContent=NET_TXT.down(S.lastNet&&S.lastNet.server);$('main-btn').textContent='去排查'}
 }
-function wakeProblem(kind){mainState=kind;goDaily()}
+function wakeProblem(kind){S.mainState=kind;goDaily()}
 /* 自动登录总开关:主页与设置页双向同步,关=桂桂睡觉(状态由开关自己表达,文字只讲服务) */
 function setAuto(on){
   {const s=$('sw-auto');if(s)s.classList.toggle('on',on)};
   const d=$('auto-desc');
-  if(d)d.textContent=on?triggerPrefix()+' '+currentTriggerTime+' 替你登 · 提前 30 分钟开始试':'已关 · 想让我开工随时说';
+  if(d)d.textContent=on?triggerPrefix()+' '+S.currentTriggerTime+' 替你登 · 提前 30 分钟开始试':'已关 · 想让我开工随时说';
   if($('v-main').classList.contains('on')){
     mood(document.querySelector('#boot-bot-greet-main'),on?'idle':'sleep');
     baselineLede(on?'网的事交给我,你放心忙~':'好,我先歇着,想我了再开。');
@@ -1009,7 +1024,7 @@ function setOperatorPick(op){
    注:同一份监听器在文件下方"自定义时间"段又重复注册了一次(原代码遗留),已合并到单点;
    这里仅保留 mainAction,详见下方唯一一份 ct-h/ct-m 监听。 */
 function mainAction(){
-  if(mainState==='down'){openDetail('v-guide');return}
+  if(S.mainState==='down'){openDetail('v-guide');return}
   quickLogin()   /* ok=立即重新登录 / out=立即登录,都是一键已存凭据(AC-16) */
 }
 /* 主页上的重登:就地反馈,不跳庆祝页(庆祝只属于首次/修复成功);等待态防重复提交;
@@ -1020,7 +1035,7 @@ async function quickLogin(){
   const r=await GG.api.login({});
   setBusy($('main-btn'),false);
   if(r.ok){
-    loginFailStreak=0;   /* 成功清零(横幅③随消) */
+    S.loginFailStreak=0;   /* 成功清零(横幅③随消) */
     if(r.data&&r.data.result==='stored'){
       /* 锚前存入:密码存了但没登上,不是成功,如实说 */
       mood(gb,'idle');
@@ -1033,14 +1048,14 @@ async function quickLogin(){
       return}
     /* 真成功:先挂 flash 再回基线渲染 — renderMain/setAuto 的基线写入会让位(A1),
        否则标题/数据回填会把成功文案在百毫秒内吃掉 */
-    mainState='ok';
+    S.mainState='ok';
     flashMainLede('刚刚把网帮你接回来啦 ✓');
     renderMain();renderMainData();
     mood(gb,'happy');
     renderBannersRefresh();return}
   if(r.code==='AUTH_REJECTED'){
     /* 被拒=凭据问题:跳改密页(带返回),警告块预填结论;连续 ≥2 次出横幅③(错误路由总表) */
-    loginFailStreak++;renderBannersRefresh();
+    S.loginFailStreak++;renderBannersRefresh();
     openDetail('v-form');
     showLoginErr(r.message||'密码好像不对',r.reason);return}
   if(r.code==='NOT_CONFIGURED'){
@@ -1049,15 +1064,14 @@ async function quickLogin(){
     openDetail('v-form');return}
   else if(r.code==='NET_UNREACHABLE'){openDetail('v-guide')}
   else{
-    loginFailStreak++;renderBannersRefresh();
+    S.loginFailStreak++;renderBannersRefresh();
     flashMainLede(r.message||'出了点问题,再试一次')}
 }
 /* 流程动作 */
 /* 终态舞台(3.4/3.7):成功三态(彩带/保存配置/拦截)+ 反馈两态共用同一舞台;
    完成是全有或全无 — 彩带只给 verified && task_ok,客观验不了的诚实叫「保存配置」 */
-let successState={verified:true,reason:null,taskOk:true};
 function showSuccess(verifiedTrue,reason,taskOk){
-  successState={verified:verifiedTrue===true,reason:reason||null,taskOk:taskOk!==false,taskFixed:false};
+  S.successState={verified:verifiedTrue===true,reason:reason||null,taskOk:taskOk!==false,taskFixed:false};
   renderSuccess();
 }
 function stageEnter(botState,title,lede,note,actions,showSettings,confetti){
@@ -1087,7 +1101,7 @@ function stageEnter(botState,title,lede,note,actions,showSettings,confetti){
   if(confetti)party();
 }
 function renderSuccess(){
-  const st=successState;
+  const st=S.successState;
   renderTriggerTime();   /* 同步最新触发时间,避免 lede 写死 07:00 */
   const done={label:'完成,回主页',fn:function(){backFrom('v-success')}};
   if(!st.taskOk){
@@ -1109,7 +1123,7 @@ function renderSuccess(){
       st.taskFixed?'定时任务已修好 ✓':null,[done],true,false);
     return}
   /* 彩带页:真验证通过 + 任务在岗,才配庆祝 */
-  stageEnter('complete','以后每天都会自动帮你登好。',triggerPrefix()+' '+currentTriggerTime+' 开始。现在关掉就行。','到点就登,你不用管。',
+  stageEnter('complete','以后每天都会自动帮你登好。',triggerPrefix()+' '+S.currentTriggerTime+' 开始。现在关掉就行。','到点就登,你不用管。',
     [done],true,true);
 }
 /* 成功页上的重建(契约 §2.14,仅用户点击触发):建成且已验证 → 重渲彩带页放行;
@@ -1119,7 +1133,7 @@ async function rebuildFromSuccess(btn){
   const r=await GG.api.rebuildTask();
   setBusy(btn,false);
   if(r.ok&&r.data.ok){
-    successState=Object.assign({},successState,{taskOk:true,taskFixed:true});
+    S.successState=Object.assign({},S.successState,{taskOk:true,taskFixed:true});
     renderSuccess();return}
   btn.textContent='没建成,再试一次';
   setTimeout(()=>{if(btn.isConnected&&!btn.classList.contains('busy'))btn.textContent='重建定时任务'},2600);
@@ -1130,7 +1144,7 @@ async function rebuildFromSuccess(btn){
    (bind 内联入口由 rejectionText 织入)/ NET_UNREACHABLE 提交过密码走「保存配置」
    终态页、空密码只跳排查页 / INTERNAL 等就地报后端原话不静默 */
 async function submitLadder(){
-  const ctx=formCtx;
+  const ctx=S.formCtx;
   const btn=$('form-btn');
   const sidVal=$('f-sid').value.trim();
   const rawPwd=$('f-pwd').value;
@@ -1139,10 +1153,10 @@ async function submitLadder(){
     $('form-warn-text').textContent='密码还没填呢';$('form-warn').style.display='block';return}
   $('form-warn').style.display='none';
   setBusy(btn,true,ctx==='save'?'保存中…':'验证中…');
-  if(ctx==='firstRun')await GG.api.saveConfig({trigger_time:currentTriggerTime});
+  if(ctx==='firstRun')await GG.api.saveConfig({trigger_time:S.currentTriggerTime});
   const r=await GG.api.login({sid:sidVal||undefined,password:ctx==='firstRun'?pwd:(rawPwd||undefined),operator:pickedOperator()});
   setBusy(btn,false);hideSubmitNotes();
-  if(r.ok){configured=true;hasPwd=true;loginFailStreak=0;
+  if(r.ok){S.configured=true;S.hasPwd=true;S.loginFailStreak=0;
     showSuccess(r.data.verified===true,r.data.reason,r.data.task_ok);renderBannersRefresh();return}
   if(r.code==='AUTH_REJECTED'){
     if(r.reason==='throttled'){
@@ -1153,8 +1167,8 @@ async function submitLadder(){
     /* 提交了密码的断网:后端已存(未验证)+任务就位 →「保存配置」终态页(不撒彩带,
        回主页 down 态引导排查,横幅①引导补验);没提交密码只跳排查页。
        mainState 一并记 down,返回主页如实渲染 */
-    mainState='down';
-    if(pwd){configured=true;hasPwd=true;showSuccess(false,'unreachable',true)}
+    S.mainState='down';
+    if(pwd){S.configured=true;S.hasPwd=true;showSuccess(false,'unreachable',true)}
     else openDetail('v-guide');
     return}
   /* INTERNAL / BRIDGE_MISSING 等:就地报后端原话,不静默(按钮恢复却什么都不说=黑洞) */
@@ -1230,7 +1244,7 @@ function toggleFallback(){
   sw.classList.toggle('on');
   const on=sw.classList.contains('on');
   p.style.display=on?'block':'none';
-  if(on&&!p.childElementCount){GG.api.scanWifi().then(s=>{if(s.ok)renderWifiList(p,s.data.networks,{pick:true,selected:curCfg&&curCfg.wifi_fallback_ssid})})}
+  if(on&&!p.childElementCount){GG.api.scanWifi().then(s=>{if(s.ok)renderWifiList(p,s.data.networks,{pick:true,selected:S.curCfg&&S.curCfg.wifi_fallback_ssid})})}
   GG.api.saveConfig({wifi_fallback_enabled:on});
 }
 function toggleGui(sw){
@@ -1277,8 +1291,8 @@ document.querySelectorAll('#time-presets .preset').forEach(b=>b.addEventListener
   b.classList.add('on');
   const t=b.dataset.t.split(':');
   $('ct-h').value=t[0];$('ct-m').value=t[1];
-  currentTriggerTime=b.dataset.t;   /* 同步给主页 desc 与庆祝页 lede(报告 1.4) */
-  GG.api.saveConfig({trigger_time:currentTriggerTime});
+  S.currentTriggerTime=b.dataset.t;   /* 同步给主页 desc 与庆祝页 lede(报告 1.4) */
+  GG.api.saveConfig({trigger_time:S.currentTriggerTime});
   setAuto($('sw-auto').classList.contains('on'));
 }));
 ['ct-h','ct-m'].forEach((id,i,arr)=>{
@@ -1297,7 +1311,7 @@ document.querySelectorAll('#time-presets .preset').forEach(b=>b.addEventListener
     if(isNaN(v)||v>max){v=Math.min(isNaN(v)?0:v,max);el.classList.add('err')}
     el.value=String(v).padStart(2,'0');
     renderTriggerTime();
-    GG.api.saveConfig({trigger_time:currentTriggerTime});
+    GG.api.saveConfig({trigger_time:S.currentTriggerTime});
   });
 });
 /* 后端事件(契约 §3):网态变化重渲;外部调度变更同步开关。
@@ -1312,14 +1326,14 @@ document.querySelectorAll('#time-presets .preset').forEach(b=>b.addEventListener
    when+else 维度豁免(when() 不成立走 else,无 else=留页不动)}。
    【v2 预留】第三批 P0-7/P1-8「网恢复系统调起状态页」接入时在本表加行/加维度
    (含调起去重),不再往 handler 里长 if 链 */
-function recordMain(e){mainState=netToMain(e.state)}
-function mainNet(e){mainState=netToMain(e.state);renderMain();renderMainData()}
-function formNet(e){mainState=netToMain(e.state);syncFormStatus()}
-function guideReprobe(e){mainState=netToMain(e.state);setTimeout(reProbe,550)}
-function guideDaily(e){mainState=netToMain(e.state);setTimeout(goDaily,550)}
-function bootNet(e){mainState=netToMain(e.state);$('boot-cap').textContent='网络好了,桂桂来了…';setTimeout(goDaily,900)}
+function recordMain(e){S.mainState=netToMain(e.state)}
+function mainNet(e){S.mainState=netToMain(e.state);renderMain();renderMainData()}
+function formNet(e){S.mainState=netToMain(e.state);syncFormStatus()}
+function guideReprobe(e){S.mainState=netToMain(e.state);setTimeout(reProbe,550)}
+function guideDaily(e){S.mainState=netToMain(e.state);setTimeout(goDaily,550)}
+function bootNet(e){S.mainState=netToMain(e.state);$('boot-cap').textContent='网络好了,桂桂来了…';setTimeout(goDaily,900)}
 const GUIDE_GOTO={render:recordMain,goto:'v-guide'};   /* 断网统一落点:记 down + 跳排查页 */
-const MAIN_NET={render:mainNet},FORM_NET={render:formNet},BOOT_NET={when:function(){return configured},render:bootNet};
+const MAIN_NET={render:mainNet},FORM_NET={render:formNet},BOOT_NET={when:function(){return S.configured},render:bootNet};
 const ROUTE={
   /* 仪式期:断网落排查页用 show 直转(首装单行道不记来路)+ renderGuide;
      可达态只认 configured — 未配置时仪式等 firstRun 的 probe 分流,事件不抢路由 */
@@ -1356,7 +1370,7 @@ function routeNet(e){
 GG.on('net:state',e=>{
   if(!e||!e.state)return;
   if(e.state==='waiting')e.state='unreachable';   /* P0-3:waiting 视同不可达,压平后再路由 */
-  lastNet=Object.assign({},lastNet||{server:'10.1.2.3'},e);
+  S.lastNet=Object.assign({},S.lastNet||{server:'10.1.2.3'},e);
   routeNet(e);
 });
 GG.on('schedule:changed',e=>{
@@ -1365,9 +1379,7 @@ GG.on('schedule:changed',e=>{
 });
 /* 任务被拦横幅②的数据源(2026-09-08 收敛为单一状态位):
    启动静默体检 / schedule:changed / 主页数据轮询 / 重建结果,都经 setTaskBlocked 汇聚 */
-let taskBlocked=false;
-let loginFailStreak=0;   /* 主页「再登一次」连续失败计数:成功清零,≥2 → 横幅③进验证器(计划 3.5) */
-function setTaskBlocked(b){taskBlocked=!!b;renderBannersRefresh()}
+function setTaskBlocked(b){S.taskBlocked=!!b;renderBannersRefresh()}
 /* 主页横幅(终态,重做后仅三种):①密码还没验证过(仅保存配置路径,点击直达改密页,
    连上后自动登成功即消)②自动登录还没生效(任务被拦,点击就地重建)
    ③反复登录都被拒(再登连续失败 ≥2,进验证器;成功清零;拟稿)。「今早没登上」已删(最近结果行已显示) */
@@ -1377,12 +1389,12 @@ function renderBanners(rec){
   /* 横幅①精确语义(P0-5/A7):「未验证 且(当前不在网 或 最近失败过)」才显示 —
      已在线且最近没失败时不存在「密码没验证」待办(验证=把自己踢下线,不是待办);
      今早真失败(unverified 场景)时密码大概率真错,横幅①有信息,不一刀切隐藏 */
-  const online=lastNet&&lastNet.state==='logged_in';
-  if(configured&&rec&&rec.verified===false&&(!online||rec.outcome==='fail'))
+  const online=S.lastNet&&S.lastNet.state==='logged_in';
+  if(S.configured&&rec&&rec.verified===false&&(!online||rec.outcome==='fail'))
     h+='<div class="banner" onclick="openDetail(\'v-form\')"><span>密码还没验证过,去改一下</span><span class="arr">›</span></div>';
-  if(configured&&taskBlocked)
+  if(S.configured&&S.taskBlocked)
     h+='<div class="banner banner-task" onclick="rebuildTaskBanner()"><span>自动登录还没生效,点此重建</span><span class="arr">›</span></div>';
-  if(configured&&loginFailStreak>=2)
+  if(S.configured&&S.loginFailStreak>=2)
     h+='<div class="banner" onclick="openDetail(\'v-diag\')"><span>反复登录都被拒?完整排查</span><span class="arr">›</span></div>';
   box.innerHTML=h;
 }
@@ -1403,20 +1415,19 @@ async function rebuildTaskBanner(){
    结论大字 + 按 exit 出口;app_fault/net_down 就地说明,页底反馈小出口兜底 */
 const DIAG_KEYS=[['network','网络连通'],['server','认证服务器'],['credential','凭据验证'],['task','定时任务'],['app','程序自身']];
 const DIAG_ICONS={ok:'✓',fail:'✗',skip:'○',running:'●',pending:'·'};
-let diagState=null;
 function renderDiag(){
   const box=$('diag-steps');if(!box)return;
   box.innerHTML=DIAG_KEYS.map((k,i)=>{
-    const s=(diagState&&diagState.steps[k[0]])||{state:'pending',detail:''};
+    const s=(S.diagState&&S.diagState.steps[k[0]])||{state:'pending',detail:''};
     return '<div class="diag-step" data-state="'+s.state+'"><span class="no">'+'①②③④⑤'.charAt(i)+
       '</span><span class="lbl">'+k[1]+'</span><span class="st">'+(DIAG_ICONS[s.state]||'·')+
       '</span><span class="dt">'+esc(s.detail||'')+'</span></div>';
   }).join('');
   const v=$('diag-verdict');
-  if(diagState&&diagState.done){
+  if(S.diagState&&S.diagState.done){
     v.style.display='block';
-    $('diag-verdict-text').textContent=diagState.verdict||'';
-    const btn=$('diag-exit'),ex=diagState.exit;
+    $('diag-verdict-text').textContent=S.diagState.verdict||'';
+    const btn=$('diag-exit'),ex=S.diagState.exit;
     if(ex==='login'||ex==='task_blocked'||ex==='ok'){
       btn.style.display='block';
       btn.textContent=ex==='login'?'去登录页改一下':(ex==='task_blocked'?'重建定时任务':'完成,回主页');
@@ -1424,23 +1435,23 @@ function renderDiag(){
   }else v.style.display='none';
 }
 async function startDiag(){
-  diagState={steps:{},verdict:null,exit:null,done:false};
+  S.diagState={steps:{},verdict:null,exit:null,done:false};
   renderDiag();
   const r=await GG.api.diagnose();
   if(r.ok){
-    diagState.done=true;diagState.verdict=r.data.verdict;diagState.exit=r.data.exit;
-    (r.data.steps||[]).forEach(s=>{diagState.steps[s.key]={state:s.state,detail:s.detail,reason:s.reason}});
+    S.diagState.done=true;S.diagState.verdict=r.data.verdict;S.diagState.exit=r.data.exit;
+    (r.data.steps||[]).forEach(s=>{S.diagState.steps[s.key]={state:s.state,detail:s.detail,reason:s.reason}});
   }else{
     /* BRIDGE_MISSING / INTERNAL:就地报后端原话,结论区当出气口 */
-    diagState.done=true;diagState.verdict=r.message||'体检没跑完,再试一次';diagState.exit=null;
+    S.diagState.done=true;S.diagState.verdict=r.message||'体检没跑完,再试一次';S.diagState.exit=null;
   }
   renderDiag();
 }
 /* 出口路由(错误路由总表):凭据→登录页预填结论;任务→拦截终态页;ok→回主页 */
 function diagExit(){
-  const ex=diagState?diagState.exit:null;
+  const ex=S.diagState?S.diagState.exit:null;
   if(ex==='login'){
-    const s=(diagState.steps&&diagState.steps.credential)||{};
+    const s=(S.diagState.steps&&S.diagState.steps.credential)||{};
     openDetail('v-form');
     showLoginErr(s.detail||'凭据有问题,改一下再试',s.reason);
     return}
@@ -1449,8 +1460,8 @@ function diagExit(){
 }
 GG.on('diag:progress',e=>{
   if(!e||!e.key)return;
-  if(!diagState)diagState={steps:{},verdict:null,exit:null,done:false};
-  diagState.steps[e.key]={state:e.state,detail:e.detail};
+  if(!S.diagState)S.diagState={steps:{},verdict:null,exit:null,done:false};
+  S.diagState.steps[e.key]={state:e.state,detail:e.detail};
   if(currentView()==='v-diag')renderDiag();
 });
 /* 自助服务平台:交系统默认浏览器,桂桂本体内不开网页;失败就地报,不弹窗 */
@@ -1464,7 +1475,6 @@ async function openSelfService(btn,failText,origText){
 }
 /* ═══ F3 数据渲染层:硬编码内容 → 契约数据;生成的标记与 PRD 原型逐字节一致 ═══ */
 const SIGNAL_TXT={strong:'信号强',medium:'信号中',weak:'信号弱'};
-let lastNet=null,curCfg=null;
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 /* P0-3(拍板⑤):开门判断全局删除 — 后端 detect 四态保留,前端映射层把 waiting 压平为
    unreachable(视同不可达,唯一落点 v-guide);netText/状态行/首装分流随之两态化(可达/不可达) */
@@ -1499,7 +1509,7 @@ function renderWifiList(box,networks,opts){
     const sig=SIGNAL_TXT[n.signal]||'';
     const sel=opts.pick&&opts.selected===n.ssid;
     /* P1-3:排查页挑网列表里,当前连着的项以「当前 · 连着」标记(信号位让位) */
-    const cur=!opts.pick&&lastNet&&n.ssid===lastNet.ssid;
+    const cur=!opts.pick&&S.lastNet&&n.ssid===S.lastNet.ssid;
     return '<div class="ssid'+(opts.pick?' sel-pick':'')+(sel?' on':'')+'"'+(opts.pick?'':' onclick="pickWifi(this)"')+
       '><span class="n">'+esc(n.ssid)+'</span><span class="q"'+(opts.pick?' data-orig="'+sig+'"':'')+'>'+
       (opts.pick?(sig+(sel?' · 已选':'')):(cur?'当前 · 连着':sig))+'</span></div>';
@@ -1510,9 +1520,8 @@ function renderWifiList(box,networks,opts){
 /* P2-1 表单合一:一套 DOM 三语境,formMode(ctx) 是唯一头部写入点 —
    firstRun(首装已连已登:问候标题+tagline)/ login(登录:登录校园网+lede,只报连通性,
    说认证服务器而不说 SSID — 热点场景 SSID 是噪声)/ save(v-guide ③ 保存配置) */
-let formCtx='login';
 function formMode(ctx){
-  formCtx=ctx;
+  S.formCtx=ctx;
   const h1=$('form-title'),lede=$('form-lede');
   if(ctx==='firstRun'){
     h1.className='g';h1.style.fontSize='';h1.textContent=greetText()+'。';
@@ -1532,9 +1541,9 @@ function formDirty(){return !!($('f-sid').value.trim()||$('f-pwd').value)}
    firstRun 报已连/掉线 danger 如实说,恢复回基线(学号识别 ✓ 由 fillLanding
    异步补,这里不抢)。net:state 停留期间实时刷新(场景:填一半切网) */
 function syncFormStatus(){
-  const net=lastNet||{};
+  const net=S.lastNet||{};
   const bar=$('form-status-bar');
-  if(formCtx!=='firstRun'){
+  if(S.formCtx!=='firstRun'){
     const up=net.state!=='unreachable';
     bar.className='status '+(up?'ok':'danger');
     $('form-status').textContent=NET_TXT[up?'up':'down'](net.server);
@@ -1557,10 +1566,10 @@ async function fillLoginLanding(){
   if(c.ok&&c.data.operator)setOperatorPick(c.data.operator);
 }
 async function fillLanding(){
-  if(mainState==='down'){renderGuide();return}
-  if(formCtx==='firstRun'){
+  if(S.mainState==='down'){renderGuide();return}
+  if(S.formCtx==='firstRun'){
     /* 首装已连已登:状态行报已连,identify(chkstatus)识别学号回填 */
-    const net=lastNet||{};
+    const net=S.lastNet||{};
     $('form-status-bar').className='status ok';
     $('form-status').textContent=(net.ssid||'校园网')+' · 已连上';
     const id=await GG.api.identify();
@@ -1571,7 +1580,7 @@ async function fillLanding(){
   }else{fillLoginLanding()}
 }
 async function renderGuide(){
-  const net=lastNet||{};
+  const net=S.lastNet||{};
   $('guide-server').textContent=NET_TXT.unreach(net.server);
   $('guide-cur').textContent='① 当前连的是「'+(net.ssid||'')+'」,像热点。挑一个校园网:';
   const s=await GG.api.scanWifi();
@@ -1583,9 +1592,9 @@ async function reProbe(btn){
   const p=await GG.api.probe();
   if(btn)setBusy(btn,false);
   if(p.ok){
-    lastNet=normNet(p.data.net);
-    if(p.data.net.state==='logged_in'){mainState='ok';goDaily();return}
-    if(p.data.net.state==='not_logged_in'){mainState='out';openDetail('v-form');return}
+    S.lastNet=normNet(p.data.net);
+    if(p.data.net.state==='logged_in'){S.mainState='ok';goDaily();return}
+    if(p.data.net.state==='not_logged_in'){S.mainState='out';openDetail('v-form');return}
     /* unreachable(waiting 已压平):留在排查页,如实刷新 */
   }
   renderGuide();
@@ -1595,19 +1604,19 @@ async function reProbe(btn){
 async function renderMainData(){
   const [c,l,g,ts]=await Promise.all([GG.api.getConfig(),GG.api.recentResult(),GG.api.logs({days:1}),GG.api.taskStatus()]);
   if(c.ok){
-    curCfg=c.data;
-    if(curCfg.trigger_time&&curCfg.trigger_time!==currentTriggerTime){
-      currentTriggerTime=curCfg.trigger_time;
-      const t=currentTriggerTime.split(':');
+    S.curCfg=c.data;
+    if(S.curCfg.trigger_time&&S.curCfg.trigger_time!==S.currentTriggerTime){
+      S.currentTriggerTime=S.curCfg.trigger_time;
+      const t=S.currentTriggerTime.split(':');
       $('ct-h').value=t[0];$('ct-m').value=t[1];
-      document.querySelectorAll('#time-presets .preset').forEach(x=>x.classList.toggle('on',x.dataset.t===currentTriggerTime));
+      document.querySelectorAll('#time-presets .preset').forEach(x=>x.classList.toggle('on',x.dataset.t===S.currentTriggerTime));
     }
-    setAuto(curCfg.master);
-    document.body.classList.toggle('hide-gui',curCfg.show_gui===false);
-    $('sw-gui').classList.toggle('on',curCfg.show_gui!==false);
+    setAuto(S.curCfg.master);
+    document.body.classList.toggle('hide-gui',S.curCfg.show_gui===false);
+    $('sw-gui').classList.toggle('on',S.curCfg.show_gui!==false);
   }
-  if(ts.ok)taskBlocked=!ts.data.ok;   /* 主页发现任务被拦 → 横幅②(master 关时后端报 ok,不冤枉) */
-  if(lastNet)$('main-net').textContent=netText(lastNet);
+  if(ts.ok)S.taskBlocked=!ts.data.ok;   /* 主页发现任务被拦 → 横幅②(master 关时后端报 ok,不冤枉) */
+  if(S.lastNet)$('main-net').textContent=netText(S.lastNet);
   if(l.ok){$('main-last-t').textContent=l.data.when||'昨晚';$('main-last').textContent=lastText(l.data);
     renderBanners(l.data)}
   /* 主页日志是「钉底最近几条」,全天完整历史在 v-log;不裁剪会把
@@ -1623,42 +1632,41 @@ async function loadLogs(){
 async function loadSettings(){
   const c=await GG.api.getConfig();
   if(!c.ok)return;
-  curCfg=c.data;
-  const t=(curCfg.trigger_time||'07:00').split(':');
-  $('ct-h').value=t[0];$('ct-m').value=t[1];currentTriggerTime=curCfg.trigger_time||'07:00';
-  document.querySelectorAll('#time-presets .preset').forEach(x=>x.classList.toggle('on',x.dataset.t===currentTriggerTime));
-  document.querySelectorAll('#v-settings .sw[data-cfg]').forEach(sw=>sw.classList.toggle('on',!!curCfg[sw.dataset.cfg]));
-  setAuto(!!curCfg.master);
-  $('sw-gui').classList.toggle('on',curCfg.show_gui!==false);
-  $('sw-fallback').classList.toggle('on',!!curCfg.wifi_fallback_enabled);
-  $('fallback-pick').style.display=curCfg.wifi_fallback_enabled?'block':'none';
+  S.curCfg=c.data;
+  const t=(S.curCfg.trigger_time||'07:00').split(':');
+  $('ct-h').value=t[0];$('ct-m').value=t[1];S.currentTriggerTime=S.curCfg.trigger_time||'07:00';
+  document.querySelectorAll('#time-presets .preset').forEach(x=>x.classList.toggle('on',x.dataset.t===S.currentTriggerTime));
+  document.querySelectorAll('#v-settings .sw[data-cfg]').forEach(sw=>sw.classList.toggle('on',!!S.curCfg[sw.dataset.cfg]));
+  setAuto(!!S.curCfg.master);
+  $('sw-gui').classList.toggle('on',S.curCfg.show_gui!==false);
+  $('sw-fallback').classList.toggle('on',!!S.curCfg.wifi_fallback_enabled);
+  $('fallback-pick').style.display=S.curCfg.wifi_fallback_enabled?'block':'none';
   document.querySelectorAll('#v-settings .dd[data-cfg-key]').forEach(dd=>{
-    const v=String(curCfg[dd.dataset.cfgKey]);
+    const v=String(S.curCfg[dd.dataset.cfgKey]);
     dd.querySelectorAll('.dd-menu button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
     const ob=dd.querySelector('.dd-menu button.on');
     dd.querySelector('.dd-label').textContent=ob?ob.textContent.replace('✓','').trim():'';
   });
-  if(curCfg.wifi_fallback_enabled){
+  if(S.curCfg.wifi_fallback_enabled){
     const s=await GG.api.scanWifi();
-    if(s.ok)renderWifiList($('fallback-pick'),s.data.networks,{pick:true,selected:curCfg.wifi_fallback_ssid});
+    if(s.ok)renderWifiList($('fallback-pick'),s.data.networks,{pick:true,selected:S.curCfg.wifi_fallback_ssid});
   }
 }
 function toggleCfg(el){el.classList.toggle('on');GG.api.saveConfig({[el.dataset.cfg]:el.classList.contains('on')})}
 /* 反馈:真通道(契约 §2.15–2.17,1.3.0)— 分类单选 → 发送;诊断自动采集;
    断网入队自动补发(status 行只报状态,零操作);复制文本 = 链路级次动作 */
-let fbKind='problem',fbDraft=null;
 const FB_PH={problem:'说说当时的情况,比如:今早七点没登上,日志说登录被拒',
   suggestion:'想建议什么?比如:希望能导出登录记录'};
 function fbPickKind(k){
-  if(fbKind===k)return;   /* 单选:点当前枚不动作,恒有一枚在选 */
-  fbKind=k;fbSyncKinds();
+  if(S.fbKind===k)return;   /* 单选:点当前枚不动作,恒有一枚在选 */
+  S.fbKind=k;fbSyncKinds();
 }
 function fbSyncKinds(){
-  document.querySelectorAll('#fb-kinds .preset').forEach(b=>b.classList.toggle('on',b.dataset.kind===fbKind));
-  const isProblem=fbKind==='problem';
+  document.querySelectorAll('#fb-kinds .preset').forEach(b=>b.classList.toggle('on',b.dataset.kind===S.fbKind));
+  const isProblem=S.fbKind==='problem';
   $('fb-diag').style.display=isProblem?'block':'none';   /* 纯建议无诊断区,复制对象随之消失 */
   $('fb-copy').style.display=isProblem?'':'none';
-  $('fb-what').placeholder=FB_PH[fbKind];
+  $('fb-what').placeholder=FB_PH[S.fbKind];
   if(isProblem&&!$('fb-diag').dataset.loaded)loadFbDiag();
 }
 async function loadFeedback(){
@@ -1668,7 +1676,7 @@ async function loadFeedback(){
 async function loadFbDiag(){
   const diag=$('fb-diag'),box=$('feedback-text');
   diag.dataset.loaded='1';box.textContent='正在生成…';
-  const r=await GG.api.feedbackDiag({kind:[fbKind]});
+  const r=await GG.api.feedbackDiag({kind:[S.fbKind]});
   if(!r.ok){box.textContent='生成失败:'+r.message;diag.dataset.loaded='';return}
   box.textContent=r.data.text;box.dataset.raw=r.data.text;
   $('fb-uid-line').textContent=r.data.uid_masked?('随附:学号 '+r.data.uid_masked+'(便于找到你)'):'';
@@ -1677,9 +1685,9 @@ async function sendFeedback(btn){
   const what=$('fb-what').value.trim(),contact=$('fb-contact').value.trim(),note=$('fb-note');
   const show=(t,warm)=>{note.textContent=t;note.style.color=warm?'var(--warm)':'var(--ink-2)';note.style.display='block'};
   if(!what)return show('说说具体情况(必填)',true);
-  fbDraft={kind:fbKind,what,contact};   /* 发出前快照(3.7):queued 终态「立刻重发」回填 */
+  S.fbDraft={kind:S.fbKind,what,contact};   /* 发出前快照(3.7):queued 终态「立刻重发」回填 */
   btn.classList.add('busy');btn.disabled=true;
-  const r=await GG.api.feedbackSend({kind:[fbKind],what,contact});
+  const r=await GG.api.feedbackSend({kind:[S.fbKind],what,contact});
   btn.classList.remove('busy');btn.disabled=false;
   if(!r.ok)return show(r.message,true);          /* FB_VALIDATION:表单内提示,不入队 */
   if(r.data.result==='queued'){showFeedbackEnd(false);return}   /* 断网入队 → 沮丧终态页 */
@@ -1692,7 +1700,7 @@ async function sendFeedback(btn){
    queued=bot sad,次级「立刻重发」回反馈页回填草稿 + 主按钮「完成,等待自动补发」 */
 function showFeedbackEnd(sent,id){
   if(sent){
-    fbDraft=null;
+    S.fbDraft=null;
     stageEnter('complete','收到啦,谢谢你','凭据号 '+id+',报问题时说它',null,
       [{label:'完成,回主页',fn:function(){backFrom('v-success')}}],false,false);
     return}
@@ -1703,10 +1711,10 @@ function showFeedbackEnd(sent,id){
 /* queued 终态「立刻重发」:回反馈页并回填草稿(刚填的内容还在) */
 function fbResend(){
   openDetail('v-feedback');
-  if(fbDraft){
-    if(fbDraft.kind&&fbDraft.kind!==fbKind)fbPickKind(fbDraft.kind);
-    $('fb-what').value=fbDraft.what;
-    $('fb-contact').value=fbDraft.contact||'';
+  if(S.fbDraft){
+    if(S.fbDraft.kind&&S.fbDraft.kind!==S.fbKind)fbPickKind(S.fbDraft.kind);
+    $('fb-what').value=S.fbDraft.what;
+    $('fb-contact').value=S.fbDraft.contact||'';
   }
 }
 async function renderFbPending(){
@@ -1716,11 +1724,11 @@ async function renderFbPending(){
   if(r.data.pending>0){el.textContent='有 '+r.data.pending+' 条没发出去的反馈,联网自动补发';el.style.display='block'}
   else{el.style.display='none';
     /* 补发成功:草稿使命完成,清掉 */
-    if(fbDraft){fbDraft=null;$('fb-what').value='';$('fb-contact').value=''}}
+    if(S.fbDraft){S.fbDraft=null;$('fb-what').value='';$('fb-contact').value=''}}
 }
 async function copyFeedback(btn){
   let t=$('feedback-text').dataset.raw||'';
-  if(!t){const r=await GG.api.feedbackDiag({kind:[fbKind]});if(r.ok)t=r.data.text}
+  if(!t){const r=await GG.api.feedbackDiag({kind:[S.fbKind]});if(r.ok)t=r.data.text}
   if(!t)return;
   try{await navigator.clipboard.writeText(t)}
   catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}
@@ -1744,9 +1752,8 @@ function closeWin(){GG.win('close')}
 function initAllBots(){document.querySelectorAll('.bot').forEach(el=>initBot(el))}
 /* 随机 gaze 调度:每 3-6 秒给所有 bot 注入一个随机 (x,y) 方向,持续 1.5s 后撤回,
    配合库自带的 idle 呼吸 + blink,bot 看起来"活的" */
-let gazeHandle=null;
 function startRandomGaze(){
-  if(gazeHandle)return;
+  if(S.gazeHandle)return;
   function tick(){
     const bts=Object.values(bots);
     if(bts.length){
@@ -1755,7 +1762,7 @@ function startRandomGaze(){
       const dir=[x,y];
       bts.forEach(b=>{try{b.setGaze&&b.setGaze(...dir)}catch(e){b.motion&&b.motion.gazeX&&(b.motion.gazeX.target=dir[0],b.motion.gazeY&&(b.motion.gazeY.target=dir[1]))}});
     }
-    gazeHandle=setTimeout(tick,3000+Math.random()*3000);
+    S.gazeHandle=setTimeout(tick,3000+Math.random()*3000);
   }
   tick();
 }
