@@ -1347,7 +1347,9 @@ GG.on('net:state',e=>{
     mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
     $('boot-cap').textContent='网络好了,桂桂来了…';setTimeout(goDaily,900);return}
   if(view==='v-guide'){
-    if(e.state==='not_logged_in'){mainState='out';setTimeout(()=>{openDetail('v-login')},550);return}
+    /* P1-3(白板 vguide→pan1「重检/选WiFi后·重探」):可达后不直跳登录页,
+       先真探一次(可达性重探),由 probe 结果路由 — 与「重新检测」按钮同一漏斗 */
+    if(e.state==='not_logged_in'){mainState='out';setTimeout(()=>reProbe(),550);return}
     if(e.state==='logged_in'){mainState='ok';setTimeout(goDaily,550);return}
     return}   /* 不可达重复推:留在排查页,网态由上次可达信息兜底 */
   if(view==='v-main'){
@@ -1487,8 +1489,11 @@ function renderWifiList(box,networks,opts){
   box.innerHTML=(networks||[]).map(n=>{
     const sig=SIGNAL_TXT[n.signal]||'';
     const sel=opts.pick&&opts.selected===n.ssid;
+    /* P1-3:排查页挑网列表里,当前连着的项以「当前 · 连着」标记(信号位让位) */
+    const cur=!opts.pick&&lastNet&&n.ssid===lastNet.ssid;
     return '<div class="ssid'+(opts.pick?' sel-pick':'')+(sel?' on':'')+'"'+(opts.pick?'':' onclick="pickWifi(this)"')+
-      '><span class="n">'+esc(n.ssid)+'</span><span class="q"'+(opts.pick?' data-orig="'+sig+'"':'')+'>'+sig+(sel?' · 已选':'')+'</span></div>';
+      '><span class="n">'+esc(n.ssid)+'</span><span class="q"'+(opts.pick?' data-orig="'+sig+'"':'')+'>'+
+      (opts.pick?(sig+(sel?' · 已选':'')):(cur?'当前 · 连着':sig))+'</span></div>';
   }).join('');
 }
 /* 学号旁注(契约 1.4.1 引入)已于 1.4.3 撤销 — 用户拍板:这行文字没必要,
