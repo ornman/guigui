@@ -799,6 +799,14 @@ const BOT_PALETTE={
 };
 /* bot 实例映射:每个 .bot 容器对应一个 XiaojiangMotion */
 const bots={};
+/* P1-5:vendor 的 aria-label 是「小匠文档助手」系文案,读屏会泄漏别家品牌 —
+   前端统一覆写为桂桂口吻(vendor 文件不动,setState 后回写) */
+const BOT_ARIA={sleep:'桂桂睡着了',idle:'桂桂在待命',complete:'桂桂很开心',
+  thinking:'桂桂在想事',angry:'桂桂有点急'};
+function botAria(el,state){
+  const a=el.querySelector('svg');
+  if(a)a.setAttribute('aria-label',BOT_ARIA[state]||BOT_ARIA.idle);
+}
 /* 初始化单个 bot */
 function initBot(el,opts){
   const XJ=globalThis.XiaojiangMotion;
@@ -811,9 +819,10 @@ function initBot(el,opts){
     eyes:BOT_PALETTE.eyes,pulse:BOT_PALETTE.pulse
   });
   bots[el.id||Math.random().toString(36).slice(2)]=inst;
+  botAria(el,state);
   return inst;
 }
-function setBotState(el,state){const b=bots[el.id];if(b)b.setState(state)}
+function setBotState(el,state){const b=bots[el.id];if(b)b.setState(state);botAria(el,state)}
 /* 给定 selector 设置所有匹配 bot 的状态(情绪联动) */
 function setAllBots(mood){
   const state=MOOD2STATE[mood];if(!state)return;
@@ -954,7 +963,7 @@ function renderMain(){
     $('main-net').textContent='校园网 · 还没登录';$('main-btn').textContent='再登一次'}
   else{mood(gb,'cry');
     baselineLede('现在够不着校园网,我陪你查查看。');
-    $('main-net').textContent=((lastNet&&lastNet.server)||'10.1.2.3')+' · 连不上';$('main-btn').textContent='去排查'}
+    $('main-net').textContent=NET_TXT.down(lastNet&&lastNet.server);$('main-btn').textContent='去排查'}
 }
 function wakeProblem(kind){mainState=kind;goDaily()}
 /* 自动登录总开关:主页与设置页双向同步,关=桂桂睡觉(状态由开关自己表达,文字只讲服务) */
@@ -1475,7 +1484,16 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 /* P0-3(拍板⑤):开门判断全局删除 — 后端 detect 四态保留,前端映射层把 waiting 压平为
    unreachable(视同不可达,唯一落点 v-guide);netText/状态行/首装分流随之两态化(可达/不可达) */
 function normNet(n){return n&&n.state==='waiting'?Object.assign({},n,{state:'unreachable'}):n}
-function netText(n){return n&&n.state==='logged_in'?('已连上 '+n.ssid+' ✓'):(n&&n.state==='not_logged_in'?((n.ssid||'校园网')+' · 还没登录'):(((n&&n.server)||'10.1.2.3')+' · 连不上'))}
+/* P1-5 可达性文案包:主页网络行 / 表单状态行 / 排查页服务器行共用同一口径,
+   改文案只动这一处(两态化:P0-3 后只有可达/不可达两族) */
+const NET_TXT={
+  ok:ssid=>'已连上 '+(ssid||'校园网')+' ✓',
+  nolog:ssid=>(ssid||'校园网')+' · 还没登录',
+  up:server=>(server||'10.1.2.3')+' · 已连通',
+  down:server=>(server||'10.1.2.3')+' · 连不上',
+  unreach:server=>(server||'10.1.2.3')+' · 不可达'
+};
+function netText(n){return n&&n.state==='logged_in'?NET_TXT.ok(n.ssid):(n&&n.state==='not_logged_in'?NET_TXT.nolog(n.ssid):NET_TXT.down(n&&n.server))}
 function lastText(r){
   if(!r||r.outcome==='none')return '还没有记录';
   if(r.outcome==='silent')return '假期静默,没打扰你';
@@ -1509,7 +1527,7 @@ function syncLoginStatusLine(){
   const up=net.state!=='unreachable';
   const bar=$('login-status').parentElement;
   bar.className='status '+(up?'ok':'danger');
-  $('login-status').textContent=(net.server||'10.1.2.3')+(up?' · 已连通':' · 连不上');
+  $('login-status').textContent=NET_TXT[up?'up':'down'](net.server);
 }
 /* 首装页状态行:掉线(不可达)转 danger 如实说;恢复时回基线文案
    (学号识别 ✓ 由 fillLanding 异步补,这里不抢) */
@@ -1518,7 +1536,7 @@ function syncOkStatusLine(){
   const bar=$('ok-status').parentElement;
   if(net.state==='unreachable'){
     bar.className='status danger';
-    $('ok-status').textContent=(net.server||'10.1.2.3')+' · 连不上'}
+    $('ok-status').textContent=NET_TXT.down(net.server)}
   else if(bar.classList.contains('danger')){
     bar.className='status ok';
     $('ok-status').textContent=(net.ssid||'校园网')+' · 已连上'}
@@ -1549,7 +1567,7 @@ async function fillLanding(){
 }
 async function renderGuide(){
   const net=lastNet||{};
-  $('guide-server').textContent=(net.server||'10.1.2.3')+' · 不可达';
+  $('guide-server').textContent=NET_TXT.unreach(net.server);
   $('guide-cur').textContent='① 当前连的是「'+(net.ssid||'')+'」,像热点。挑一个校园网:';
   const s=await GG.api.scanWifi();
   if(s.ok)renderWifiList($('guide-wifi'),s.data.networks);
