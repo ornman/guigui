@@ -1110,7 +1110,10 @@ async function quickLogin(){
 }
 /* 流程动作 */
 /* 终态舞台(3.4/3.7):成功三态(彩带/保存配置/拦截)+ 反馈两态共用同一舞台;
-   完成是全有或全无 — 彩带只给 verified && task_ok,客观验不了的诚实叫「保存配置」 */
+   完成是全有或全无 — 彩带只给 verified && task_ok,客观验不了的诚实叫「保存配置」
+   P1-16 成功页矩阵定稿:彩带=用户在场的验证通过(首装链/日常改密,submitLadder
+   唯一入口);明早无人值守成功不弹彩带(通知+日常页状态,net:state 只重渲主页)/
+   okpg2=配置模式建成,不可达语境返回落 v-guide(白板唯一出边,按当前状态) */
 function showSuccess(verifiedTrue,reason,taskOk){
   S.successState={verified:verifiedTrue===true,reason:reason||null,taskOk:taskOk!==false,taskFixed:false};
   renderSuccess();
@@ -1160,13 +1163,23 @@ function renderSuccess(){
        {label:'先不管,回主页',quiet:true,fn:function(){backFrom('v-success')}}],false,false);
     return}
   if(!st.verified){
-    /* 保存配置页(不撒彩带,bot idle 呼吸):客观无法当场验证就不冒充成功,按存入原因说人话;
-       P0-7(v2):「连上后自动登录」承诺下线 — 网恢复调起状态页递快登按钮,一键才登 */
-    const lede=st.reason==='unreachable'?'连上后一键就登,桂桂把按钮递到手边。'
+    /* 保存配置页 okpg2(不撒彩带,bot idle 呼吸):客观无法当场验证就不冒充成功,按存入原因说人话;
+       P0-7(v2):「连上后自动登录」承诺下线 — 网恢复调起状态页递快登按钮,一键才登;
+       P1-16:不可达语境(配置模式)标题带时间锚(H 拟稿,triggerPrefix 动态),唯一出口=
+       回排查页(白板 okpg2→vguide「返回(当前不可达)」,openDetail 记来路可回本页;
+       高级设置出口仅彩带页有,这里对齐白板收掉)— 网已恢复的兜底回主页(理论上
+       早就被 P0-7 调起状态页带走了,这是防御分支) */
+    const unreachable=st.reason==='unreachable';
+    const lede=unreachable?'连上后一键就登,桂桂把按钮递到手边。'
       :(st.reason==='before_open'?'时间还没到,桂桂先把密码收好,到点自动验证。'
       :triggerPrefix()+'第一次自动登录会真验证,万一不对桂桂会提醒你。');
-    stageEnter('idle',st.reason==='unreachable'?'配置保存成功!':'配置已保存。',lede,
-      st.taskFixed?'定时任务已修好 ✓':null,[done],true,false);
+    const leave=unreachable
+      ?{label:'回排查页',fn:function(){
+          if((S.lastNet||{}).state==='unreachable')openDetail('v-guide');
+          else backFrom('v-success')}}
+      :done;
+    stageEnter('idle',unreachable?'保存配置成功,'+triggerPrefix()+' '+S.currentTriggerTime+' 见。':'配置已保存。',lede,
+      st.taskFixed?'定时任务已修好 ✓':null,[leave],!unreachable,false);
     return}
   /* 彩带页:真验证通过 + 任务在岗,才配庆祝 */
   stageEnter('complete','以后每天都会自动帮你登好。',triggerPrefix()+' '+S.currentTriggerTime+' 开始。现在关掉就行。','到点就登,你不用管。',
@@ -1330,11 +1343,16 @@ async function submitLadder(){
       const n=$('form-note');n.textContent=r.message||'登录太频繁,稍后再试';n.style.display='flex';return}
     showLoginErr(r.message||'密码被服务器拒绝了,核对一下再试',r.reason);return}
   if(r.code==='NET_UNREACHABLE'){
-    /* 提交了密码的断网:后端已存(未验证)+任务就位 →「保存配置」终态页(不撒彩带,
-       回主页 down 态引导排查,横幅①引导补验);没提交密码只跳排查页。
-       mainState 一并记 down,返回主页如实渲染 */
+    /* 提交了密码的断网:后端已存(未验证)→ 配置模式自成一路(P1-17 任务①):
+       存凭据+建任务后,建成与否决定 okpg2/拦截页 — NET_UNREACHABLE 信封不带
+       task_ok(契约 1.5.0 本轮不动),补一次只读 taskStatus(秒回,启动静默体检
+       同款)分流;查询本身失败不冤枉人,按建成放行(横幅②兜底)。
+       没提交密码只跳排查页。mainState 一并记 down,返回主页如实渲染 */
     S.mainState='down';
-    if(pwd){S.configured=true;S.hasPwd=true;showSuccess(false,'unreachable',true)}
+    if(pwd){
+      S.configured=true;S.hasPwd=true;
+      const ts=await GG.api.taskStatus();
+      showSuccess(false,'unreachable',!(ts.ok&&ts.data&&ts.data.ok===false))}
     else openDetail('v-guide');
     return}
   /* INTERNAL / BRIDGE_MISSING 等:就地报后端原话,不静默(按钮恢复却什么都不说=黑洞) */

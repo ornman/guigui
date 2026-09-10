@@ -33,7 +33,9 @@
                 同样真登被拒 → exit=login(文案与 rejected 场景逐字一致)
 
    dev 驱动钩子(摆拍/联调):_setNet(state,ssid) 真改网态源;_setRej(reason) 强改
-   「已存凭据登录」的拒绝 reason(P1-12 状态页快登五态摆拍;null=关,恢复按场景) */
+   「已存凭据登录」的拒绝 reason(P1-12 状态页快登五态摆拍;null=关,恢复按场景);
+   _setTaskOk(ok) 强改任务在岗位(P1-17 任务①:断网存配置的拦截分流摆拍);
+   _runMorningTask('ok'|'fail') 模拟明早任务真跑(P1-17 任务②三结局摆拍) */
 (function(){
 'use strict';
 const LS_SCENE='gg-mock-scene',LS_CFG='gg-mock-cfg';
@@ -358,6 +360,35 @@ window.GGMock={
     /* dev 驱动钩子(P1-12):强改已存凭据登录的拒绝 reason(五态摆拍);null/空=关 */
     forcedRej=reason||null;
     return OK({forced:forcedRej});
+  },
+  async _setTaskOk(ok){
+    /* dev 驱动钩子(P1-17 任务①):强改任务在岗位 — 断网存配置后 submitLadder
+       补询 taskStatus 的分流摆拍(false=杀软拦了建成失败 → 拦截页;不还原,
+       需要复位就传 true 或重载场景) */
+    S.taskOk=!!ok;
+    return OK({taskOk:S.taskOk});
+  },
+  async _runMorningTask(outcome){
+    /* dev 驱动钩子(P1-17 任务②):模拟明早 07:00 定时任务真跑一次(GUI 在场视角),
+       按 FileWatcher 翻译口径推事件(log:appended 先到、net:state 后到)—
+       'ok'=登上(verified 翻真;GUI 不弹彩带,只日志+主页状态,彩带规则见 P1-16)/
+       'fail'=重试穷尽没登上(任务仍在岗不进拦截页;网态翻 not_logged_in 走
+       ROUTE 调起状态页·蓝变红递快登,横幅①按 verified 自洽;通知由后端发) */
+    const t='07:00:'+String(11+Math.floor(Math.random()*78)).padStart(2,'0');
+    if(outcome==='ok'){
+      S.verified=true;S.net.state='logged_in';
+      S.last={when:'今早',time:'07:00',tries:1,outcome:'ok'};
+      const e={ts:t,level:'ok',text:'已登录 · '+UID_MASK};
+      S.logs[0].entries.push(e);emit('log:appended',{day_label:'今天',entry:e});
+      netEmit();
+      return OK({ran:'ok'});
+    }
+    S.net.state='not_logged_in';
+    S.last={when:'今早',time:'07:00',tries:3,outcome:'fail'};
+    const e={ts:t,level:'fail',text:'登录被拒:密码不对,改一下再试'};
+    S.logs[0].entries.push(e);emit('log:appended',{day_label:'今天',entry:e});
+    netEmit();
+    return OK({ran:'fail'});
   },
   async openSelfService(){window.open('https://bcs.guat.edu.cn/Cas/Login?appid=71999680','_blank')}
 };

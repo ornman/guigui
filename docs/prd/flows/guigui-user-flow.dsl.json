@@ -887,7 +887,7 @@
       {
        "type": "rect",
        "id": "v1",
-       "text": "任务① 建成?+通知",
+       "text": "任务① 建成?+通知(断网存配置后前端补询 taskStatus 分流拦截页/okpg2·P1-17已落)",
        "width": 145,
        "height": 52,
        "fillColor": "#DBEAFE",
@@ -913,7 +913,7 @@
       {
        "type": "rect",
        "id": "vok",
-       "text": "🔔任务完成·删任务(成功通知·默认开)",
+       "text": "🔔任务完成·删任务(成功通知·默认开;GUI 不弹彩带=通知+日常页,P1-16已落)",
        "width": 140,
        "height": 44,
        "fillColor": "#DCFCE7",
@@ -926,7 +926,7 @@
       {
        "type": "rect",
        "id": "vfail",
-       "text": "🔔任务登录失败(带原因·含连不上)",
+       "text": "🔔任务登录失败(带原因·含连不上;不进拦截页·五态分流归状态页/横幅,P1-17已落)",
        "width": 130,
        "height": 44,
        "fillColor": "#FEE2E2",

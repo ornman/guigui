@@ -242,11 +242,19 @@ const PANELS=[
   {label:'save · v-guide ③ 路径(按钮=保存配置)',scene:'down',setup:W=>W.openDetail('v-form')},
   {label:'断网 · 已键入留页(A3,状态行 danger)',scene:'out',setup:W=>{E(W,'f-sid').value='2025000000001';W.GGMock._setNet('unreachable','iphone17 pro max')}},
 ]},
-{view:'v-success',name:'终态页(彩带 / 保存配置 / 拦截)',frames:[
-  {label:'彩带(真验证 + 任务在岗)',scene:'daily',setup:W=>W.showSuccess(true,null,true)},
-  {label:'保存配置 · 不可达存入',scene:'daily',setup:W=>W.showSuccess(false,'unreachable',true)},
-  {label:'保存配置 · 锚前(06:50 前)',scene:'daily',setup:W=>W.showSuccess(false,'before_open',true)},
-  {label:'保存配置 · 降级存入',scene:'daily',setup:W=>W.showSuccess(false,null,true)},
+{view:'v-success',name:'终态页(P1-16 两成功页矩阵:彩带 okpg / 保存配置 okpg2 / 拦截)',frames:[
+  {label:'彩带 okpg(在场验证通过 · 双出口)',scene:'daily',setup:W=>W.showSuccess(true,null,true)},
+  {label:'okpg2 · 配置模式建成(时间锚+回排查页)',scene:'down',setup:W=>W.showSuccess(false,'unreachable',true)},
+  {label:'okpg2 · 锚前(06:50 前)',scene:'daily',setup:W=>W.showSuccess(false,'before_open',true)},
+  {label:'okpg2 · 降级存入',scene:'daily',setup:W=>W.showSuccess(false,null,true)},
+  {label:'拦截页 · 任务①建成失败(P1-17 断网存配置复询)',scene:'down',setup:W=>W.showSuccess(false,'unreachable',false)},
+  {label:'okpg2 · 重建放行(任务已修好 ✓)',scene:'down',setup:W=>{(async()=>{
+    /* 真路径摆拍:拦截姿态 → rebuildFromSuccess 走 mock 重建(600ms)→ okpg2+修好注记 */
+    W.GGMock._setTaskOk(false);W.showSuccess(false,'unreachable',false);
+    await new Promise(r=>setTimeout(r,400));
+    const b=W.document.querySelector('#success-actions .btn');
+    if(b)W.rebuildFromSuccess(b);
+  })()}},
   {label:'拦截页(双出口:重建/先不管 · bot sad)',scene:'daily',setup:W=>W.showSuccess(true,null,false)},
   {label:'拦截页 · 重建失败(再试一次)',scene:'daily',setup:W=>{W.showSuccess(true,null,false);
     const b=Q(W,'#success-actions .btn');if(b)b.textContent='没建成,再试一次'}},
@@ -400,8 +408,8 @@ const STORIES=[
   {t:'落地 v-form',d:'可达+没登录,正常填表。',scene:'out'},
   {t:'用户切网',d:'亲手:点右下网络切换器「不可达(热点)」→ 表单空着时断网,直接跳排查页(2026-09-08 路由统一,原先只刷状态行;表单数据保留,回来还在);已键入的豁免见 S5b(A3 拍板④)。',scene:'out',free:'点「网络状态切换器」里的「不可达(热点)」'},
   {t:'③ 先保存配置',d:'亲手:点排查页 ③「先保存配置,连上后桂桂自动登录」→ 回到登录页,表单还在,提交按钮变成「保存配置」。',scene:'out',free:'点 ③ 回登录页,看按钮文案'},
-  {t:'提交 → 保存配置终态',d:'亲手:填上密码点「保存配置」→ 不可达但后端已把密码存了 → 保存配置终态页「配置保存成功!连上校园网后自动执行登录」,不撒彩带。',scene:'out',free:'填个密码点「保存配置」'},
-  {t:'回主页看状态',d:'亲手:点「完成,回主页」→ 主页两态·带横幅(P1-13):标题恒问候语,「网络」行如实「10.1.2.3 · 连不上」,横幅①「密码还没验证过,去改一下」在场;再用切换器推「未登录(可达)」→ 系统调起状态页(网恢复 P0-7)。',scene:'out',free:'回主页后点「未登录(可达)」'},
+  {t:'提交 → 保存配置终态',d:'亲手:填上密码点「保存配置」→ 不可达但后端已把密码存了 → okpg2 保存配置成功页(P1-16:标题「保存配置成功,今天/明早 HH:MM 见」时间动态,不撒彩带,唯一出口「回排查页」)。mock 已对齐后端:断网提交的密码真的入库(存未验证)。',scene:'out',free:'填个密码点「保存配置」'},
+  {t:'回排查页 / 网恢复',d:'亲手:点「回排查页」→ 回排查页继续等网(P1-16 okpg2 唯一出边,白板口径);此时点右下「未登录(可达)」→ reProbe 重探 → 已配置 → 调起状态页(网恢复 P0-7)。不点返回、直接在保存页推网恢复也一样(保存页在 ROUTE 调起视图清单里)。',scene:'out',free:'回排查页后点「未登录(可达)」'},
 ]},
 {t:'S5b 填表中断网(A3 豁免)',s:'已键入不拽人,状态行就地转红',steps:[
   {t:'落地 v-form 填入学号',d:'可达+没登录,正常填表 — 学号(或密码)任一非空即 formDirty(P2-2 起 ROUTE 表的豁免维度)。',scene:'out',setup:W=>{E(W,'f-sid').value='2025000000001'}},
@@ -454,10 +462,23 @@ const STORIES=[
 ]},
 {t:'S10 网恢复调起状态页',s:'P0-7+P1-14:断网存配置 → 网恢复 → 调起 + 未验证库自动验证',steps:[
   {t:'首装断网 · 排查页',d:'down 底座:开机落 v-guide(未配置走旧路,P0-7 不动首装);③ 文案已改「先保存配置,连上后一键就登」(自动登录承诺下线)。',scene:'down'},
-  {t:'③ 保存配置',d:'亲手:点 ③ → 登录页(save 语境)填学号密码点「保存配置」→ 保存配置终态页(新文案:连上后一键就登,桂桂把按钮递到手边)。mock 已对齐后端:断网提交的密码真的入库(存未验证)。',scene:'down',free:'走 ③ 存配置,提交后到保存页'},
-  {t:'网恢复 → 系统调起',d:'亲手:点右下「未登录(可达)」→ P0-7 核心:保存页收到 not_logged_in,系统调起大头状态页(蓝变红),不再静默、不再拽空密码表单(D1/D1b 两病灶的 v2 修法)。',scene:'down',free:'点「未登录(可达)」看调起'},
+  {t:'③ 保存配置',d:'亲手:点 ③ → 登录页(save 语境)填学号密码点「保存配置」→ okpg2 保存配置成功页(P1-16 定稿:标题「保存配置成功,今天/明早 HH:MM 见」时间动态 + 「连上后一键就登,桂桂把按钮递到手边」,唯一出口「回排查页」)。mock 已对齐后端:断网提交的密码真的入库(存未验证)。',scene:'down',free:'走 ③ 存配置,提交后到保存页'},
+  {t:'回排查页继续等(P1-16 出边)',d:'亲手:点「回排查页」→ 回排查页按当前状态渲染(挑网/重检都在);首装单行道此页无返回键(日常语境经此返回可 ‹ 回保存页)。从这里或保存页推网恢复都走同一条调起路。',scene:'down',free:'点「回排查页」试试'},
+  {t:'网恢复 → 系统调起',d:'亲手:点右下「未登录(可达)」→ P0-7 核心:保存页/排查页收到 not_logged_in,系统调起大头状态页(蓝变红),不再静默、不再拽空密码表单(D1/D1b 两病灶的 v2 修法)。',scene:'down',free:'点「未登录(可达)」看调起'},
   {t:'vt2 自动验证 → 全部正常(P1-14)',d:'存配置后库未验证 → 网恢复不但调起状态页,还自动跑 🔑 检验(拍板⑫:唯一保留的自动验证动作;与快登/进入检测同一实现):约 1.5 秒真登成功 → 自动回日常页·全部正常,横幅⑧随消、横幅①随 verified 翻转消失。想手动点「快速登录」的看 S9(已验证库不自动)。',scene:'down',free:'调起后别动,等约 2 秒看自动回日常'},
   {t:'调起去重(不骚扰)+ 探测常驻',d:'再验:切「不可达(热点)」→ 状态页·等网;「带横幅回日常」后等 10 秒 — 探测仍在跑(预览 iframe 控制台看 S.probeCount 在涨),同一问题不再二次调起,横幅⑧在场;库已验证,网恢复也不会再自动登录(P1-14 触发条件演示)。',scene:'down',free:'回日常等 10 秒,确认没有第二次弹窗'},
+]},
+{t:'S11 任务①②生命周期',s:'P1-17:建成?+通知 / 明早登上网?三结局',steps:[
+  {t:'任务①:建成失败 → 拦截页',d:'底座已把任务拦下(上一步 mock._setTaskOk(false),模拟杀软):亲手走 ③「先保存配置」→ 填学号密码点「保存配置」— 存凭据+建任务后任务①没建成 → 拦截页(okpg2 不出场)。口径:登录失败不进拦截页,建成失败要进;断网语境信封不带 task_ok,提交后补一次只读 taskStatus 分流。',scene:'down',setup:W=>W.GGMock._setTaskOk(false),free:'走 ③ 存配置提交,看拦截页'},
+  {t:'加白重建 → okpg2 放行',d:'亲手:点「重建定时任务」(mock 模拟加白后一次建成)→ 重渲为保存配置成功页 + 「定时任务已修好 ✓」,唯一出口「回排查页」— 白板:拦截 → 加白重建成功 → 回任务链 → okpg2。',scene:'down',setup:W=>{(async()=>{
+    /* 直接进入本步也要有拦截姿态:pose 后真跑 rebuildFromSuccess(600ms)→ okpg2+修好 */
+    W.GGMock._setTaskOk(false);W.showSuccess(false,'unreachable',false);
+    await new Promise(r=>setTimeout(r,400));
+    const b=W.document.querySelector('#success-actions .btn');
+    if(b)W.rebuildFromSuccess(b);
+  })()},free:'点「重建定时任务」'},
+  {t:'任务②:明早登录失败(GUI 在场)',d:'切日常底座,mock 模拟明早 07:00 任务真跑、重试穷尽没登上:日志落「登录被拒」行,网态翻未登录 → 系统调起状态页·蓝变红递快登(🅛 五态分流复用,拍板B);任务仍在岗 — 不进拦截页、横幅②不亮(亲手点「带横幅回日常」看:只有横幅⑧,最近结果行如实「没能登上」)。',scene:'daily',setup:W=>W.GGMock._runMorningTask('fail'),free:'点「带横幅回日常」看横幅与最近结果'},
+  {t:'任务②:明早登上(GUI 不弹彩带)',d:'mock 模拟明早任务一次登好:P1-16 彩带规则 — 彩带只属于用户在场的验证通过(首装/日常改密),无人值守成功 = 后端通知 + 日常页状态刷新,页面停在主页;状态页在页则自动收场回日常。',scene:'daily',setup:W=>W.GGMock._runMorningTask('ok')},
 ]},
 ];
 
