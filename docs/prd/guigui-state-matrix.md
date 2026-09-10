@@ -15,7 +15,7 @@
 | `logged_in` | 已认证在线 | `ok` | 问候语。 |
 | `not_logged_in` | 服务器可达、未认证 | `out` | 呜,刚才掉线了。 |
 | `unreachable` | 认证服务器够不着 | `down` | 现在连不上校园网。 |
-| `waiting` | 网络栈未就绪(刚开机/WiFi 在连) | (bootWait 等门,不进主页) | — |
+| `waiting` | 网络栈未就绪(刚开机/WiFi 在连) | `down`(P0-3 起前端映射层压平 waiting≡unreachable,唯一落点 v-guide) | 现在连不上校园网。 |
 
 ### 登录结果(login 信封,契约 §2.3;前端落点 = 2026-09-08 终态收敛后)
 
@@ -26,7 +26,7 @@
 | `success` + verified + task_ok | 真验证通过且任务在岗 | 彩带终态页(四行文案 + 彩带三波) |
 | `success` + verified + task_ok=false | 登上了但定时任务被拦 | 拦截终态页(只留「重建定时任务」;rebuild ok+verified 才重渲为彩带放行) |
 | `already` | 已在线(线上是本人) | verified=true → 彩带;verified=false → 保存配置终态(降级存入文案) |
-| `stored` / reason=before_open | 06:50 前被拒,不判密码错,存未验证 | 保存配置终态页(锚前文案);主页重登返 stored → lede 如实「还没开门,密码先存着」,不撒花 |
+| `stored` / reason=before_open | 06:50 前被拒,不判密码错,存未验证 | 保存配置终态页(锚前文案);主页重登返 stored → lede 如实「时间还没到,密码先存着」,不撒花(P0-3 开门文案已下线) |
 | `AUTH_REJECTED` reason=`wrong_password` | 密码不对,不存 | 表单页统一警告块(B 基准:与密码空同一组件同一位置) |
 | `AUTH_REJECTED` reason=`wrong_account` | 学号/运营商选错 | 同上(identify 误抓室友学号的自纠出口) |
 | `AUTH_REJECTED` reason=`bound` | 密码对但绑定被拦 | 同上,「自助服务平台」六字内联可点 |
@@ -50,7 +50,7 @@
 
 | 视图 | 状态 |
 |---|---|
-| v-boot | 仪式检查中(sleep)/ 等门 bootWait(waiting)/ BRIDGE_MISSING;仪式期间静默任务体检(configured 时并行,只读秒回、2s 超时保护,用户无感) |
+| v-boot | 仪式检查中(sleep)/ BRIDGE_MISSING(bootWait 等门页已随 P0-3 删,waiting 落点同 unreachable);仪式期间静默任务体检(configured 时并行,只读秒回、2s 超时保护,用户无感) |
 | v-form(2026-09-10 P2-1 合一,原 v-ok + v-login 并为一张 DOM) | **一套表单三语境**,由 `formMode(ctx)` 派生头部/按钮/状态行:**firstRun**(首装已连已登:问候标题+tagline+「开启每日自动登录」,密码必填,提交先落触发时间)/ **login**(未登录落地 / 改密 / 验证器结论预填:「登录校园网。」+「立即登录」)/ **save**(v-guide ③ 路径,按钮=「保存配置」,空密码可提交);共用状态:firstRun 学号已识别 / 验证中 busy / 注销告知 / 密码空警告(仅 firstRun)/ 被拒五态(wrong_password / wrong_account / bound / limit_users / throttled)/ 场景4 注销后失败两变体(网先断着 / 已接回);换学号确认框已删(密码迁移静默,验证不过当场自纠);提交走同一条 `submitLadder()`;停留断网 → 直跳 v-guide(表单数据保留);返回键=来路栈(首装期 body.setup 由 CSS 隐藏) |
 | v-diag(2026-09-08 新,契约 1.5.0) | 进入即自动开跑(不用点开始) / 跑步中(diag:progress 逐拍上屏,running 脉冲) / 全绿 exit=ok / 凭据败 exit=login / 任务败 exit=task_blocked / 程序败 exit=app_fault(就地说明,无出口按钮) / net_down;页底固定小出口「排查也没解决?说给桂桂听 →」 |
 | v-success | 终态三 + 反馈二(共用舞台):彩带(verified && task_ok) / 保存配置(不可达存入 · 锚前 · 降级三文案,bot idle 呼吸不撒彩带) / 拦截页(只留「重建定时任务」,bot sad 思考脸;重建失败变「没建成,再试一次」);反馈收到(工单号在文案行,按钮不带编号) / 没发出去(bot sad;立刻重发=草稿回填 + 完成等待自动补发) |
@@ -64,7 +64,7 @@
 
 | 当前视图 | unreachable | logged_in | not_logged_in |
 |---|---|---|---|
-| v-boot(configured) | 仪式后跳 v-guide(不再落主页 down;返回后主页 down 态保留) | 门开:mainState=ok → goDaily(waiting 门开按实际网态,不预写假绿) | 门开:mainState=out → goDaily |
+| v-boot(configured) | 仪式后跳 v-guide(不再落主页 down;返回后主页 down 态保留) | mainState=ok → goDaily | mainState=out → goDaily |
 | v-guide | 留在排查页(它正是落点) | 自动回主页 ok | 自动跳 v-form(login) |
 | v-main | down 态重渲(「去排查」按钮;主页有自己的四态,不自动跳) | ok 重渲 | out 重渲 |
 | v-form(2026-09-10 P2-1 合一) | **直跳 v-guide**(表单数据保留,回来还在;原先只刷状态行,2026-09-08 撤) | 状态行实时刷新 + mainState 记对(返回主页不混搭) | 同左 |
