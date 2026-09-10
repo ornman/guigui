@@ -286,6 +286,11 @@
      ],
      [
       "probe5",
+      "beret",
+      "通但异常"
+     ],
+     [
+      "probe5",
       "noway",
       "还不通"
      ],
@@ -435,6 +440,16 @@
       "改时间保存"
      ],
      [
+      "timeedit",
+      "chain",
+      ""
+     ],
+     [
+      "fine",
+      "probe5",
+      "5s探测能否连上"
+     ],
+     [
       "probe5",
       "probe5b",
       "通了"
@@ -468,41 +483,6 @@
       "fb2",
       "dailypg",
       "返回"
-     ],
-     [
-      "vsrc",
-      "vdo",
-      "存根输入"
-     ],
-     [
-      "vt1",
-      "vdo",
-      "明早到点"
-     ],
-     [
-      "vt2",
-      "vdo",
-      "网恢复·拟"
-     ],
-     [
-      "vdo",
-      "vdb",
-      "成功·验证通过"
-     ],
-     [
-      "vdo",
-      "vb1",
-      "失败·提醒"
-     ],
-     [
-      "intercept2",
-      "fb2",
-      "重建3次失败"
-     ],
-     [
-      "timeedit",
-      "dailypg",
-      "对齐完成"
      ]
     ]
    },
@@ -924,84 +904,6 @@
        "borderRadius": 10,
        "fontSize": 13,
        "textColor": "#1F2937"
-      },
-      {
-       "type": "rect",
-       "id": "vsrc",
-       "text": "未验证库存根(上接主图)",
-       "width": 170,
-       "height": 48,
-       "fillColor": "#F0FDF4",
-       "borderColor": "#22C55E",
-       "borderWidth": 2,
-       "borderRadius": 10,
-       "fontSize": 12,
-       "textColor": "#1F2937"
-      },
-      {
-       "type": "diamond",
-       "id": "vdo",
-       "text": "真登验证",
-       "width": 150,
-       "height": 88,
-       "fillColor": "#FEF3C7",
-       "borderColor": "#D97706",
-       "borderWidth": 2,
-       "fontSize": 13,
-       "textColor": "#92400E"
-      },
-      {
-       "type": "rect",
-       "id": "vt1",
-       "text": "明早07:00 定时任务首试",
-       "width": 180,
-       "height": 48,
-       "fillColor": "#DBEAFE",
-       "borderColor": "#2563EB",
-       "borderWidth": 2,
-       "borderRadius": 10,
-       "fontSize": 12,
-       "textColor": "#1F2937"
-      },
-      {
-       "type": "rect",
-       "id": "vt2",
-       "text": "网恢复自动验证(P0-7拟)·登录态探测[有问题]触发",
-       "width": 200,
-       "height": 56,
-       "fillColor": "#DBEAFE",
-       "borderColor": "#2563EB",
-       "borderWidth": 2,
-       "borderRadius": 10,
-       "fontSize": 12,
-       "textColor": "#1F2937",
-       "borderDash": "dashed"
-      },
-      {
-       "type": "rect",
-       "id": "vdb",
-       "text": "凭证库✓(=主图凭证库)",
-       "width": 170,
-       "height": 48,
-       "fillColor": "#F0FDF4",
-       "borderColor": "#22C55E",
-       "borderWidth": 2,
-       "borderRadius": 10,
-       "fontSize": 12,
-       "textColor": "#1F2937"
-      },
-      {
-       "type": "rect",
-       "id": "vb1",
-       "text": "横幅①·密码还没验证过,去改一下(挂主页)",
-       "width": 210,
-       "height": 48,
-       "fillColor": "#FEE2E2",
-       "borderColor": "#DC2626",
-       "borderWidth": 2,
-       "borderRadius": 10,
-       "fontSize": 12,
-       "textColor": "#1F2937"
       }
      ]
     },
@@ -1075,7 +977,7 @@
       {
        "type": "rect",
        "id": "bigB",
-       "text": "#大头状态页 蓝变红·网在,登录态丢了(⑧)",
+       "text": "#大头状态页 蓝变红·网络断开(⑧)",
        "width": 180,
        "height": 56,
        "fillColor": "#EFE9FC",
@@ -1347,7 +1249,7 @@
       {
        "type": "rect",
        "id": "timeedit",
-       "text": "改时间→静默对齐定时任务(不触发登录)",
+       "text": "改时间→自动走链路",
        "width": 150,
        "height": 44,
        "fillColor": "#DBEAFE",
