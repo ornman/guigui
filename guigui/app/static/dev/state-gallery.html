@@ -274,36 +274,54 @@ const PANELS=[
   {label:'表单页断网自动跳来(场景5)',scene:'out',setup:W=>W.GGMock._setNet('unreachable','iphone17 pro max')},
 ]},
 {view:'v-main',name:'日常主页',frames:[
-  {label:'一切正常',scene:'daily',setup:W=>{}},
+  {label:'两态① 全部正常(无横幅)',scene:'daily',setup:W=>{}},
   {label:'总开关关(桂桂睡觉)',scene:'daily',setup:W=>W.setAuto(false)},
-  {label:'掉线(out · 再登一次)',scene:'daily',setup:W=>W.wakeProblem('out')},
-  {label:'不可达(down · 去排查)',scene:'daily',setup:W=>W.wakeProblem('down')},
   {label:'横幅① 密码还没验证过(未验证+今早失败)',scene:'unverified',setup:W=>{}},
+  {label:'两态② 带横幅 · ①+⑧并存(断网未解 · 事实在网络行)',scene:'unverified',setup:W=>{(async()=>{
+    /* P1-13 两态:断网 → 系统调起状态页 → 带横幅回日常;标题恒问候语,
+       网络行如实「连不上」,横幅⑧在等 + 横幅①未验证同屏(放在纯①帧后,同场景复用) */
+    await W.GGMock._setNet('unreachable','iphone17 pro max');
+    setTimeout(()=>W.backFrom('v-status'),450);
+  })()}},
   {label:'横幅② 自动登录还没生效',scene:'daily',setup:W=>W.setTaskBlocked(true)},
   {label:'横幅② 重建失败(再试一次)',scene:'daily',setup:W=>{W.setTaskBlocked(true);
-    const b=Q(W,'#main-banners .banner span');if(b)b.textContent='没建成,再试一次'}},
+    /* setTaskBlocked 的刷横幅是异步(recentResult ~50ms 后 innerHTML 重写),
+       文案改写须等重渲落定再落笔,否则被覆盖回原文案 */
+    setTimeout(()=>{const b=Q(W,'#main-banners .banner span');if(b)b.textContent='没建成,再试一次'},150)}},
+  {label:'横幅② · 总开关关联动隐退(P1-13)',scene:'daily',setup:W=>{(async()=>{
+    /* 摆拍口径(不走 toggleAuto 真路径,免把 master=false 持久化进 localStorage 污染后续帧;
+       联动真路径已在产品页验收):横幅②在场 → 总开关关 → 任务停用,横幅即时隐退。
+       放②组帧尾:master=false 姿态只影响本帧,下一帧 streak 换场景重挂载即复位 */
+    W.setTaskBlocked(true);await new Promise(r=>setTimeout(r,150));
+    W.setAuto(false);W.renderBannersRefresh();
+  })()}},
   {label:'横幅③ 再登连败 ≥2(文案拟稿)',scene:'streak',setup:W=>{(async()=>{
     /* 两连败走产品真路径(计数器只能由 quickLogin 改);步间等 500ms:
-       show() 的 .on 有 250ms 延迟,紧跟 backFrom 会被 cur===next 吞掉,收尾错留 v-form */
+       show() 的 .on 有 250ms 延迟,紧跟 backFrom 会被 cur===next 吞掉,收尾错留 v-form。
+       streak 开机即被拍板⑪ 调起状态页(v-boot 不记来路)→ backFrom('v-form')
+       回的是 v-status;末尾 backFrom('v-status') 落 v-main,横幅③⑧ 同屏 */
     const wait=ms=>new Promise(r=>setTimeout(r,ms));
     await W.quickLogin();await wait(500);   /* 失败 1:跳改密页预填警告 */
-    W.backFrom('v-form');await wait(500);  /* 返回主页(1 次失败不出横幅) */
+    W.backFrom('v-form');await wait(500);
     await W.quickLogin();await wait(500);   /* 失败 2:计数 ≥2 */
-    W.backFrom('v-form');await wait(500);  /* 返回主页,横幅③ 在场 */
+    W.backFrom('v-form');await wait(500);
+    W.backFrom('v-status');await wait(500); /* 回主页:横幅③ 在场 */
   })()}},
   {label:'重登中(busy 防重复提交)',scene:'daily',setup:W=>W.setBusy(E(W,'main-btn'),true,'登录中…')},
-  {label:'重登成功(就地反馈)',scene:'daily',setup:W=>{W.wakeProblem('out');
+  {label:'重登成功(就地反馈)',scene:'daily',setup:W=>{
     W.mood(Q(W,'#boot-bot-greet-main'),'happy');
     E(W,'main-lede').textContent='刚刚把网帮你接回来啦 ✓'}},
-  {label:'门没开 stored(如实不撒花)',scene:'daily',setup:W=>{W.wakeProblem('out');
+  {label:'门没开 stored(如实不撒花)',scene:'daily',setup:W=>{
     E(W,'main-lede').textContent='时间还没到,密码先存着,到点自动登'}},
-  {label:'断网存配置回主页(down + ①横幅 · 场景5 终态)',scene:'unverified',setup:W=>{W.wakeProblem('down')}},
   {label:'横幅⑧ 网络还没通(调起后带横幅返回)',scene:'daily',setup:W=>{(async()=>{
-    /* 真路径:断网 → 系统调起状态页 → 450ms(过 250ms 转场)带横幅回日常 */
+    /* 真路径:断网 → 系统调起状态页 → 450ms(过 250ms 转场)带横幅回日常;
+       setBusy 复位清掉前面 busy 帧在同场景 iframe 的残影 */
+    W.setBusy(E(W,'main-btn'),false);
     await W.GGMock._setNet('unreachable','iphone17 pro max');
     setTimeout(()=>W.backFrom('v-status'),450);
   })()}},
   {label:'横幅⑧ 网在没登录',scene:'daily',setup:W=>{(async()=>{
+    W.setBusy(E(W,'main-btn'),false);
     await W.GGMock._setNet('not_logged_in','Campus-WiFi');
     setTimeout(()=>W.backFrom('v-status'),450);
   })()}},
@@ -383,7 +401,7 @@ const STORIES=[
   {t:'用户切网',d:'亲手:点右下网络切换器「不可达(热点)」→ 表单空着时断网,直接跳排查页(2026-09-08 路由统一,原先只刷状态行;表单数据保留,回来还在);已键入的豁免见 S5b(A3 拍板④)。',scene:'out',free:'点「网络状态切换器」里的「不可达(热点)」'},
   {t:'③ 先保存配置',d:'亲手:点排查页 ③「先保存配置,连上后桂桂自动登录」→ 回到登录页,表单还在,提交按钮变成「保存配置」。',scene:'out',free:'点 ③ 回登录页,看按钮文案'},
   {t:'提交 → 保存配置终态',d:'亲手:填上密码点「保存配置」→ 不可达但后端已把密码存了 → 保存配置终态页「配置保存成功!连上校园网后自动执行登录」,不撒彩带。',scene:'out',free:'填个密码点「保存配置」'},
-  {t:'回主页看状态',d:'亲手:点「完成,回主页」→ 主页 down 态(去排查)+ 横幅①「密码还没验证过,去改一下」;再用切换器推「未登录(可达)」看恢复路由。',scene:'out',free:'回主页后点「未登录(可达)」'},
+  {t:'回主页看状态',d:'亲手:点「完成,回主页」→ 主页两态·带横幅(P1-13):标题恒问候语,「网络」行如实「10.1.2.3 · 连不上」,横幅①「密码还没验证过,去改一下」在场;再用切换器推「未登录(可达)」→ 系统调起状态页(网恢复 P0-7)。',scene:'out',free:'回主页后点「未登录(可达)」'},
 ]},
 {t:'S5b 填表中断网(A3 豁免)',s:'已键入不拽人,状态行就地转红',steps:[
   {t:'落地 v-form 填入学号',d:'可达+没登录,正常填表 — 学号(或密码)任一非空即 formDirty(P2-2 起 ROUTE 表的豁免维度)。',scene:'out',setup:W=>{E(W,'f-sid').value='2025000000001'}},
@@ -429,7 +447,7 @@ const STORIES=[
   {t:'开机即状态页(streak 底座)',d:'streak 底座:密码存过也验证过,但已被人在别处改掉 — 已存凭据重登必被拒。P1-8 第三批:开机探测 L2 发现未登录,系统直接调起状态页(蓝变红心境),「快速登录」在场。',scene:'streak'},
   {t:'快登被拒 · 沮丧⑦',d:'亲手:点「快速登录」→ 🅛 返回 wrong_password → 状态页转沮丧心境(坏消息:登录被拒了),lede=后端原话,亮互斥选项「去登录页改」。',scene:'streak',free:'点「快速登录」看沮丧心境'},
   {t:'去登录页改(预填结论)',d:'亲手:点「去登录页改」→ 登录页警告块预填后端原话(与被拒同组件同位置,来路栈可回状态页)。',scene:'streak',free:'点「去登录页改」,再 ‹ 返回'},
-  {t:'带横幅回日常 · 再登连败',d:'亲手:「带横幅回日常」→ 主页横幅⑧在场;「再登一次」连败两次(每次被拒自动跳改密页,‹ 返回再试)→ 横幅③「反复登录都被拒?完整排查」出现(文案拟稿,请在这里过目)。',scene:'streak',free:'回日常,把「再登一次」点败两次再返回'},
+  {t:'带横幅回日常 · 再登连败',d:'亲手:「带横幅回日常」→ 主页横幅⑧在场;「立即重新登录」连败两次(每次被拒自动跳改密页,‹ 返回再试)→ 横幅③「反复登录都被拒?完整排查」出现(文案拟稿,请在这里过目)。',scene:'streak',free:'回日常,把「立即重新登录」点败两次再返回'},
   {t:'进验证器(自动开跑)',d:'亲手:点横幅③ → v-diag 进入即自动开跑五步,不用再点开始:①网络 ✓ ②服务器 ✓ ③真登一次也被拒 ✗ ④任务 ✓ ⑤程序 ✓ → 结论「凭据有问题,去登录页改一下」。',scene:'streak',free:'点横幅③,等结论出来'},
   {t:'出口:登录页预填结论',d:'亲手:点「去登录页改一下」→ 回登录页,警告块预填的就是验证器结论(与被拒同组件同位置)— 错误路由总表的 login 出口。',scene:'streak',free:'点「去登录页改一下」'},
   {t:'兜底:说给桂桂听',d:'验证器也解决不了时的固定小出口:‹ 返回 回 v-diag(结论还在),点页底「排查也没解决?说给桂桂听 →」→ 反馈页;填一句发送 → 「收到」终态页,工单号在文案行。',scene:'streak',setup:W=>W.show('v-diag'),free:'点「说给桂桂听 →」,填一句发送'},

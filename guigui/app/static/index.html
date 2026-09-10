@@ -224,8 +224,8 @@ h1{font-size:27px;font-weight:600;letter-spacing:-.01em;line-height:1.3}
 /* v-guide 不可达状态条(B 方案·琥珀加强):⚠ 图标自身脉冲,与主页 down 态同族但更重 */
 .status.danger .wico{color:var(--warm);font-size:13.5px;line-height:1;flex-shrink:0;animation:pulse 1.4s ease-in-out infinite}
 /* 状态即标题时,修复按钮与状态同色 */
-#v-main.st-warn #main-btn{border-color:var(--accent);color:var(--accent)}
-#v-main.st-down #main-btn{border-color:oklch(60% 0.11 70);color:oklch(52% 0.11 70)}
+/* P1-13 两态化:#main-status 状态条与 st-warn/st-down 大字分支已删(2026-09-11)——
+   网络事实由「网络」行呈现,问题由横幅⑧→状态页接管 */
 /* 首装链路是单行道:无返回 */
 body.setup .back{display:none}
 /* 首次仪式的苏醒动画:拉伸弹起 + 眼嘴弧线依次描画 */
@@ -619,7 +619,6 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
           <p class="say" id="main-lede">网的事交给我,你放心忙~</p>
         </div>
       </div>
-      <div class="status warn" id="main-status" style="display:none"><span class="dot"></span><span id="main-status-text"></span></div>
       <div id="main-banners"></div>
 
       <div style="height:10px"></div>
@@ -776,8 +775,9 @@ const origin={};   /* 详情视图来路:返回必回原处 */
    字段语义注记:currentTriggerTime 从 v-settings 时间输入/药丸同步,主页 desc 与庆祝页
    lede 都读这个值(报告 1.4);lastNet 一律经 normNet/事件入口压平 waiting(P0-3) */
 const S={
-  mainState:'ok',                 /* ok/out/down 主页三态(netToMain 唯一压缩点) */
+  mainState:'ok',                 /* ok/out/down 内部语境(netToMain 唯一压缩点):未配置首装分流/boot 心境用;P1-13 起不再驱动主页渲染 */
   configured:false,hasPwd:false,
+  master:true,                    /* 总开关镜像(setAuto 唯一写入):false=停自动登录,横幅②联动条件(P1-13) */
   currentTriggerTime:'07:00',
   flashUntil:0,flashTimer:null,   /* A1 瞬时反馈:过期时刻 + 归位定时器 */
   successState:{verified:true,reason:null,taskOk:true},
@@ -983,30 +983,23 @@ function baselineLede(text){
   if(Date.now()<S.flashUntil)return;
   $('main-lede').textContent=text;
 }
-/* 状态即标题:出问题时,页面最大的字直接说这件事(不靠装饰条) */
+/* P1-13(拍板⑪):日常页仅两态 — ①全部正常(无横幅)②带横幅(状态页/故障页返回自带)。
+   标题恒问候语,网络事实由「网络」行呈现(netText 三态,📡 探测喂),
+   网态问题交横幅⑧→状态页接管,主页不再是 mainState 分支链;
+   bot 心境只认总开关(on=idle / off=sleep,动作 flash 临时覆盖) */
 function renderMain(){
   const gb=document.querySelector('#boot-bot-greet-main');
-  const vm=$('v-main');
-  vm.classList.toggle('st-warn',S.mainState==='out');
-  vm.classList.toggle('st-down',S.mainState==='down');
-  $('main-h1').textContent=S.mainState==='out'?'呜,刚才掉线了。':(S.mainState==='down'?'现在连不上校园网。':greetText()+'。');
-  const st=$('main-status');
-  st.style.display=S.mainState==='ok'?'none':'flex';
-  st.className='status '+(S.mainState==='down'?'danger':'warn');
-  $('main-status-text').textContent=S.mainState==='out'?'校园网 · 刚刚掉线了':'认证服务器 · 不可达';
-  if(S.mainState==='ok'){mood(gb,'idle');
-    baselineLede('网的事交给我,你放心忙~');
-    $('main-net').textContent=netText(S.lastNet);$('main-btn').textContent='立即重新登录'}
-  else if(S.mainState==='out'){mood(gb,'sad');
-    baselineLede('刚才网断了一下,别担心,登一下就回来。');
-    $('main-net').textContent='校园网 · 还没登录';$('main-btn').textContent='再登一次'}
-  else{mood(gb,'cry');
-    baselineLede('现在够不着校园网,我陪你查查看。');
-    $('main-net').textContent=NET_TXT.down(S.lastNet&&S.lastNet.server);$('main-btn').textContent='去排查'}
+  const off=S.master===false;
+  mood(gb,off?'sleep':'idle');
+  $('main-h1').textContent=greetText()+'。';
+  baselineLede(off?'好,我先歇着,想我了再开。':'网的事交给我,你放心忙~');
+  $('main-net').textContent=netText(S.lastNet);
+  $('main-btn').textContent='立即重新登录';
 }
-function wakeProblem(kind){S.mainState=kind;goDaily()}
-/* 自动登录总开关:主页与设置页双向同步,关=桂桂睡觉(状态由开关自己表达,文字只讲服务) */
+/* 自动登录总开关:主页与设置页双向同步,关=桂桂睡觉(状态由开关自己表达,文字只讲服务);
+   P1-13 联动:关=任务停用+拦截解除(后端删任务),S.master 镜像供横幅②隐退/两态渲染取用 */
 function setAuto(on){
+  S.master=!!on;
   {const s=$('sw-auto');if(s)s.classList.toggle('on',on)};
   const d=$('auto-desc');
   if(d)d.textContent=on?triggerPrefix()+' '+S.currentTriggerTime+' 替你登 · 提前 30 分钟开始试':'已关 · 想让我开工随时说';
@@ -1015,7 +1008,7 @@ function setAuto(on){
     baselineLede(on?'网的事交给我,你放心忙~':'好,我先歇着,想我了再开。');
   }
 }
-function toggleAuto(){const on=!$('sw-auto').classList.contains('on');setAuto(on);GG.api.masterToggle(on)}
+function toggleAuto(){const on=!$('sw-auto').classList.contains('on');setAuto(on);GG.api.masterToggle(on);renderBannersRefresh()}   /* 横幅②随 master 即时联动,不等 schedule:changed 回填 */
 /* 密码小眼睛:明文核对 */
 function togglePw(id,btn){
   const inp=$(id);const showPw=inp.type==='password';
@@ -1073,10 +1066,7 @@ function setOperatorPick(op){
 /* 自定义时间:两位一格直接键入,自动跳格 + 范围约束(比滚轮快,比原生控件美)
    注:同一份监听器在文件下方"自定义时间"段又重复注册了一次(原代码遗留),已合并到单点;
    这里仅保留 mainAction,详见下方唯一一份 ct-h/ct-m 监听。 */
-function mainAction(){
-  if(S.mainState==='down'){openDetail('v-guide');return}
-  quickLogin()   /* ok=立即重新登录 / out=立即登录,都是一键已存凭据(AC-16) */
-}
+function mainAction(){quickLogin()}   /* P1-13 两态:唯一动作=一键重登(断网时 NET_UNREACHABLE → v-guide,诚实路由) */
 /* 主页上的重登:就地反馈,不跳庆祝页(庆祝只属于首次/修复成功);等待态防重复提交;
    成功表情/文案等 r.ok 确认后才切——点击即切,失败或跳登录页时会留一句假成功 */
 async function quickLogin(){
@@ -1521,7 +1511,7 @@ const ROUTE={
      reProbe 内分岔:已配置 → 状态页(P0-7:不再拽空密码表单),未配置 → v-form 首装路径 */
   'v-guide':{unreachable:{render:recordMain},not_logged_in:{render:guideReprobe},logged_in:{render:guideDaily}},
   /* 日常主页:网态问题系统调起状态页(拍板⑪);去重拦下时(已调起过/带横幅返回过)
-     就地重渲旧三态(P1-13 两态化落地前保留) */
+     就地重渲 — P1-13 两态:标题不换,「网络」行+横幅⑧如实呈现 */
   'v-main':{unreachable:{render:mainHubWait},not_logged_in:{render:mainHubDrop},logged_in:MAIN_NET},
   /* 表单页:A3 拍板④已键入不被拽走(断网/网恢复两半);空表单 configured → 状态页,未配置 → 旧路 */
   'v-form':{unreachable:{when:formDirty,render:formNet,else:HUB_WAIT},
@@ -1561,9 +1551,9 @@ GG.on('schedule:changed',e=>{
 /* 任务被拦横幅②的数据源(2026-09-08 收敛为单一状态位):
    启动静默体检 / schedule:changed / 主页数据轮询 / 重建结果,都经 setTaskBlocked 汇聚 */
 function setTaskBlocked(b){S.taskBlocked=!!b;renderBannersRefresh()}
-/* 主页横幅(终态,重做后仅三种):①密码还没验证过(仅保存配置路径,点击直达改密页,
-   连上后自动登成功即消)②自动登录还没生效(任务被拦,点击就地重建)
-   ③反复登录都被拒(再登连续失败 ≥2,进验证器;成功清零;拟稿)。「今早没登上」已删(最近结果行已显示) */
+/* 主页横幅(P1-13 语义定稿,白板图例口径):①未验证/验证失败提醒(点击→📄登录页)
+   ②拦截态(master 开关联动:关=任务已停,拦截警告随之撤)③反馈相关(再登连败 ≥2 → 完整排查)
+   ⑧网态问题中枢入口(P1-10,与横幅并存)。「今早没登上」已删(最近结果行已显示) */
 function renderBanners(rec){
   const box=$('main-banners');if(!box)return;
   let h='';
@@ -1575,11 +1565,13 @@ function renderBanners(rec){
       '</span><span class="arr">›</span></div>';
   /* 横幅①精确语义(P0-5/A7):「未验证 且(当前不在网 或 最近失败过)」才显示 —
      已在线且最近没失败时不存在「密码没验证」待办(验证=把自己踢下线,不是待办);
-     今早真失败(unverified 场景)时密码大概率真错,横幅①有信息,不一刀切隐藏 */
+     今早真失败(unverified 场景)时密码大概率真错,横幅①有信息,一刀切会错杀 */
   const online=S.lastNet&&S.lastNet.state==='logged_in';
   if(S.configured&&rec&&rec.verified===false&&(!online||rec.outcome==='fail'))
     h+='<div class="banner" onclick="openDetail(\'v-form\')"><span>密码还没验证过,去改一下</span><span class="arr">›</span></div>';
-  if(S.configured&&S.taskBlocked)
+  /* 横幅②拦截态:master 关 = 任务已停用、拦截随之解除(taskStatus 亦回报 ok),
+     横幅不再显示;重新开启后由 schedule:changed / 轮询按真实任务态恢复 */
+  if(S.configured&&S.taskBlocked&&S.master!==false)
     h+='<div class="banner banner-task" onclick="rebuildTaskBanner()"><span>自动登录还没生效,点此重建</span><span class="arr">›</span></div>';
   if(S.configured&&S.loginFailStreak>=2)
     h+='<div class="banner" onclick="openDetail(\'v-diag\')"><span>反复登录都被拒?完整排查</span><span class="arr">›</span></div>';
@@ -1666,7 +1658,8 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 /* P0-3(拍板⑤):开门判断全局删除 — 后端 detect 四态保留,前端映射层把 waiting 压平为
    unreachable(视同不可达,唯一落点 v-guide);netText/状态行/首装分流随之两态化(可达/不可达) */
 function normNet(n){return n&&n.state==='waiting'?Object.assign({},n,{state:'unreachable'}):n}
-/* P2-2:网态 → 主页态唯一压缩点(原先 4 处三元各写一份,后写者胜难审)。
+/* P2-2:网态 → 语境态唯一压缩点(原先 4 处三元各写一份,后写者胜难审)。
+   P1-13 起 mainState 不再驱动主页渲染(两态化),取用方=未配置首装分流(goSetup/fillLanding)与 boot 心境。
    waiting 到不了这里(normNet/事件入口已按 P0-3 拍板⑤压平),兜底落 down 与压平口径一致 */
 function netToMain(s){return s==='logged_in'?'ok':(s==='not_logged_in'?'out':'down')}
 /* P1-5 可达性文案包:主页网络行 / 表单状态行 / 排查页服务器行共用同一口径,
