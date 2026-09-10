@@ -776,6 +776,15 @@ function renderTriggerTime(){
   const h=parseInt($('ct-h').value,10),m=parseInt($('ct-m').value,10);
   if(!isNaN(h)&&!isNaN(m))currentTriggerTime=formatTriggerTime(h,m);
 }
+/* P1-2:时间前缀按当前时刻派生(明早写死对傍晚配置是谎话)—
+   目标时刻仍在今天前面:今天(<18点)/今晚(≥18点);已经过了:明早 */
+function triggerPrefix(){
+  const p=currentTriggerTime.split(':');
+  const now=new Date();
+  const target=new Date(now.getFullYear(),now.getMonth(),now.getDate(),parseInt(p[0],10),parseInt(p[1],10));
+  if(now<target)return now.getHours()<18?'今天':'今晚';
+  return '明早';
+}
 
 /* 桂桂 bot 状态映射:5 状态 → noteai 的内部状态机
    sleep↔sleep / idle↔idle / happy↔complete(眯弯月+心跳消失) / sad↔thinking / cry↔angry(哭) */
@@ -952,7 +961,7 @@ function wakeProblem(kind){mainState=kind;goDaily()}
 function setAuto(on){
   {const s=$('sw-auto');if(s)s.classList.toggle('on',on)};
   const d=$('auto-desc');
-  if(d)d.textContent=on?'明早 '+currentTriggerTime+' 替你登 · 提前 30 分钟开始试':'已关 · 想让我开工随时说';
+  if(d)d.textContent=on?triggerPrefix()+' '+currentTriggerTime+' 替你登 · 提前 30 分钟开始试':'已关 · 想让我开工随时说';
   if($('v-main').classList.contains('on')){
     mood(document.querySelector('#boot-bot-greet-main'),on?'idle':'sleep');
     baselineLede(on?'网的事交给我,你放心忙~':'好,我先歇着,想我了再开。');
@@ -1100,19 +1109,19 @@ function renderSuccess(){
     /* 拦截页:去掉「完成,回主页」,只留重建;bot sad(思考脸);
        放行规则(路由而非文案):rebuild ok+verified→彩带 / ok+!verified→保存配置页 / fail→再试一次 */
     stageEnter('thinking','密码存好了,自动登录还差一步。',
-      '定时任务被安全软件拦了,明早还不会自动登录。把桂桂加进杀毒软件信任区,再点下面的按钮。',null,
+      '定时任务被安全软件拦了,'+triggerPrefix()+'还不会自动登录。把桂桂加进杀毒软件信任区,再点下面的按钮。',null,
       [{label:'重建定时任务',fn:function(){rebuildFromSuccess(this)}}],false,false);
     return}
   if(!st.verified){
     /* 保存配置页(不撒彩带,bot idle 呼吸):客观无法当场验证就不冒充成功,按存入原因说人话 */
     const lede=st.reason==='unreachable'?'连上校园网后,桂桂自动执行登录。'
       :(st.reason==='before_open'?'时间还没到,桂桂先把密码收好,到点自动验证。'
-      :'明早第一次自动登录会真验证,万一不对桂桂会提醒你。');
+      :triggerPrefix()+'第一次自动登录会真验证,万一不对桂桂会提醒你。');
     stageEnter('idle',st.reason==='unreachable'?'配置保存成功!':'配置已保存。',lede,
       st.taskFixed?'定时任务已修好 ✓':null,[done],true,false);
     return}
   /* 彩带页:真验证通过 + 任务在岗,才配庆祝 */
-  stageEnter('complete','以后每天都会自动帮你登好。','明早 '+currentTriggerTime+' 开始。现在关掉就行。','到点就登,你不用管。',
+  stageEnter('complete','以后每天都会自动帮你登好。',triggerPrefix()+' '+currentTriggerTime+' 开始。现在关掉就行。','到点就登,你不用管。',
     [done],true,true);
 }
 /* 成功页上的重建(契约 §2.14,仅用户点击触发):建成且已验证 → 重渲彩带页放行;
