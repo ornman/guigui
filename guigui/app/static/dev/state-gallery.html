@@ -246,7 +246,7 @@ const PANELS=[
   {label:'保存配置 · 不可达存入',scene:'daily',setup:W=>W.showSuccess(false,'unreachable',true)},
   {label:'保存配置 · 锚前(06:50 前)',scene:'daily',setup:W=>W.showSuccess(false,'before_open',true)},
   {label:'保存配置 · 降级存入',scene:'daily',setup:W=>W.showSuccess(false,null,true)},
-  {label:'拦截页(只留重建 · bot sad)',scene:'daily',setup:W=>W.showSuccess(true,null,false)},
+  {label:'拦截页(双出口:重建/先不管 · bot sad)',scene:'daily',setup:W=>W.showSuccess(true,null,false)},
   {label:'拦截页 · 重建失败(再试一次)',scene:'daily',setup:W=>{W.showSuccess(true,null,false);
     const b=Q(W,'#success-actions .btn');if(b)b.textContent='没建成,再试一次'}},
 ]},
@@ -261,7 +261,7 @@ const PANELS=[
   {label:'总开关关(桂桂睡觉)',scene:'daily',setup:W=>W.setAuto(false)},
   {label:'掉线(out · 再登一次)',scene:'daily',setup:W=>W.wakeProblem('out')},
   {label:'不可达(down · 去排查)',scene:'daily',setup:W=>W.wakeProblem('down')},
-  {label:'横幅① 密码还没验证过',scene:'daily',setup:W=>W.renderBanners({verified:false})},
+  {label:'横幅① 密码还没验证过(未验证+今早失败)',scene:'unverified',setup:W=>{}},
   {label:'横幅② 自动登录还没生效',scene:'daily',setup:W=>W.setTaskBlocked(true)},
   {label:'横幅② 重建失败(再试一次)',scene:'daily',setup:W=>{W.setTaskBlocked(true);
     const b=Q(W,'#main-banners .banner span');if(b)b.textContent='没建成,再试一次'}},
@@ -280,8 +280,7 @@ const PANELS=[
     E(W,'main-lede').textContent='刚刚把网帮你接回来啦 ✓'}},
   {label:'门没开 stored(如实不撒花)',scene:'daily',setup:W=>{W.wakeProblem('out');
     E(W,'main-lede').textContent='时间还没到,密码先存着,到点自动登'}},
-  {label:'断网存配置回主页(down + ①横幅 · 场景5 终态)',scene:'daily',setup:W=>{W.wakeProblem('down');
-    W.renderBanners({verified:false})}},
+  {label:'断网存配置回主页(down + ①横幅 · 场景5 终态)',scene:'unverified',setup:W=>{W.wakeProblem('down')}},
 ]},
 {view:'v-log',name:'历史日志',frames:[
   {label:'正常历史(含假期静默)',scene:'daily',setup:W=>W.openDetail('v-log')},
@@ -375,7 +374,7 @@ const STORIES=[
   {t:'提交被节流',d:'throttled 底座落地登录页;输密码点登录:等待行「被节流了,服务器让等 10 秒,桂桂等一下接着试…」→ 信封 AUTH_REJECTED / throttled,中性展示(不进密码警告框,节流不是密码错)。',scene:'throttled',free:'填密码点「立即登录」,看等待行与最终提示'},
 ]},
 {t:'S7c 任务被拦',s:'密码存好了,杀软拦了定时任务',steps:[
-  {t:'拦截终态页',d:'blocked 底座:输密码点「开启每日自动登录」→ 登录成功但 task_ok=false:拦截页只留「重建定时任务」一个按钮(没有「完成,回主页」,2026-09-08 重做),bot 换 sad 思考脸,不撒彩带。',scene:'blocked',free:'填密码点「开启每日自动登录」'},
+  {t:'拦截终态页',d:'blocked 底座:输密码点「开启每日自动登录」→ 登录成功但 task_ok=false:拦截页双出口(P1-1):主按钮「重建定时任务」+ quiet 次按钮「先不管,回主页」(回日常页横幅②在场),bot 换 sad 思考脸,不撒彩带。',scene:'blocked',free:'填密码点「开启每日自动登录」'},
   {t:'点重建 → 放行',d:'亲手:点「重建定时任务」→ mock 一次修好 → verified=true → 自动重渲成彩带页放行(全有或全无:重建成功且验证通过才见彩带)。',scene:'blocked',free:'点「重建定时任务」'},
 ]},
 {t:'S7d 误抓室友学号',s:'预填他人号 → 直接改号 → 阶梯回滚',steps:[
