@@ -852,7 +852,7 @@ async function firstRun(){
     lastNet=normNet(p.data.net);
     configured=!!p.data.configured;
     const s=lastNet.state;
-    mainState=s==='logged_in'?'ok':(s==='not_logged_in'?'out':'down');
+    mainState=netToMain(s);
     if(configured){
       silentTaskCheck();   /* 仪式期间静默任务体检(只读秒回):被拦 → 主页横幅② */
       if(s==='unreachable'){
@@ -1303,36 +1303,61 @@ document.querySelectorAll('#time-presets .preset').forEach(b=>b.addEventListener
 /* 后端事件(契约 §3):网态变化重渲;外部调度变更同步开关。
    2026-09-08 路由统一:断网(unreachable)只有 v-guide 一个落点 — 表单/详情/仪式
    任何视图收到都跳排查页(表单数据保留,回来还在);v-main 例外(主页有自己的
-   down 态与「去排查」按钮),v-guide 本身就是落点。可达态各视图就地更新 */
+   down 态与「去排查」按钮),v-guide 本身就是落点。可达态各视图就地更新。
+   P2-2 路由总表数据化:if 链收口为 ROUTE 查表(与 docs/prd/guigui-state-matrix.md §2
+   逐格对应),mainState 三元收口为 netToMain;A3 formDirty 豁免(拍板④:填表中不被
+   拽去排查页)固化为 v-form 行的 when 维度。
+   cell 词汇:{goto 目标 / via 'openDetail'(默认,记来路)|'show'(直转,仪式单行道)/
+   delay 转场延迟 / then 直转后进场渲染 / render 留页就地动作(e=压平后事件)/
+   when+else 维度豁免(when() 不成立走 else,无 else=留页不动)}。
+   【v2 预留】第三批 P0-7/P1-8「网恢复系统调起状态页」接入时在本表加行/加维度
+   (含调起去重),不再往 handler 里长 if 链 */
+function recordMain(e){mainState=netToMain(e.state)}
+function mainNet(e){mainState=netToMain(e.state);renderMain();renderMainData()}
+function formNet(e){mainState=netToMain(e.state);syncFormStatus()}
+function guideReprobe(e){mainState=netToMain(e.state);setTimeout(reProbe,550)}
+function guideDaily(e){mainState=netToMain(e.state);setTimeout(goDaily,550)}
+function bootNet(e){mainState=netToMain(e.state);$('boot-cap').textContent='网络好了,桂桂来了…';setTimeout(goDaily,900)}
+const GUIDE_GOTO={render:recordMain,goto:'v-guide'};   /* 断网统一落点:记 down + 跳排查页 */
+const MAIN_NET={render:mainNet},FORM_NET={render:formNet},BOOT_NET={when:function(){return configured},render:bootNet};
+const ROUTE={
+  /* 仪式期:断网落排查页用 show 直转(首装单行道不记来路)+ renderGuide;
+     可达态只认 configured — 未配置时仪式等 firstRun 的 probe 分流,事件不抢路由 */
+  'v-boot':{unreachable:{render:recordMain,goto:'v-guide',via:'show',delay:550,then:renderGuide},
+    logged_in:BOOT_NET,not_logged_in:BOOT_NET},
+  /* 排查页正是不可达落点(重复推:留页,网态由上次可达信息兜底);
+     恢复 not_logged_in 先真探一次再由 probe 路由(P1-3 白板 vguide→pan1
+     「重检/选WiFi后·重探」,与「重新检测」按钮同一漏斗);登上自动回日常 */
+  'v-guide':{unreachable:{render:recordMain},not_logged_in:{render:guideReprobe},logged_in:{render:guideDaily}},
+  /* 主页有自己的 down 态与「去排查」按钮:任何网态都就地重渲,不自动跳 */
+  'v-main':{unreachable:MAIN_NET,not_logged_in:MAIN_NET,logged_in:MAIN_NET},
+  /* 表单页:状态行实时跟真,mainState 顺手记对(返回主页时 renderMain 才不会
+     拿旧网态渲染);A3 拍板④:unreachable 且已键入 → 不跳页就地转 danger、提交照常
+     (保存配置语义本就允许断网提交);空表单维持统一跳 v-guide(09-08 拍板) */
+  'v-form':{unreachable:{when:formDirty,render:formNet,else:GUIDE_GOTO},
+    not_logged_in:FORM_NET,logged_in:FORM_NET},
+  /* 详情/终态视图(v-success/v-settings/v-log/v-feedback/v-diag):断网统一跳排查页;
+     可达=留页不动(返回时如实)。新增视图自动继承本行(收益断言:新增网态/视图=改表一行) */
+  '*':{unreachable:GUIDE_GOTO}
+};
+function routeNet(e){
+  let cell=(ROUTE[currentView()]||ROUTE['*'])[e.state];
+  if(!cell)return;
+  if(cell.when&&!cell.when())cell=cell.else;
+  if(!cell)return;   /* 豁免不成立且无 else:留页不动(仪式未配置收可达态) */
+  if(cell.render)cell.render(e);
+  if(cell.goto){
+    const go=cell.via==='show'
+      ?function(){show(cell.goto);if(cell.then)cell.then()}
+      :function(){openDetail(cell.goto)};
+    if(cell.delay)setTimeout(go,cell.delay);else go()
+  }
+}
 GG.on('net:state',e=>{
   if(!e||!e.state)return;
   if(e.state==='waiting')e.state='unreachable';   /* P0-3:waiting 视同不可达,压平后再路由 */
   lastNet=Object.assign({},lastNet||{server:'10.1.2.3'},e);
-  const view=currentView();
-  if(e.state==='unreachable'){
-    mainState='down';
-    if(view==='v-guide')return;                    /* 重复推:排查页正是此态 */
-    if(view==='v-main'){renderMain();renderMainData();return}
-    if(view==='v-boot'){setTimeout(()=>{show('v-guide');renderGuide()},550);return}
-    openDetail('v-guide');return                   /* v-form/v-success/详情页:跳排查页 */
-  }
-  if(view==='v-boot'&&configured){
-    mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
-    $('boot-cap').textContent='网络好了,桂桂来了…';setTimeout(goDaily,900);return}
-  if(view==='v-guide'){
-    /* P1-3(白板 vguide→pan1「重检/选WiFi后·重探」):可达后不直跳登录页,
-       先真探一次(可达性重探),由 probe 结果路由 — 与「重新检测」按钮同一漏斗 */
-    if(e.state==='not_logged_in'){mainState='out';setTimeout(()=>reProbe(),550);return}
-    if(e.state==='logged_in'){mainState='ok';setTimeout(goDaily,550);return}
-    return}   /* 不可达重复推:留在排查页,网态由上次可达信息兜底 */
-  if(view==='v-main'){
-    mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
-    renderMain();renderMainData()}
-  else if(view==='v-form'){
-    /* 表单页停留:状态行实时跟真;mainState 顺手记对 — 返回主页时 renderMain
-       才不会拿旧网态渲染(否则 out 标题配 down 数据的混搭) */
-    mainState=e.state==='logged_in'?'ok':(e.state==='not_logged_in'?'out':'down');
-    syncFormStatus()}
+  routeNet(e);
 });
 GG.on('schedule:changed',e=>{
   if(e&&typeof e.master==='boolean')setAuto(e.master);
@@ -1444,6 +1469,9 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 /* P0-3(拍板⑤):开门判断全局删除 — 后端 detect 四态保留,前端映射层把 waiting 压平为
    unreachable(视同不可达,唯一落点 v-guide);netText/状态行/首装分流随之两态化(可达/不可达) */
 function normNet(n){return n&&n.state==='waiting'?Object.assign({},n,{state:'unreachable'}):n}
+/* P2-2:网态 → 主页态唯一压缩点(原先 4 处三元各写一份,后写者胜难审)。
+   waiting 到不了这里(normNet/事件入口已按 P0-3 拍板⑤压平),兜底落 down 与压平口径一致 */
+function netToMain(s){return s==='logged_in'?'ok':(s==='not_logged_in'?'out':'down')}
 /* P1-5 可达性文案包:主页网络行 / 表单状态行 / 排查页服务器行共用同一口径,
    改文案只动这一处(两态化:P0-3 后只有可达/不可达两族) */
 const NET_TXT={
@@ -1497,6 +1525,9 @@ function formMode(ctx){
   }
   $('form-btn').textContent=ctx==='firstRun'?'开启每日自动登录':(ctx==='save'?'保存配置':'立即登录');
 }
+/* A3(拍板④):表单已键入内容 = 学号(trim,与提交同口径)或密码(原文)任一非空 —
+   net:state 打断豁免维度:填表中不被系统事件拽去排查页(ROUTE v-form 行 when 引用) */
+function formDirty(){return !!($('f-sid').value.trim()||$('f-pwd').value)}
 /* 表单页状态行(唯一实现):login/save 只报连通性(NET_TXT.up/down);
    firstRun 报已连/掉线 danger 如实说,恢复回基线(学号识别 ✓ 由 fillLanding
    异步补,这里不抢)。net:state 停留期间实时刷新(场景:填一半切网) */

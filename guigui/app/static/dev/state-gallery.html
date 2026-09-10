@@ -166,8 +166,8 @@ footer{position:fixed;left:0;right:0;bottom:0;z-index:25;padding:8px 22px;
         <button onclick="pushNet('waiting',null)">未就绪 waiting(≡不可达)</button>
       </div>
       <div class="note">经 mock._setNet 真改数据源并推 net:state:当前视图的路由
-        (v-form/详情页断网直跳排查页、v-guide 自动分流、v-main 重渲)
-        全部走产品代码,顺带验收 2026-09-08 的路由统一;waiting 自 P0-3 起在映射层压平为不可达,行为应与「不可达」逐格一致。</div>
+        (v-form 空表单与详情页断网直跳排查页、v-form 已键入留页(A3)、v-guide 自动分流、v-main 重渲)
+        全部走产品代码(P2-2 起 ROUTE 表驱动),顺带验收 2026-09-08 的路由统一;waiting 自 P0-3 起在映射层压平为不可达,行为应与「不可达」逐格一致。</div>
     </div>
     <div class="sops">
       <button onclick="reloadStoryPanel()">重载预览</button>
@@ -238,6 +238,7 @@ const PANELS=[
   {label:'login · 场景4注销后失败(网先断着)',scene:'out',setup:W=>W.showLoginErr('密码不对,改一下再试;网先断着,输对马上通','wrong_password')},
   {label:'login · 场景4b旧凭据已接回',scene:'out',setup:W=>W.showLoginErr('密码不对,改一下再试;已用旧密码把网接回来了,改对再点一次','wrong_password')},
   {label:'save · v-guide ③ 路径(按钮=保存配置)',scene:'down',setup:W=>W.openDetail('v-form')},
+  {label:'断网 · 已键入留页(A3,状态行 danger)',scene:'out',setup:W=>{E(W,'f-sid').value='2025000000001';W.GGMock._setNet('unreachable','iphone17 pro max')}},
 ]},
 {view:'v-success',name:'终态页(彩带 / 保存配置 / 拦截)',frames:[
   {label:'彩带(真验证 + 任务在岗)',scene:'daily',setup:W=>W.showSuccess(true,null,true)},
@@ -352,10 +353,15 @@ const STORIES=[
 ]},
 {t:'S5 登录页断网(场景5)',s:'填一半切网 → 直跳排查 → 保存配置终态',steps:[
   {t:'落地 v-form',d:'可达+没登录,正常填表。',scene:'out'},
-  {t:'用户切网',d:'亲手:点右下网络切换器「不可达(热点)」→ 登录页停留时断网,直接跳排查页(2026-09-08 路由统一,原先只刷状态行;表单数据保留,回来还在)。',scene:'out',free:'点「网络状态切换器」里的「不可达(热点)」'},
+  {t:'用户切网',d:'亲手:点右下网络切换器「不可达(热点)」→ 表单空着时断网,直接跳排查页(2026-09-08 路由统一,原先只刷状态行;表单数据保留,回来还在);已键入的豁免见 S5b(A3 拍板④)。',scene:'out',free:'点「网络状态切换器」里的「不可达(热点)」'},
   {t:'③ 先保存配置',d:'亲手:点排查页 ③「先保存配置,连上后桂桂自动登录」→ 回到登录页,表单还在,提交按钮变成「保存配置」。',scene:'out',free:'点 ③ 回登录页,看按钮文案'},
   {t:'提交 → 保存配置终态',d:'亲手:填上密码点「保存配置」→ 不可达但后端已把密码存了 → 保存配置终态页「配置保存成功!连上校园网后自动执行登录」,不撒彩带。',scene:'out',free:'填个密码点「保存配置」'},
   {t:'回主页看状态',d:'亲手:点「完成,回主页」→ 主页 down 态(去排查)+ 横幅①「密码还没验证过,去改一下」;再用切换器推「未登录(可达)」看恢复路由。',scene:'out',free:'回主页后点「未登录(可达)」'},
+]},
+{t:'S5b 填表中断网(A3 豁免)',s:'已键入不拽人,状态行就地转红',steps:[
+  {t:'落地 v-form 填入学号',d:'可达+没登录,正常填表 — 学号(或密码)任一非空即 formDirty(P2-2 起 ROUTE 表的豁免维度)。',scene:'out',setup:W=>{E(W,'f-sid').value='2025000000001'}},
+  {t:'断网事件到达',d:'亲手:点「不可达(热点)」— A3 拍板④:填表中不被拽去排查页,留在表单、状态行就地转 danger「10.1.2.3 · 连不上」,提交照常(保存配置语义本就允许断网提交)。',scene:'out',setup:W=>{E(W,'f-sid').value='2025000000001'},free:'点「不可达(热点)」看状态行转红、页面不跳'},
+  {t:'清空表单再断网',d:'亲手:删掉学号,再点一次「不可达(热点)」— 空表单维持统一跳 v-guide(09-08 拍板不动);豁免只保护已键入的时刻。',scene:'out',free:'清空学号,再点「不可达(热点)」'},
 ]},
 {t:'S6 恢复后密码错(场景6)',s:'不可达 → 可达 → 密码错',steps:[
   {t:'v-guide',d:'不可达,等网。',scene:'down'},

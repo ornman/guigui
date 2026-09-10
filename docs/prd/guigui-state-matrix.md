@@ -51,7 +51,7 @@
 | 视图 | 状态 |
 |---|---|
 | v-boot | 仪式检查中(sleep)/ BRIDGE_MISSING(bootWait 等门页已随 P0-3 删,waiting 落点同 unreachable);仪式期间静默任务体检(configured 时并行,只读秒回、2s 超时保护,用户无感) |
-| v-form(2026-09-10 P2-1 合一,原 v-ok + v-login 并为一张 DOM) | **一套表单三语境**,由 `formMode(ctx)` 派生头部/按钮/状态行:**firstRun**(首装已连已登:问候标题+tagline+「开启每日自动登录」,密码必填,提交先落触发时间)/ **login**(未登录落地 / 改密 / 验证器结论预填:「登录校园网。」+「立即登录」)/ **save**(v-guide ③ 路径,按钮=「保存配置」,空密码可提交);共用状态:firstRun 学号已识别 / 验证中 busy / 注销告知 / 密码空警告(仅 firstRun)/ 被拒五态(wrong_password / wrong_account / bound / limit_users / throttled)/ 场景4 注销后失败两变体(网先断着 / 已接回);换学号确认框已删(密码迁移静默,验证不过当场自纠);提交走同一条 `submitLadder()`;停留断网 → 直跳 v-guide(表单数据保留);返回键=来路栈(首装期 body.setup 由 CSS 隐藏) |
+| v-form(2026-09-10 P2-1 合一,原 v-ok + v-login 并为一张 DOM) | **一套表单三语境**,由 `formMode(ctx)` 派生头部/按钮/状态行:**firstRun**(首装已连已登:问候标题+tagline+「开启每日自动登录」,密码必填,提交先落触发时间)/ **login**(未登录落地 / 改密 / 验证器结论预填:「登录校园网。」+「立即登录」)/ **save**(v-guide ③ 路径,按钮=「保存配置」,空密码可提交);共用状态:firstRun 学号已识别 / 验证中 busy / 注销告知 / 密码空警告(仅 firstRun)/ 被拒五态(wrong_password / wrong_account / bound / limit_users / throttled)/ 场景4 注销后失败两变体(网先断着 / 已接回);换学号确认框已删(密码迁移静默,验证不过当场自纠);提交走同一条 `submitLadder()`;停留断网:空表单直跳 v-guide(表单数据保留,回来还在),**已键入学号/密码(A3 formDirty,P2-2)不跳**——状态行就地转 danger、提交照常(保存配置语义允许断网提交);返回键=来路栈(首装期 body.setup 由 CSS 隐藏) |
 | v-diag(2026-09-08 新,契约 1.5.0) | 进入即自动开跑(不用点开始) / 跑步中(diag:progress 逐拍上屏,running 脉冲) / 全绿 exit=ok / 凭据败 exit=login / 任务败 exit=task_blocked / 程序败 exit=app_fault(就地说明,无出口按钮) / net_down;页底固定小出口「排查也没解决?说给桂桂听 →」 |
 | v-success | 终态三 + 反馈二(共用舞台):彩带(verified && task_ok) / 保存配置(不可达存入 · 锚前 · 降级三文案,bot idle 呼吸不撒彩带) / 拦截页(只留「重建定时任务」,bot sad 思考脸;重建失败变「没建成,再试一次」);反馈收到(工单号在文案行,按钮不带编号) / 没发出去(bot sad;立刻重发=草稿回填 + 完成等待自动补发) |
 | v-guide | 不可达落地(琥珀加强状态条:danger+⚠+脉冲;greet 布局 + bot 哭脸) / 重新检测 busy(真调 probe,通了自动分流) / 日常开机落地(可返回,主页 down 态保留) / ③ 保存配置路径(连上后自动登录);事件自动跳:恢复 not_logged_in → v-login,他设备登好 → v-main |
@@ -60,15 +60,19 @@
 | v-settings | 默认(系统区含「立即体检」→ v-diag) / WiFi 兜底展开;「定时任务被拦」行已删(归主页横幅②) |
 | v-feedback | 问题 / 建议 / 校验错误 / 发送中 / pending 行;两终态(复用 v-success 舞台):收到 / 没发出去(草稿回填重发 + 等待自动补发) |
 
-## 2. net:state 事件路由表(2026-09-08 路由统一后:断网只有 v-guide 一个落点)
+## 2. net:state 事件路由表(2026-09-08 路由统一后:断网只有 v-guide 一个落点;2026-09-10 P2-2 起代码侧 `ROUTE`/`routeNet` 表驱动,与本表逐格对应)
 
-| 当前视图 | unreachable | logged_in | not_logged_in |
+| 当前视图 | unreachable(waiting 压平同格) | logged_in | not_logged_in |
 |---|---|---|---|
-| v-boot(configured) | 仪式后跳 v-guide(不再落主页 down;返回后主页 down 态保留) | mainState=ok → goDaily | mainState=out → goDaily |
-| v-guide | 留在排查页(它正是落点) | 自动回主页 ok | 自动跳 v-form(login) |
+| v-boot(configured) | mainState 记 down → 550ms 后跳 v-guide(show 直转,仪式单行道不记来路) | mainState=ok → boot-cap 提示 → goDaily(900ms) | mainState=out → 同左 |
+| v-boot(未配置) | 同上跳 v-guide | 留页不动(仪式等 firstRun 的 probe 分流,事件不抢路由) | 同左 |
+| v-guide | 留在排查页(它正是落点,重复推) | mainState=ok → goDaily(550ms) | mainState=out → reProbe 重探(550ms,P1-3)→ probe 结果路由:未登录 → v-form(login) |
 | v-main | down 态重渲(「去排查」按钮;主页有自己的四态,不自动跳) | ok 重渲 | out 重渲 |
-| v-form(2026-09-10 P2-1 合一) | **直跳 v-guide**(表单数据保留,回来还在;原先只刷状态行,2026-09-08 撤) | 状态行实时刷新 + mainState 记对(返回主页不混搭) | 同左 |
-| 其他(v-success / v-diag / 详情) | 跳 v-guide | 记 lastNet,视图不动(返回时如实) | 同左 |
+| v-form(2026-09-10 P2-1 合一) | 空表单 **直跳 v-guide**(数据保留,回来还在);**已键入(A3 formDirty,P2-2 落地)不跳**:状态行就地转 danger、提交照常 | 状态行实时刷新 + mainState 记对(返回主页不混搭) | 同左 |
+| 其他(v-success / v-diag / v-settings / v-log / v-feedback) | 跳 v-guide(openDetail 记来路) | 记 lastNet,视图不动(返回时如实) | 同左 |
+
+> waiting 不单列:P0-3 拍板⑤起事件入口即压平为 unreachable,逐格行为一致(画廊切换器「未就绪 waiting」可验)。
+> 代码侧 `ROUTE` 表在 `index.html`(`ROUTE`/`routeNet`,cell 词汇 goto/via/delay/then/render/when+else);新增网态或视图 = 改表一行;「其他」行是默认行,新增详情视图自动继承。v2 第三批「网恢复系统调起状态页」接入时在此表加行/加维度(含调起去重)。
 
 ## 3. 用户场景映射(验收链)
 
@@ -76,9 +80,9 @@
 |---|---|---|---|
 | 1 | 可达+已登录 | 首装→v-form(firstRun)/ 日常→v-main ok | S1 / S2 |
 | 2 | 可达+没登录 | 首装→v-form(login)/ 日常 out | S2 / S3 |
-| 3 | 不可达不登录 | →v-guide(挑网→连上→自动跳 v-form login);任何视图停留断网也直跳此页 | S3 / S5 |
+| 3 | 不可达不登录 | →v-guide(挑网→连上→自动跳 v-form login);空表单停留断网也直跳此页(表单已键入留页转 danger,A3/§2) | S3 / S5 / S5b |
 | 4 | 可达但登录有问题(阶梯注销后没回滚) | 提交→logging_out→被拒;信封带接回/断着说明;后端节流变体已修 | S4 |
-| 5 | 首装测试登录时切网→不可达,还在登录页 | 直跳 v-guide(表单保留);提交路径密码已存 → 保存配置终态 + 主页 down + 横幅① | S5 |
+| 5 | 首装测试登录时切网→不可达,还在登录页 | 空表单直跳 v-guide(表单保留;已键入留页转 danger,A3);提交路径密码已存 → 保存配置终态 + 主页 down + 横幅① | S5 / S5b |
 | 6 | 不可达→又可达→密码错 | v-guide 收 not_logged_in 自动跳 v-form(login)→ wrong_password → 改对成功 | S6 |
 | 7a | 门没开(06:50 前)提交 | stored/before_open → 保存配置终态(锚前文案);主页重登返 stored 如实 | S7a |
 | 7b | 节流 | note「让等 N 秒」;不进密码警告框 | S7b |
@@ -99,6 +103,7 @@
 | 2026-09-08 | 0acdc60 | P1:diagnose 验证器(契约 1.4.3→1.5.0,§2.18 + diag:progress 事件)+ v-diag 页 + 两入口(设置页「立即体检」/ 横幅③)+ 登录页结论预填 + 失败计数 |
 | 2026-09-08 | (本提交) | P2:矩阵/画廊同步 — mock streak 场景(重登连败)、画廊 v-diag 卡、横幅③ 帧(拟稿待用户过目)、S8 启动静默任务体检 / S9 连败→排查→反馈 两故事 |
 | 2026-09-10 | 633435f | P2-1 表单合一:v-ok + v-login 并为 v-form 一套 DOM 三语境(formMode/submitLadder/syncFormStatus 唯一实现);画廊两卡并一卡 17 帧;本表 §1/§2/§3 与 NOT_CONFIGURED 行同步;视觉不变经三语境截图对照验证(基准存 dev/p2-1-before/) |
+| 2026-09-10 | (本提交) | P2-2 路由数据化:net:state if 链 → `ROUTE` 查表 + `netToMain` 唯一压缩(4 处三元收口);A3 formDirty 豁免落地(表单已键入断网不跳页、状态行转 danger、提交照常,AC-3 两半实测);画廊 S5b 故事 + v-form 留页帧 + netctl/S5 注记;§1/§2 重写为与代码表逐格对应;视觉零变化经同会话 A/B 验证(0.137% < 噪声底 0.359%,证据存 dev/p2-2-before/、p2-2-after/、p2-2-abtest/) |
 
 ## 5. 执行约定(新对话零上下文可续)
 
