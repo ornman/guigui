@@ -1361,7 +1361,11 @@ function setTaskBlocked(b){taskBlocked=!!b;renderBannersRefresh()}
 function renderBanners(rec){
   const box=$('main-banners');if(!box)return;
   let h='';
-  if(configured&&rec&&rec.verified===false)
+  /* 横幅①精确语义(P0-5/A7):「未验证 且(当前不在网 或 最近失败过)」才显示 —
+     已在线且最近没失败时不存在「密码没验证」待办(验证=把自己踢下线,不是待办);
+     今早真失败(unverified 场景)时密码大概率真错,横幅①有信息,不一刀切隐藏 */
+  const online=lastNet&&lastNet.state==='logged_in';
+  if(configured&&rec&&rec.verified===false&&(!online||rec.outcome==='fail'))
     h+='<div class="banner" onclick="openDetail(\'v-login\')"><span>密码还没验证过,去改一下</span><span class="arr">›</span></div>';
   if(configured&&taskBlocked)
     h+='<div class="banner banner-task" onclick="rebuildTaskBanner()"><span>自动登录还没生效,点此重建</span><span class="arr">›</span></div>';
