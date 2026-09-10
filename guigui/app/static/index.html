@@ -16,6 +16,7 @@
   --accent-2:#c084fc;
   --accent-soft:rgba(124,58,237,.12);
   --warm:#e0a04a;
+  --view-ms:250ms;   /* A8:视图转场时长唯一源(JS VIEW_MS 启动时注入同值,此处仅首帧兜底) */
 }
 @supports (color: oklch(0% 0 0)){
   :root{
@@ -90,9 +91,9 @@ body{
 .log::-webkit-scrollbar{width:5px}
 .log::-webkit-scrollbar-track{background:transparent}
 .log::-webkit-scrollbar-thumb{border-radius:99px;background:oklch(97% 0.005 295 / 0.25)}
-.v{display:none;animation:fadein .3s ease-out}
+.v{display:none;animation:fadein var(--view-ms) ease-out}
 .v.on{display:block}
-.v.leaving{animation:fadeout .25s ease-in forwards;pointer-events:none}  /* A2:转场窗口内旧视图不可点,防连点穿页 */
+.v.leaving{animation:fadeout var(--view-ms) ease-in forwards;pointer-events:none}  /* A2:转场窗口内旧视图不可点,防连点穿页 */
 @keyframes fadeout{from{opacity:1}to{opacity:0}}
 /* 日常页:一屏装下不靠滚动 — 日志框是唯一弹性区,问题状态(顶部多横幅)时
    它自己收缩(条目区内滚),「历史日志 →」和按钮永远在屏内 */
@@ -767,6 +768,10 @@ const $=id=>document.getElementById(id);
 const views=['v-boot','v-ok','v-login','v-success','v-guide','v-main','v-settings','v-log','v-feedback','v-diag'];
 /* 主页日志钉底保留条数:全天历史走 v-log;过多会顶飞「历史日志 →」 */
 const MAIN_LOG_KEEP=5;
+/* A8 动画时序单源:视图转场 250ms 唯一源 — JS 定时常量 + 注入 CSS 变量,
+   改一处,JS(show)/CSS(fadein/fadeout)/画廊摆拍铁律(emit 延后 VIEW_MS)三处随动 */
+const VIEW_MS=250;
+document.documentElement.style.setProperty('--view-ms',VIEW_MS+'ms');
 let mainState='ok',configured=false,hasPwd=false;
 const origin={};   /* 详情视图来路:返回必回原处 */
 /* 触发时间:从 v-settings 时间输入/药丸同步,主页 desc 与庆祝页 lede 都读这个值(报告 1.4) */
@@ -835,14 +840,14 @@ function mood(el,m){
   setBotState(el,MOOD2STATE[m]||'idle');
 }
 function currentView(){return views.find(v=>$(v).classList.contains('on'))||'v-main'}
-/* 视图切换:旧 view fadeout(0.25s)→ display:none;新 view 延后 250ms 出现 fadein */
+/* 视图切换:旧 view fadeout(VIEW_MS)→ display:none;新 view 延后 VIEW_MS 出现 fadein */
 function show(id){
   const cur=views.map(v=>$(v)).find(v=>v.classList.contains('on'));
   const next=$(id);if(cur===next)return;
   if(cur){
     cur.classList.add('leaving');
-    setTimeout(()=>cur.classList.remove('on','leaving'),250);
-    setTimeout(()=>{next.classList.add('on')},cur?250:0);
+    setTimeout(()=>cur.classList.remove('on','leaving'),VIEW_MS);
+    setTimeout(()=>{next.classList.add('on')},VIEW_MS);
   }else{next.classList.add('on')}
 }
 /* 来路栈:首次进入时记录,返回后清除(报告 5.5);不再每次覆盖 */
