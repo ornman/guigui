@@ -22,7 +22,7 @@
      [
       "launch",
       "pan1",
-      ""
+      "首装"
      ],
      [
       "pan1",
@@ -38,16 +38,6 @@
       "netbad",
       "vguide",
       ""
-     ],
-     [
-      "vguide",
-      "netbad",
-      "重检"
-     ],
-     [
-      "vguide",
-      "pan2",
-      "选WiFi后"
      ],
      [
       "vguide",
@@ -88,11 +78,6 @@
       "loginpg",
       "cfgmode",
       "先保存配置"
-     ],
-     [
-      "cfgmode",
-      "submit",
-      "以配置模式"
      ],
      [
       "cfgmode",
@@ -201,11 +186,6 @@
      ],
      [
       "v1",
-      "vfail",
-      "创建失败"
-     ],
-     [
-      "v1",
       "v2",
       "创建成功"
      ],
@@ -222,11 +202,6 @@
      [
       "vok",
       "okpg",
-      ""
-     ],
-     [
-      "vfail",
-      "intercept",
       ""
      ],
      [
@@ -548,6 +523,36 @@
       "intercept",
       "v1",
       "加白后重建成功·回任务链"
+     ],
+     [
+      "unvdb",
+      "create",
+      "存好凭据·建任务"
+     ],
+     [
+      "v1",
+      "okpg2",
+      "保存模式·建成"
+     ],
+     [
+      "v1",
+      "intercept",
+      "创建失败(杀软拦?)"
+     ],
+     [
+      "vfail",
+      "beret",
+      "五态分流·复用🅛"
+     ],
+     [
+      "okpg2",
+      "vguide",
+      "返回(当前不可达)"
+     ],
+     [
+      "vguide",
+      "pan1",
+      "重检/选WiFi后·重探"
      ]
     ]
    },
@@ -882,7 +887,7 @@
       {
        "type": "rect",
        "id": "v1",
-       "text": "验证器① 建成?+通知",
+       "text": "任务① 建成?+通知",
        "width": 145,
        "height": 52,
        "fillColor": "#DBEAFE",
@@ -895,7 +900,7 @@
       {
        "type": "rect",
        "id": "v2",
-       "text": "验证器② 登上网?",
+       "text": "任务② 登上网?",
        "width": 145,
        "height": 52,
        "fillColor": "#DBEAFE",
@@ -934,7 +939,7 @@
       {
        "type": "rect",
        "id": "okpg",
-       "text": "#成功页 彩带=全有",
+       "text": "#成功页 彩带=全有(首装/日常改密验证通过)",
        "width": 135,
        "height": 48,
        "fillColor": "#DCFCE7",
@@ -1020,6 +1025,19 @@
        "borderWidth": 2,
        "borderRadius": 10,
        "fontSize": 12,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "okpg2",
+       "text": "#成功页 保存配置成功(返回按当前状态·不可达排查页)",
+       "width": 210,
+       "height": 52,
+       "fillColor": "#EFE9FC",
+       "borderColor": "#7C5CD6",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 13,
        "textColor": "#1F2937"
       }
      ]
@@ -1528,6 +1546,32 @@
        "text": "🔔=发系统通知·点击深链对应页:成功默认开(可关);重试穷尽才报;同类30分钟合并·每类每天≤1条;无标记=静默",
        "width": 270,
        "height": 64,
+       "fillColor": "#F8FAFC",
+       "borderColor": "#64748B",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 12,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "lg6",
+       "text": "横幅②=拦截态(master开关联动) ③=反馈相关(文案拟稿)——语义详见 plan",
+       "width": 260,
+       "height": 52,
+       "fillColor": "#F8FAFC",
+       "borderColor": "#64748B",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 12,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "lg7",
+       "text": "总开关(停自动登录)→任务停用/拦截解除/横幅②联动——操作流见 plan",
+       "width": 260,
+       "height": 52,
        "fillColor": "#F8FAFC",
        "borderColor": "#64748B",
        "borderWidth": 2,
