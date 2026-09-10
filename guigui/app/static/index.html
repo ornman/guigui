@@ -1106,11 +1106,14 @@ function renderSuccess(){
   renderTriggerTime();   /* 同步最新触发时间,避免 lede 写死 07:00 */
   const done={label:'完成,回主页',fn:function(){backFrom('v-success')}};
   if(!st.taskOk){
-    /* 拦截页:去掉「完成,回主页」,只留重建;bot sad(思考脸);
-       放行规则(路由而非文案):rebuild ok+verified→彩带 / ok+!verified→保存配置页 / fail→再试一次 */
+    /* 拦截页(P1-1 双出口):主出口重建;次出口 quiet「先不管,回主页」(拍板③)—
+       死胡同逃生不再只靠标题栏小字;返回日常页时横幅②在场(taskBlocked 未清)。
+       放行规则(路由而非文案):rebuild ok+verified→彩带 / ok+!verified→保存配置页 / fail→再试一次;
+       重建 3 败→问题反馈属 P1-15 故障带,第三批落地 */
     stageEnter('thinking','密码存好了,自动登录还差一步。',
       '定时任务被安全软件拦了,'+triggerPrefix()+'还不会自动登录。把桂桂加进杀毒软件信任区,再点下面的按钮。',null,
-      [{label:'重建定时任务',fn:function(){rebuildFromSuccess(this)}}],false,false);
+      [{label:'重建定时任务',fn:function(){rebuildFromSuccess(this)}},
+       {label:'先不管,回主页',quiet:true,fn:function(){backFrom('v-success')}}],false,false);
     return}
   if(!st.verified){
     /* 保存配置页(不撒彩带,bot idle 呼吸):客观无法当场验证就不冒充成功,按存入原因说人话 */
