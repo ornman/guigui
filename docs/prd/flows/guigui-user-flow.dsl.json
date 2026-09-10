@@ -467,7 +467,7 @@
      [
       "proggrep",
       "fb2",
-      "修复失败·附重装指引"
+      "修复失败·🔔附重装指引"
      ],
      [
       "unvdb",
@@ -888,7 +888,7 @@
       {
        "type": "rect",
        "id": "vok",
-       "text": "任务完成·删任务",
+       "text": "🔔任务完成·删任务(成功通知·默认开)",
        "width": 140,
        "height": 44,
        "fillColor": "#DCFCE7",
@@ -901,7 +901,7 @@
       {
        "type": "rect",
        "id": "vfail",
-       "text": "任务登录失败",
+       "text": "🔔任务登录失败(带原因·含连不上)",
        "width": 130,
        "height": 44,
        "fillColor": "#FEE2E2",
@@ -927,7 +927,7 @@
       {
        "type": "rect",
        "id": "intercept",
-       "text": "#拦截页 要求加白名单",
+       "text": "🔔#拦截页 要求加白名单",
        "width": 145,
        "height": 48,
        "fillColor": "#FEE2E2",
@@ -992,7 +992,7 @@
       {
        "type": "rect",
        "id": "vb1",
-       "text": "横幅①·密码还没验证过,去改一下(挂主页)",
+       "text": "🔔横幅①·密码还没验证过,去改一下(挂主页)",
        "width": 210,
        "height": 48,
        "fillColor": "#FEE2E2",
@@ -1344,7 +1344,7 @@
         {
          "type": "rect",
          "id": "degrade",
-         "text": "降级:切备份库JSON",
+         "text": "🔔降级:切备份库JSON",
          "width": 145,
          "height": 42,
          "fillColor": "#DBEAFE",
@@ -1370,7 +1370,7 @@
         {
          "type": "rect",
          "id": "intercept2",
-         "text": "#拦截页 重建直到正常",
+         "text": "🔔#拦截页 重建直到正常",
          "width": 135,
          "height": 48,
          "fillColor": "#EFE9FC",
@@ -1495,6 +1495,19 @@
        "text": "📡 L1/L2 探测:全局一份·后台常驻;巡检『网』维度即其结果",
        "width": 250,
        "height": 56,
+       "fillColor": "#F8FAFC",
+       "borderColor": "#64748B",
+       "borderWidth": 2,
+       "borderRadius": 10,
+       "fontSize": 12,
+       "textColor": "#1F2937"
+      },
+      {
+       "type": "rect",
+       "id": "lg5",
+       "text": "🔔=发系统通知·点击深链对应页:成功默认开(可关);重试穷尽才报;同类30分钟合并·每类每天≤1条;无标记=静默",
+       "width": 270,
+       "height": 64,
        "fillColor": "#F8FAFC",
        "borderColor": "#64748B",
        "borderWidth": 2,
