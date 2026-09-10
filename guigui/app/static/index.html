@@ -277,7 +277,7 @@ input[type=password]::-ms-clear{display:none}
 .btn.quiet.busy::after{border-color:oklch(23% 0.015 295 / .25);border-top-color:var(--ink)}
 @keyframes spin{to{transform:rotate(360deg)}}
 /* 主页横幅:①密码还没验证过 ②自动登录还没生效(任务被拦,点击就地重建);
-   ③试了几次还没登上(再登失败 ≥2,进验证器);「今早没登上」已删(2026-09-08) */
+   ③反复登录都被拒(再登失败 ≥2,进验证器;拟稿);「今早没登上」已删(2026-09-08) */
 .banner{display:flex;align-items:center;gap:8px;margin:10px 0 0;padding:9px 12px;border-radius:10px;
   background:oklch(58% 0.15 295 / 0.07);border:1px solid oklch(58% 0.15 295 / 0.22);
   font:500 12.5px/1.5 Inter,"PingFang SC",sans-serif;color:var(--accent);cursor:pointer;
@@ -1373,7 +1373,7 @@ let loginFailStreak=0;   /* 主页「再登一次」连续失败计数:成功清
 function setTaskBlocked(b){taskBlocked=!!b;renderBannersRefresh()}
 /* 主页横幅(终态,重做后仅三种):①密码还没验证过(仅保存配置路径,点击直达改密页,
    连上后自动登成功即消)②自动登录还没生效(任务被拦,点击就地重建)
-   ③试了几次还没登上(再登连续失败 ≥2,进验证器;成功清零)。「今早没登上」已删(最近结果行已显示) */
+   ③反复登录都被拒(再登连续失败 ≥2,进验证器;成功清零;拟稿)。「今早没登上」已删(最近结果行已显示) */
 function renderBanners(rec){
   const box=$('main-banners');if(!box)return;
   let h='';
@@ -1386,7 +1386,7 @@ function renderBanners(rec){
   if(configured&&taskBlocked)
     h+='<div class="banner banner-task" onclick="rebuildTaskBanner()"><span>自动登录还没生效,点此重建</span><span class="arr">›</span></div>';
   if(configured&&loginFailStreak>=2)
-    h+='<div class="banner" onclick="openDetail(\'v-diag\')"><span>试了几次还没登上?完整排查</span><span class="arr">›</span></div>';
+    h+='<div class="banner" onclick="openDetail(\'v-diag\')"><span>反复登录都被拒?完整排查</span><span class="arr">›</span></div>';
   box.innerHTML=h;
 }
 /* 横幅②就地重建(带 busy,A2:重建期间不可再点);失败变「没建成,再试一次」,成功横幅消失 */
