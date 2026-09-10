@@ -790,7 +790,8 @@ const S={
   gazeHandle:null,                /* 随机注视定时器句柄(非业务状态,入 S 让顶格 let 清零) */
   hubRaised:null,                 /* P1-8 调起去重:已调起的网态问题('wait'|'drop'),logged_in 清空;横幅⑧数据源 */
   statusMood:null,statusInfo:null,/* P1-10 状态页心境(wait/drop/contra/sad)+ sad 的 {reason,message} */
-  probeTimer:null,probeCount:0    /* P1-8 探测定时器句柄(单链)+ 可观测拍数 */
+  probeTimer:null,probeCount:0,   /* P1-8 探测定时器句柄(单链)+ 可观测拍数 */
+  vt2Busy:false                   /* P1-14 vt2 自动验证进行中(防叠发) */
 };
 function formatTriggerTime(h,m){return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
 function renderTriggerTime(){
@@ -1186,7 +1187,7 @@ async function rebuildFromSuccess(btn){
 /* ═══ 大头状态页 v-status(P1-10,拍板⑪:问题中枢)═══
    三心境由入场原因决定:等网 wait(L1 还不通)/ 蓝变红⑧ drop(网在,登录态丢)/
    日志矛盾 contra(今早没登上,当下正常;巡检分诊入口属 P1-15)/ 沮丧⑦ sad(凭据被拒);
-   出口表:快速登录(P1-12)/ 进入检测(仅矛盾态,暂走 v-diag 五步,P1-14 落地后改 🔑 检验)/
+   出口表:快速登录(P1-12)/ 进入检测(仅矛盾态,P1-14 起走 🔑 检验 — 与快登同一实现)/
    去登录页改 / 换账号?(换→登录页,不换→带横幅回日常)/ 带横幅回日常 / 网侧排查(→v-guide) */
 const STATUS_COPY={
   wait:{title:'还在等网络通。',lede:'10.1.2.3 还够不着 — 连上校园网,桂桂马上接着办。',bot:'thinking'},
@@ -1222,7 +1223,7 @@ function renderStatusPage(){
   const acts=[];
   if(kind==='drop')acts.push({label:'快速登录',fn:function(){statusQuickLogin(this)}});
   if(kind==='wait')acts.push({label:'去排查网络',quiet:true,fn:function(){openDetail('v-guide')}});
-  if(kind==='contra')acts.push({label:'进入检测',fn:function(){openDetail('v-diag')}});
+  if(kind==='contra')acts.push({label:'进入检测',fn:function(){statusQuickLogin(this)}});   /* P1-14:🔑 检验(与快登同一函数,白板 autotest→beret) */
   if(kind==='sad'){
     const info=S.statusInfo||{},r=info.reason;
     if(r==='bound'||r==='limit_users')acts.push({label:'换账号?',fn:function(){statusSwap()}});
@@ -1263,23 +1264,44 @@ function statusSwap(){
     {label:'换一个账号',fn:function(){openDetail('v-form')}},
     {label:'不换,回主页',quiet:true,fn:function(){delete origin['v-status'];goDaily()}}]);
 }
-/* P1-12 快登:🔑 存库凭据登录(与主页重登同一后端服务,K 章)— 🅛 五态分流:
+/* P1-12+P1-14 🔑 存库凭据登录/检验服务(K 章实现一份):唯一入口调 GG.api.login({}),
+   即后端 _login_stored_credential — 自适应:未登录→真登;已登录→chkstatus 对账
+   (线上是自己=already 对账通过,不冒领;他人=不报 already 改走真登);禁注销全量
+   (共享会话/断网风险)。三入口同一函数:状态页「快速登录」/ 矛盾态「进入检测」/
+   vt2 网恢复·未验证库自动验证(auto=true,无按钮)。🅛 五态分流:
    成功/already(对账通过)→ 日常全部正常(不弹彩带,P1-16);节流 → 中性提示留页可再试;
-   密码/学号运营商错 → 沮丧+「去登录页改」;绑定/别设备 → 沮丧+「换账号?」 */
-async function statusQuickLogin(btn){
-  setBusy(btn,true,'登录中…');
+   密码/学号运营商错 → 沮丧+「去登录页改」;绑定/别设备 → 沮丧+「换账号?」。
+   auto 语境差异(拍板⑫:vt2 是唯一保留的自动验证动作,失败不调起打扰)—
+   成功不拽人:页面迁移交给 net:state(logged_in) 的 ROUTE(formDirty 豁免天然成立,
+   状态页在页时 statusNetMood 自己收场),主页 lede 闪一句;already 静默(对账通过
+   但 verified 不翻,密码盲区留给下一未登录时刻自然暴露);被拒且不在状态页 →
+   只横幅①提醒(白板 vdo→vb1),在状态页(系统调起的 drop)就地转沮丧如实揭示 */
+async function statusQuickLogin(btn,auto){
+  if(btn)setBusy(btn,true,S.statusMood==='contra'?'检测中…':'登录中…');
   const r=await GG.api.login({});
-  setBusy(btn,false);
+  if(btn)setBusy(btn,false);
   if(r.ok){
     S.loginFailStreak=0;
-    if(r.data&&r.data.result==='stored'){statusNote('时间还没到,密码先存着,到点自动登');return}
+    if(r.data && r.data.result==='stored'){statusNote('时间还没到,密码先存着,到点自动登');return}
+    if(auto){
+      if(r.data && r.data.result==='already'){
+        /* 对账通过:verified 不翻(盲区留待下回),绝不 flash「登好了」冒领;
+           状态页在页时幂等收场(net 事件的 statusResolved 可能已跑过) */
+        if(currentView()==='v-status')statusResolved();
+        return}
+      if(currentView()==='v-status'){statusResolved();flashMainLede('登好了,网的事继续交给我 ✓');return}
+      S.mainState='ok';
+      flashMainLede('登好了,网的事继续交给我 ✓');renderBannersRefresh();return}   /* 横幅①随 verified 翻转消失 */
     statusResolved();flashMainLede('登好了,网的事继续交给我 ✓');return
   }
   if(r.code==='AUTH_REJECTED'){
     if(r.reason==='throttled'){statusNote(r.message||'登录太频繁,稍后再试');return}   /* 节流≠凭据坏 */
+    if(auto && currentView()!=='v-status')return;   /* vt2 被拒:横幅①在场提醒,不调起沮丧页吓人 */
     enterStatus('sad',{reason:r.reason,message:r.message});return}
-  if(r.code==='NET_UNREACHABLE'){enterStatus('wait');statusNote(r.message||'现在够不着校园网');return}
-  if(r.code==='NOT_CONFIGURED'){openDetail('v-form');return}   /* 防御:没存过凭据直接去填 */
+  if(r.code==='NET_UNREACHABLE'){
+    if(auto)return;   /* 网又断的竞态:等网展示归 net:state 管线(wait 调起/横幅⑧),不重复开口 */
+    enterStatus('wait');statusNote(r.message||'现在够不着校园网');return}
+  if(r.code==='NOT_CONFIGURED'){if(!auto)openDetail('v-form');return}   /* 防御:没存过凭据直接去填 */
   statusNote(r.message||'出了点问题,再试一次');
 }
 /* P2-1 提交阶梯合一:首装(firstRun:密码必填 + 先落触发时间)/ 登录(login)/
@@ -1539,11 +1561,28 @@ function routeNet(e){
 GG.on('net:state',e=>{
   if(!e||!e.state)return;
   if(e.state==='waiting')e.state='unreachable';   /* P0-3:waiting 视同不可达,压平后再路由 */
+  const prevNetState=(S.lastNet||{}).state;   /* 更新前留一拍:vt2 判「网恢复」用 */
   S.lastNet=Object.assign({},S.lastNet||{server:'10.1.2.3'},e);
   if(e.state==='logged_in'&&S.hubRaised){S.hubRaised=null;   /* 问题解决:调起标记清,横幅⑧随消 */
     if(currentView()==='v-main')renderBannersRefresh()}
   routeNet(e);
+  autoVerifyOnRecover(prevNetState,e.state);   /* P1-14 vt2:网恢复∧未验证库 → 自动跑 🔑 */
 });
+/* P1-14 vt2(白板 unvdb→vt2→🔑,拍板⑫):网恢复(不可达→可达)∧ 库中凭据未验证 →
+   自动跑 🔑 检验(statusQuickLogin(null,true),与快登/进入检测同一实现)— 这是
+   唯一保留的自动验证动作(日常登录侧网恢复不自动,只调起状态页递按钮,P0-7);
+   verified 现拉 recentResult(单一真源,不信前端缓存);vt2Busy 防叠发;
+   vt1(明早 07:00 定时任务首试)在任务侧,与 GUI 无关 */
+async function autoVerifyOnRecover(prev,next){
+  if(S.vt2Busy)return;
+  if(prev!=='unreachable')return;   /* 非恢复迁移(含首拍)不触发 */
+  if(next!=='not_logged_in'&&next!=='logged_in')return;
+  if(!S.configured)return;
+  const rr=await GG.api.recentResult();
+  if(!rr.ok||!rr.data||rr.data.verified!==false)return;   /* 只在未验证库非空时自动 */
+  S.vt2Busy=true;
+  try{await statusQuickLogin(null,true)}finally{S.vt2Busy=false}
+}
 GG.on('schedule:changed',e=>{
   if(e&&typeof e.master==='boolean')setAuto(e.master);
   if(e&&typeof e.task_ok==='boolean')setTaskBlocked(!e.task_ok)

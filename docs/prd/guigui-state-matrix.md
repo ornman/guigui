@@ -8,6 +8,8 @@
 > §0 补快登分岔注、§1 加 v-status 行、§2 路由表加 hub 调起维度重写、§3 补场景 #10/#11。
 > 2026-09-11 第三批续(P1-13,计划 ui-interaction-rework v2):日常页两态化落地 —
 > §0 主页呈现列改两态口径、§1 v-main 行重写、§2 v-main 行措辞、§3 #7e 补横幅②联动、§4 记录。
+> 2026-09-11 第三批续二(P1-14):🔑 检验自适应服务落地 — §0 加 🔑 补注、§1 v-status 行
+> contra 口径改(进入检测走 🔑)、§2 表尾加 vt2 注、§3 #12、§4 记录。
 > 活的形式见 `guigui/app/static/dev/state-gallery.html`(陈列矩阵 + 场景流程 + 网络切换器)。
 
 ## 0. 两轴状态模型
@@ -41,6 +43,8 @@
 | `INTERNAL` / `BRIDGE_MISSING` | 兜底 | 三提交函数 + quickLogin 就地报原话,不静默 |
 
 > **快登分岔补注(2026-09-10 P1-12)**:状态页「快速登录」走 `login({})` 存库凭据,复用上表同一信封,但落点归状态页语境:成功/already → `statusResolved` 回日常(全部正常,不撒彩带,lede 闪「登好了,网的事继续交给我 ✓」)/ stored → 状态行转已登录 + note;throttled → 中性 note 留页可再试;AUTH_REJECTED → 沮丧心境(sad)+ 互斥出口(凭据类 → 去登录页改并预填;绑定/别设备 → 换账号?);NET_UNREACHABLE → 等网心境(wait)+ note;NOT_CONFIGURED → 直开 v-form(save 语境)。
+>
+> **🔑 检验自适应服务(2026-09-11 P1-14,拍板⑫,实现一份)**:后端 `_login_stored_credential` 自适应语义 — 未登录→真登;已登录→chkstatus 对账(线上是自己=already 通过不冒领,他人=改走真登);**禁注销全量**(共享会话/断网风险);对账验不了密码的盲区由下一未登录时刻(掉线/明早任务/网恢复)自然暴露,走五态。前端三入口同一函数 `statusQuickLogin(btn,auto)`:①状态页「快速登录」②矛盾态「进入检测」(contra,不再走 v-diag 五步)③vt2 网恢复·未验证库自动验证(auto=true)。auto 语境:成功不拽人(页面迁移交 net:state 的 ROUTE,formDirty 豁免天然成立)、already 静默不冒领(verified 不翻,横幅①留)、被拒不在状态页时只横幅①(白板 vdo→vb1,在状态页就地转 sad)、vt2Busy 防叠发。vt1(明早 07:00 任务首试)在任务侧。
 
 ### 验证阶梯(提交密码时线上已有人)
 
@@ -60,7 +64,7 @@
 | v-form(2026-09-10 P2-1 合一,原 v-ok + v-login 并为一张 DOM) | **一套表单三语境**,由 `formMode(ctx)` 派生头部/按钮/状态行:**firstRun**(首装已连已登:问候标题+tagline+「开启每日自动登录」,密码必填,提交先落触发时间)/ **login**(未登录落地 / 改密 / 验证器结论预填:「登录校园网。」+「立即登录」)/ **save**(v-guide ③ 路径,按钮=「保存配置」,空密码可提交);共用状态:firstRun 学号已识别 / 验证中 busy / 注销告知 / 密码空警告(仅 firstRun)/ 被拒五态(wrong_password / wrong_account / bound / limit_users / throttled)/ 场景4 注销后失败两变体(网先断着 / 已接回);换学号确认框已删(密码迁移静默,验证不过当场自纠);提交走同一条 `submitLadder()`;停留断网:空表单直跳 v-guide(表单数据保留,回来还在),**已键入学号/密码(A3 formDirty,P2-2)不跳**——状态行就地转 danger、提交照常(保存配置语义允许断网提交);返回键=来路栈(首装期 body.setup 由 CSS 隐藏) |
 | v-diag(2026-09-08 新,契约 1.5.0) | 进入即自动开跑(不用点开始) / 跑步中(diag:progress 逐拍上屏,running 脉冲) / 全绿 exit=ok / 凭据败 exit=login / 任务败 exit=task_blocked / 程序败 exit=app_fault(就地说明,无出口按钮) / net_down;页底固定小出口「排查也没解决?说给桂桂听 →」 |
 | v-success | 终态三 + 反馈二(共用舞台):彩带(verified && task_ok) / 保存配置(不可达存入 · 锚前 · 降级三文案,bot idle 呼吸不撒彩带) / 拦截页(只留「重建定时任务」,bot sad 思考脸;重建失败变「没建成,再试一次」);反馈收到(工单号在文案行,按钮不带编号) / 没发出去(bot sad;立刻重发=草稿回填 + 完成等待自动补发) |
-| v-status(2026-09-10 新,P1-10 问题中枢) | 大 bot 舞台四心境:**wait** 等网(琥珀染,bot 思考脸,「去排查网络」)/ **drop** 登录掉了(红染,bot 哭脸,「快速登录」主按钮)/ **contra** 日志与现状矛盾(紫染,「进入检测」,P1-14 前暂走 v-diag)/ **sad** 被拒(红染加重,互斥出口:凭据类 → 去登录页改+预填;bound/limit_users → 换账号?揭示「换一个账号/不换」);实时状态行三态(已登录✓ / 已连通·还没登录 / 还不通);快登五态(P1-12,见 §0 补注);恒有「带横幅回日常」次级出口;系统调起去重 `S.hubRaised`(同问题只弹一次,v-form 已键入豁免,v-guide 等网中不抢)→ 主页横幅⑧ 点开重进;在页迁移 `statusNetMood`(wait↔drop 就地换境,sad 只刷状态行,logged_in → `statusResolved` 清旗回日常) |
+| v-status(2026-09-10 新,P1-10 问题中枢) | 大 bot 舞台四心境:**wait** 等网(琥珀染,bot 思考脸,「去排查网络」)/ **drop** 登录掉了(红染,bot 哭脸,「快速登录」主按钮)/ **contra** 日志与现状矛盾(紫染,「进入检测」=🔑 检验同一实现,P1-14;已登录时点它=对账不触发登录,未登录=真登)/ **sad** 被拒(红染加重,互斥出口:凭据类 → 去登录页改+预填;bound/limit_users → 换账号?揭示「换一个账号/不换」);实时状态行三态(已登录✓ / 已连通·还没登录 / 还不通);快登五态(P1-12,见 §0 补注);恒有「带横幅回日常」次级出口;系统调起去重 `S.hubRaised`(同问题只弹一次,v-form 已键入豁免,v-guide 等网中不抢)→ 主页横幅⑧ 点开重进;在页迁移 `statusNetMood`(wait↔drop 就地换境,sad 只刷状态行,logged_in → `statusResolved` 清旗回日常) |
 | v-guide | 不可达落地(琥珀加强状态条:danger+⚠+脉冲;greet 布局 + bot 哭脸) / 重新检测 busy(真调 probe,通了自动分流) / 日常开机落地(可返回,主页 down 态保留) / ③ 保存配置路径(P0-7 改口径:先保存配置,连上后一键就登);事件自动跳:恢复 not_logged_in → reProbe → configured ? 状态页 : v-form(login),他设备登好 → v-main |
 | v-main | **两态(2026-09-11 P1-13,拍板⑪)**:①全部正常(问候语标题+基线 lede,无横幅)②带横幅(状态页/故障页返回自带);out/down 大字分支链已删(标题恒问候语,网络事实由「网络」行呈现 = netText 三态由 📡 探测喂;`#main-status` 状态条与 st-warn/st-down 随删);按钮恒「立即重新登录」(断网时 login→NET_UNREACHABLE→v-guide 诚实路由);bot 心境只认总开关(on=idle/off=sleep,动作 flash 临时覆盖);总开关关=桂桂睡觉(auto-desc「已关 · 想让我开工随时说」;`S.master` 镜像);横幅语义定稿(白板图例口径):**①未验证/验证失败提醒**(P0-5 条件,点击→📄 v-form)/ **②拦截态·master 开关联动**(关=任务停用+拦截解除,横幅即时隐退——toggleAuto 即刷+taskStatus 关=ok 双保险;开=点击就地重建 busy,失败「没建成,再试一次」)/ **③反馈相关**(再登连败 ≥2 → v-diag;文案拟稿)/ **⑧网态问题中枢入口**(hubRaised 在场即显,等网/未登录两文案,点击进 v-status;logged_in 自动消失);重登中 busy / 成功就地 flash / stored 如实;再登被拒 → 跳改密页预填;「今早没登上」横幅已删(最近结果行已显示) |
 | v-log | 正常历史 / 含失败日 / 假期静默日 |
@@ -83,6 +87,7 @@
 > 代码侧 `ROUTE` 表在 `index.html`(`ROUTE`/`routeNet`,cell 词汇 goto/via/delay/then/render/when+else,when 链多级兜底);新增网态或视图 = 改表一行;「其他」行是默认行,新增详情视图自动继承。
 > **hub 调起去重(P1-8)**:`hubRaise(kind)` 三道闸 —— 未配置不调起;`S.hubRaised` 同问题只弹一次(换问题照弹,v-guide 等网中不被 wait 抢);v-form 已键入豁免(A3)。调起被拦 ≠ 丢事件:主页就地重渲,横幅⑧(`hubRaised` 在场即显示)保留手动入口。
 > **探测常驻(P1-8)**:`startProbeLoop` 每 5s 只读 probe(不触发登录),网态有变才发 net:state;`S.probeCount` 可观测。巡检「网」维度读探测结果(轮询不再各问各的)。
+> **vt2 未验证库自动验证(P1-14,拍板⑫)**:`autoVerifyOnRecover(prev,next)` 挂在 net:state 处理器尾 — 迁移为「不可达→可达」∧ configured ∧ `recentResult().verified===false`(现拉真源)时自动跑 🔑(`statusQuickLogin(null,true)`);这是唯一保留的自动验证动作,已验证库的网恢复只调起状态页不自动登(P0-7);`S.vt2Busy` 防叠发;失败不在状态页时只横幅①,不调起打扰。
 
 ## 3. 用户场景映射(验收链)
 
@@ -104,6 +109,7 @@
 | 9 | 显式体检(2026-09-08 新) | 设置页「立即体检」/ 横幅③ → v-diag 进入即自动开跑;启动静默只跑 probe+taskStatus 两项只读,全量五步只在此页(第 3 步真登有副作用,必须看得见) | S8 / S9 / 画廊 v-diag 卡 |
 | 10 | 老用户断网 / 网恢复(2026-09-10 新,P1-8+P0-7) | 探测常驻(5s 只读)发现网态有变 → configured 用户带问题系统调起状态页(去重:同问题一次;v-form 已键入豁免;横幅⑧ 保留手动入口);网恢复 not_logged_in → drop 心境 + 快登;logged_in → 清旗自动回日常;未配置走旧路 v-guide 不变;「连上后自动登录」承诺文案已下线 | S10 / 画廊 v-status 卡 |
 | 11 | 状态页快登五态(2026-09-10 新,P1-12) | 🔑 → 成功/already → 回日常全部正常(不撒彩带)/ throttled → 中性提示留页可再试 / 密码·学号错 → 沮丧 + 去登录页改(预填)/ 绑定·别设备 → 沮丧 + 换账号?(不换 → 带横幅回日常) | S9 / 画廊 v-status 卡 |
+| 12 | 🔑 检验三入口(2026-09-11 新,P1-14) | 矛盾态「进入检测」=同一 🔑(已登录→对账不触发登录,未登录→真登)/ vt2:网恢复 ∧ 未验证库 → 自动验证(唯一自动动作;成功回日常横幅①消,already 静默不翻 verified,被拒→状态页在场转 sad、否则横幅①)/ 已验证库网恢复不自动(streak 开机即状态页,快登键等手动) | S10 / S9 / 画廊 v-status 卡 |
 
 ## 4. 修复记录
 
@@ -118,6 +124,7 @@
 | 2026-09-10 | (本提交) | P2-2 路由数据化:net:state if 链 → `ROUTE` 查表 + `netToMain` 唯一压缩(4 处三元收口);A3 formDirty 豁免落地(表单已键入断网不跳页、状态行转 danger、提交照常,AC-3 两半实测);画廊 S5b 故事 + v-form 留页帧 + netctl/S5 注记;§1/§2 重写为与代码表逐格对应;视觉零变化经同会话 A/B 验证(0.137% < 噪声底 0.359%,证据存 dev/p2-2-before/、p2-2-after/、p2-2-abtest/) |
 | 2026-09-10 | (本提交) | 第三批 P1-8/P1-10/P1-12/P0-7:探测常驻(5s 只读,net:state 只在网态有变时发)+ 大头状态页 v-status(四心境/实时状态行/互斥出口)+ 快登五态 + 网恢复系统调起(hubRaise 三道闸去重,横幅⑧ 手动入口);mock 对齐后端 unreachable 存未验证 + `_setRej` 驱动钩子;补 angry botIn 入场规则(此前 drop/sad 心境 bot 停 opacity:0)+ sad 红染加重(24%);画廊 v-status 卡 7 帧 + 横幅⑧ 2 帧 + S9 重写 + S10 新增;本表 §0 补注/§1 v-status 行/§2 重写/§3 #10#11 |
 | 2026-09-11 | (本提交) | 第三批 P1-13 日常页两态化:renderMain 删 out/down 分支链(标题恒问候语,网络事实归「网络」行=📡探测喂;`#main-status` 状态条/st-warn/st-down CSS/wakeProblem 随删);按钮恒「立即重新登录」(mainAction 去分支,断网走 NET_UNREACHABLE→v-guide);总开关联动(`S.master` 镜像 setAuto 唯一写入,横幅②加 master!==false 条件,toggleAuto 即刷横幅);横幅①②③语义定稿注记;画廊 v-main 卡重拍 13 帧(两态①②、①+⑧并存、②联动隐退;out/down 帧删)+ S5/S9 故事文案跟进;本表 §0/§1/§2/§3 同步 |
+| 2026-09-11 | (本提交) | 第三批 P1-14 🔑 检验自适应服务:`statusQuickLogin(btn,auto)` 收为三入口同一实现(状态页快登/矛盾态「进入检测」改道不再走 v-diag/vt2 自动验证);`autoVerifyOnRecover` 挂 net:state 尾(不可达→可达 ∧ configured ∧ verified=false 现拉 recentResult → 自动跑 🔑,vt2Busy 防叠发);auto 语境:成功不拽人交 ROUTE、already 静默不冒领(verified 不翻)、被拒不在状态页只横幅①;实测 9 组全绿(对账仅 probe 无真登/真登成功/两负样本/失败两分支/already 静默竞态修复/主页重登+手动 sad 回归/down 存配置全链);画廊 contra 帧注记+S9 补已验证库不自动+S10 第 4 步改 vt2;本表 §0 补注/§1 contra/§2 vt2 注/§3 #12 |
 
 ## 5. 执行约定(新对话零上下文可续)
 
