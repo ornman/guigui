@@ -1034,6 +1034,11 @@ async function quickLogin(){
       mood(gb,'idle');
       flashMainLede('还没开门,密码先存着,开门自动登');
       renderBannersRefresh();return}
+    if(r.data&&r.data.result==='already'){
+      /* 已经在线:如实说不冒领(P0-2)— 网不是这次点出来的,不切成功表情、mainState 不动 */
+      mood(gb,'idle');
+      flashMainLede('你已经在网上了,桂桂没动');
+      return}
     /* 真成功:先挂 flash 再回基线渲染 — renderMain/setAuto 的基线写入会让位(A1),
        否则标题/数据回填会把成功文案在百毫秒内吃掉 */
     mainState='ok';
