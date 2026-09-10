@@ -147,6 +147,14 @@ body{
 .v-success-stage.in .s-4{animation-delay:1.10s}
 .v-success-stage.in .s-5{animation-delay:1.30s}
 @keyframes lineIn{to{opacity:1;transform:none}}
+/* ═══ 大头状态页 v-status(P1-10,拍板⑪):复用成功页舞台的大 bot;心境染色 ═══
+   wait=琥珀(外部等网)/ drop=红(蓝变红⑧:网在登录态丢)/ sad=红加重(坏消息⑦)/
+   contra=紫(日志矛盾,中性怀疑);实时状态行复用 .status 点色语义 */
+.st-hub[data-mood=wait]{background:linear-gradient(180deg,oklch(72% 0.12 70 / .12),oklch(72% 0.12 70 / .05) 50%,transparent)}
+.st-hub[data-mood=drop]{background:linear-gradient(180deg,oklch(55% 0.19 25 / .10),oklch(65% 0.16 25 / .05) 50%,transparent)}
+.st-hub[data-mood=sad]{background:linear-gradient(180deg,oklch(55% 0.19 25 / .24),oklch(62% 0.18 25 / .12) 50%,transparent)}
+.st-hub[data-mood=contra]{background:linear-gradient(180deg,oklch(58% 0.15 295 / .12),oklch(70% 0.14 330 / .06) 50%,transparent)}
+#status-live{width:fit-content;margin:14px auto 0}
 
 /* ═══ 主页问候行:bot-greet + 标题,flex 垂直居中,永不错位 ═══ */
 /* bot-greet 容器:58x58,flex-shrink:0;回主页入口是标题栏名字,不再点 bot */
@@ -179,6 +187,8 @@ body.hide-gui .bot-greet{display:none}
 /* 终态页 bot 变体:保存配置页=idle 呼吸,拦截页/反馈沮丧页=sad 思考脸(sad-droop) */
 .v-success-stage.in .bot-success[data-state=idle]{animation-name:botIn, idle-breath;animation-duration:.55s, 2.4s;animation-delay:0s, .55s;animation-timing-function:cubic-bezier(.22,1,.36,1), ease-in-out;animation-iteration-count:1, infinite;animation-fill-mode:both, none;transform-origin:50% 50%}
 .v-success-stage.in .bot-success[data-state=thinking]{animation-name:botIn, sad-droop;animation-duration:.55s, 2.2s;animation-delay:0s, .55s;animation-timing-function:cubic-bezier(.22,1,.36,1), ease-in-out;animation-iteration-count:1, infinite;animation-fill-mode:both, none;transform-origin:50% 50%}
+/* 状态页沮丧心境=angry 哭脸抖动(cry-shake);没有这行 bot 停在 opacity:0 */
+.v-success-stage.in .bot-success[data-state=angry]{animation-name:botIn, cry-shake;animation-duration:.55s, 2.2s;animation-delay:0s, .55s;animation-timing-function:cubic-bezier(.22,1,.36,1), ease-in-out;animation-iteration-count:1, infinite;animation-fill-mode:both, none;transform-origin:50% 50%}
 /* 终态页动作区:单按钮(完成/重建)或双按钮(反馈 queued:次级重发+主按钮等待补发)同排居中 */
 #success-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:16px auto 0}
 #success-actions .btn{width:auto;min-width:188px}
@@ -565,6 +575,23 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       </div>
     </div>
 
+    <!-- 大头状态页(P1-10,拍板⑪:问题中枢,非首装独有):复用成功页舞台的大头 bot;
+         三心境(等网 wait / 蓝变红⑧ drop / 日志矛盾 contra / 沮丧⑦ sad)由入场原因决定;
+         功能专一 = 当前问题 + 实时状态行(P1-8 探测每 5s 喂 net:state)+ 快速登录(P1-12)+
+         互斥两选项(凭据类→去登录页改 / 绑定·别设备→换账号?,由 🅛 reason 决定);
+         入口:横幅⑧ / L1·L2 系统调起(去重)/ 快登被拒(沮丧);巡检分诊入口属 P1-15 -->
+    <div class="v" id="v-status">
+      <button class="back" onclick="backFrom('v-status')">‹ 返回</button>
+      <div class="v-success-stage st-hub" id="status-stage" data-mood="wait">
+        <div class="bot bot-success" id="bot-status" data-state="thinking" data-size="140"></div>
+        <h1 class="s-line s-1" id="status-title"></h1>
+        <p class="lede s-line s-2" id="status-lede"></p>
+        <div class="status s-line s-3" id="status-live"><span class="dot"></span><span id="status-live-text"></span></div>
+        <div class="micro-line" id="status-note" style="display:none"></div>
+        <div class="s-line s-4" id="status-actions"></div>
+      </div>
+    </div>
+
     <!-- 不可达排查(断网统一落点,原则 3):挑网 ① / 等网 ② / 保存配置 ③ 三出口 -->
     <div class="v" id="v-guide">
       <button class="back" onclick="backFrom('v-guide')">‹ 返回</button>
@@ -580,7 +607,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div id="guide-wifi"></div>
       <div class="micro-line" style="margin-top:10px">② 已是校园网仍不通?可能维护中</div>
       <button class="btn quiet" id="guide-reprobe" onclick="reProbe(this)" style="margin-top:6px">重新检测</button>
-      <button class="link" onclick="openDetail('v-form')">③ 先保存配置,连上后桂桂自动登录</button>
+      <button class="link" onclick="openDetail('v-form')">③ 先保存配置,连上后一键就登</button>
     </div>
 
     <!-- 日常主页:体检卡(bot 在 .greet 内 flex 第一位) -->
@@ -735,7 +762,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
 <script>
 const win=document.getElementById('win');
 const $=id=>document.getElementById(id);
-const views=['v-boot','v-form','v-success','v-guide','v-main','v-settings','v-log','v-feedback','v-diag'];
+const views=['v-boot','v-form','v-success','v-status','v-guide','v-main','v-settings','v-log','v-feedback','v-diag'];
 /* 主页日志钉底保留条数:全天历史走 v-log;过多会顶飞「历史日志 →」 */
 const MAIN_LOG_KEEP=5;
 /* A8 动画时序单源:视图转场 250ms 唯一源 — JS 定时常量 + 注入 CSS 变量,
@@ -760,7 +787,10 @@ const S={
   lastNet:null,curCfg:null,
   formCtx:'login',                /* P2-1 表单语境:firstRun/login/save */
   fbKind:'problem',fbDraft:null,  /* 反馈分类 + 发出前草稿快照(queued 重发回填) */
-  gazeHandle:null                 /* 随机注视定时器句柄(非业务状态,入 S 让顶格 let 清零) */
+  gazeHandle:null,                /* 随机注视定时器句柄(非业务状态,入 S 让顶格 let 清零) */
+  hubRaised:null,                 /* P1-8 调起去重:已调起的网态问题('wait'|'drop'),logged_in 清空;横幅⑧数据源 */
+  statusMood:null,statusInfo:null,/* P1-10 状态页心境(wait/drop/contra/sad)+ sad 的 {reason,message} */
+  probeTimer:null,probeCount:0    /* P1-8 探测定时器句柄(单链)+ 可观测拍数 */
 };
 function formatTriggerTime(h,m){return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
 function renderTriggerTime(){
@@ -871,10 +901,11 @@ async function firstRun(){
     S.mainState=netToMain(s);
     if(S.configured){
       silentTaskCheck();   /* 仪式期间静默任务体检(只读秒回):被拦 → 主页横幅② */
-      if(s==='unreachable'){
-        /* 断网统一落 v-guide(原则 3):不再落主页 down;从 v-guide 返回后主页 down 态保留 */
+      if(s==='unreachable'||s==='not_logged_in'){
+        /* 拍板⑪:老用户开机带网态问题 → 直接进状态页(等网/蓝变红⑧),快登在场;
+           深链(creds/settings)此拍让位 — 两页从状态页/日常页都可达 */
         document.body.classList.remove('setup');
-        setTimeout(()=>{show('v-guide');renderGuide()},Math.max(0,1500-el));return}
+        setTimeout(()=>{enterStatus(s==='unreachable'?'wait':'drop')},Math.max(0,1500-el));return}
       setTimeout(()=>{goDaily();applyLaunch()},Math.max(0,1500-el));return
     }
   }else{S.mainState='down'}
@@ -895,6 +926,25 @@ function silentTaskCheck(){
     setTaskBlocked(!r.data.ok)
   });
 }
+/* ═══ P1-8 探测机制:后台常驻(拍板⑪,全局一份 📡)═══
+   每 5s 一拍只读 probe(后端 L1 连通性⇒L2 登录态合一,不触发登录);
+   网态有变才走 net:state 事件管线(ROUTE 路由 + 状态页系统调起去重都在那),
+   不变则静默 —「全部正常」时探测仍在跑,S.probeCount 可观测(画廊/验收);
+   定时器单链 setTimeout 随 GUI 生命周期;休眠/最小化暂停属工程注记(G 章) */
+const PROBE_MS=5000;
+async function probeTick(){
+  const r=await GG.api.probe();
+  S.probeCount++;
+  if(r.ok&&r.data&&r.data.net){
+    if(r.data.configured)S.configured=true;
+    const net=normNet(r.data.net);
+    const prev=S.lastNet?S.lastNet.state:null;
+    if(net&&net.state!==prev)
+      guiguiEmit('net:state',{state:net.state,ssid:net.ssid,server:net.server});
+  }
+  S.probeTimer=setTimeout(probeTick,PROBE_MS);
+}
+function startProbeLoop(){if(!S.probeTimer)probeTick()}
 /* 深链(契约 §4):壳在 loaded 前注入 window.__guigui_launch('main'|'creds'|'settings'),
    前端启动路由完成后消费一次即清除;未完成首装时忽略,单行道优先 */
 function applyLaunch(){
@@ -1074,6 +1124,17 @@ function showSuccess(verifiedTrue,reason,taskOk){
   S.successState={verified:verifiedTrue===true,reason:reason||null,taskOk:taskOk!==false,taskFixed:false};
   renderSuccess();
 }
+/* 动作区按钮组(v-success 终态舞台与 v-status 状态页共用;onclick 直挂保留 this=按钮) */
+function buildActions(box,actions){
+  box.innerHTML='';
+  (actions||[]).forEach(a=>{
+    const el=document.createElement('button');
+    el.className='btn'+(a.quiet?' quiet':'');
+    el.textContent=a.label;
+    el.onclick=a.fn;
+    box.appendChild(el);
+  });
+}
 function stageEnter(botState,title,lede,note,actions,showSettings,confetti){
   const bot=$('bot-success');
   bot.dataset.state=botState;   /* CSS 动画按 data-state 分支(idle 呼吸 / thinking 思考脸) */
@@ -1083,14 +1144,7 @@ function stageEnter(botState,title,lede,note,actions,showSettings,confetti){
   const n=$('success-note');
   if(note){n.textContent=note;n.style.display='block'}
   else{n.textContent='';n.style.display='none'}
-  const box=$('success-actions');box.innerHTML='';
-  (actions||[]).forEach(a=>{
-    const el=document.createElement('button');
-    el.className='btn'+(a.quiet?' quiet':'');
-    el.textContent=a.label;
-    el.onclick=a.fn;
-    box.appendChild(el);
-  });
+  buildActions($('success-actions'),actions);
   $('success-extra').style.display=showSettings?'block':'none';
   show('v-success');
   const stage=$('success-stage');
@@ -1115,8 +1169,9 @@ function renderSuccess(){
        {label:'先不管,回主页',quiet:true,fn:function(){backFrom('v-success')}}],false,false);
     return}
   if(!st.verified){
-    /* 保存配置页(不撒彩带,bot idle 呼吸):客观无法当场验证就不冒充成功,按存入原因说人话 */
-    const lede=st.reason==='unreachable'?'连上校园网后,桂桂自动执行登录。'
+    /* 保存配置页(不撒彩带,bot idle 呼吸):客观无法当场验证就不冒充成功,按存入原因说人话;
+       P0-7(v2):「连上后自动登录」承诺下线 — 网恢复调起状态页递快登按钮,一键才登 */
+    const lede=st.reason==='unreachable'?'连上后一键就登,桂桂把按钮递到手边。'
       :(st.reason==='before_open'?'时间还没到,桂桂先把密码收好,到点自动验证。'
       :triggerPrefix()+'第一次自动登录会真验证,万一不对桂桂会提醒你。');
     stageEnter('idle',st.reason==='unreachable'?'配置保存成功!':'配置已保存。',lede,
@@ -1137,6 +1192,105 @@ async function rebuildFromSuccess(btn){
     renderSuccess();return}
   btn.textContent='没建成,再试一次';
   setTimeout(()=>{if(btn.isConnected&&!btn.classList.contains('busy'))btn.textContent='重建定时任务'},2600);
+}
+/* ═══ 大头状态页 v-status(P1-10,拍板⑪:问题中枢)═══
+   三心境由入场原因决定:等网 wait(L1 还不通)/ 蓝变红⑧ drop(网在,登录态丢)/
+   日志矛盾 contra(今早没登上,当下正常;巡检分诊入口属 P1-15)/ 沮丧⑦ sad(凭据被拒);
+   出口表:快速登录(P1-12)/ 进入检测(仅矛盾态,暂走 v-diag 五步,P1-14 落地后改 🔑 检验)/
+   去登录页改 / 换账号?(换→登录页,不换→带横幅回日常)/ 带横幅回日常 / 网侧排查(→v-guide) */
+const STATUS_COPY={
+  wait:{title:'还在等网络通。',lede:'10.1.2.3 还够不着 — 连上校园网,桂桂马上接着办。',bot:'thinking'},
+  drop:{title:'网在,登录掉了。',lede:'校园网通了,但登录掉了,点一下就回来。',bot:'angry'},
+  contra:{title:'今早没登上,但现在都正常。',lede:'日志和现状对不上,再检测一次看看。',bot:'thinking'},
+  sad:{title:'坏消息:登录被拒了。',lede:'',bot:'angry'}
+};
+function enterStatus(kind,info){
+  S.statusMood=kind;S.statusInfo=info||null;
+  if(kind==='wait'||kind==='drop')S.hubRaised=kind;
+  const from=currentView();
+  if(from!=='v-boot'&&!('v-status' in origin))origin['v-status']=from;   /* 调起也记来路:‹ 返回回原处(仪式期除外) */
+  renderStatusPage();
+  show('v-status');
+}
+function renderStatusPage(){
+  const kind=S.statusMood||'wait';
+  const c=STATUS_COPY[kind]||STATUS_COPY.wait;
+  const stage=$('status-stage');
+  stage.dataset.mood=kind;
+  const bot=$('bot-status');
+  bot.dataset.state=c.bot;
+  setBotState(bot,c.bot);
+  $('status-title').textContent=c.title;
+  const lede=$('status-lede');
+  if(kind==='sad'&&S.statusInfo){
+    lede.textContent='';   /* 沮丧:lede=后端原话,bind 六字内联入口照常织入 */
+    rejectionText(lede,S.statusInfo.message||'密码被服务器拒绝了,核对一下再试',S.statusInfo.reason);
+  }else lede.textContent=c.lede;
+  $('status-note').style.display='none';
+  updateStatusLive();
+  /* 动作区(拍板⑪:两选项互斥 — 凭据类亮「去登录页改」,绑定/别设备亮「换账号?」) */
+  const acts=[];
+  if(kind==='drop')acts.push({label:'快速登录',fn:function(){statusQuickLogin(this)}});
+  if(kind==='wait')acts.push({label:'去排查网络',quiet:true,fn:function(){openDetail('v-guide')}});
+  if(kind==='contra')acts.push({label:'进入检测',fn:function(){openDetail('v-diag')}});
+  if(kind==='sad'){
+    const info=S.statusInfo||{},r=info.reason;
+    if(r==='bound'||r==='limit_users')acts.push({label:'换账号?',fn:function(){statusSwap()}});
+    else acts.push({label:'去登录页改',fn:function(){
+      openDetail('v-form');
+      showLoginErr(info.message||'密码不对,改一下再试',r)}});
+  }
+  acts.push({label:'带横幅回日常',quiet:true,fn:function(){delete origin['v-status'];goDaily()}});
+  buildActions($('status-actions'),acts);
+  stage.classList.remove('in');void stage.offsetWidth;   /* 强制 reflow 重放舞台动画(同 stageEnter) */
+  stage.classList.add('in');
+}
+/* 实时状态行(P1-8):探测结果一行 — 还不通(L1)/ 已连通·还没登录(L1✓L2✗)/ 已登录 */
+function updateStatusLive(){
+  const el=$('status-live'),tx=$('status-live-text');
+  if(!el)return;
+  const net=S.lastNet||{};
+  if(net.state==='logged_in'){el.className='status ok';tx.textContent=(net.ssid||'校园网')+' · 已登录 ✓'}
+  else if(net.state==='not_logged_in'){el.className='status warn';tx.textContent=(net.server||'10.1.2.3')+' · 已连通 · 还没登录'}
+  else{el.className='status danger';tx.textContent=(net.server||'10.1.2.3')+' · 还不通'}
+}
+/* 状态页在页时的网态迁移(P1-8):wait↔drop 就地换心境;登上=问题解决自动回日常 */
+function statusNetMood(e){
+  if(e.state==='logged_in'){statusResolved();return}
+  if(S.statusMood==='sad'){updateStatusLive();return}   /* 沮丧是当前问题主角,只刷状态行 */
+  const k=e.state==='unreachable'?'wait':'drop';
+  if(S.statusMood!==k)enterStatus(k);else updateStatusLive();
+}
+function statusResolved(){
+  S.hubRaised=null;S.statusMood=null;   /* 问题解决:清调起标记,横幅⑧随消 */
+  S.mainState='ok';
+  goDaily();renderBannersRefresh();
+}
+function statusNote(t){const n=$('status-note');if(n){n.textContent=t;n.style.display='block'}}
+/* 换账号?(拍板⑦):换 → 登录页;不换 → 带横幅回日常 */
+function statusSwap(){
+  buildActions($('status-actions'),[
+    {label:'换一个账号',fn:function(){openDetail('v-form')}},
+    {label:'不换,回主页',quiet:true,fn:function(){delete origin['v-status'];goDaily()}}]);
+}
+/* P1-12 快登:🔑 存库凭据登录(与主页重登同一后端服务,K 章)— 🅛 五态分流:
+   成功/already(对账通过)→ 日常全部正常(不弹彩带,P1-16);节流 → 中性提示留页可再试;
+   密码/学号运营商错 → 沮丧+「去登录页改」;绑定/别设备 → 沮丧+「换账号?」 */
+async function statusQuickLogin(btn){
+  setBusy(btn,true,'登录中…');
+  const r=await GG.api.login({});
+  setBusy(btn,false);
+  if(r.ok){
+    S.loginFailStreak=0;
+    if(r.data&&r.data.result==='stored'){statusNote('时间还没到,密码先存着,到点自动登');return}
+    statusResolved();flashMainLede('登好了,网的事继续交给我 ✓');return
+  }
+  if(r.code==='AUTH_REJECTED'){
+    if(r.reason==='throttled'){statusNote(r.message||'登录太频繁,稍后再试');return}   /* 节流≠凭据坏 */
+    enterStatus('sad',{reason:r.reason,message:r.message});return}
+  if(r.code==='NET_UNREACHABLE'){enterStatus('wait');statusNote(r.message||'现在够不着校园网');return}
+  if(r.code==='NOT_CONFIGURED'){openDetail('v-form');return}   /* 防御:没存过凭据直接去填 */
+  statusNote(r.message||'出了点问题,再试一次');
 }
 /* P2-1 提交阶梯合一:首装(firstRun:密码必填 + 先落触发时间)/ 登录(login)/
    保存配置(save)共用一条验证阶梯 —
@@ -1323,42 +1477,67 @@ document.querySelectorAll('#time-presets .preset').forEach(b=>b.addEventListener
    拽去排查页)固化为 v-form 行的 when 维度。
    cell 词汇:{goto 目标 / via 'openDetail'(默认,记来路)|'show'(直转,仪式单行道)/
    delay 转场延迟 / then 直转后进场渲染 / render 留页就地动作(e=压平后事件)/
-   when+else 维度豁免(when() 不成立走 else,无 else=留页不动)}。
-   【v2 预留】第三批 P0-7/P1-8「网恢复系统调起状态页」接入时在本表加行/加维度
-   (含调起去重),不再往 handler 里长 if 链 */
+   when+else 维度豁免(when() 不成立走 else,支持多级链,无 else=留页不动)}。
+   【v2 已接入】第三批 P1-8/P1-10/P1-12/P0-7(2026-09-10):状态页系统调起作为
+   表维度落地 — configured 用户 unreachable/not_logged_in 经 HUB_WAIT/HUB_DROP
+   调起(去重在 hubRaise);新增 v-status 行;未配置用户维持 09-08 旧路 */
 function recordMain(e){S.mainState=netToMain(e.state)}
 function mainNet(e){S.mainState=netToMain(e.state);renderMain();renderMainData()}
 function formNet(e){S.mainState=netToMain(e.state);syncFormStatus()}
 function guideReprobe(e){S.mainState=netToMain(e.state);setTimeout(reProbe,550)}
 function guideDaily(e){S.mainState=netToMain(e.state);setTimeout(goDaily,550)}
 function bootNet(e){S.mainState=netToMain(e.state);$('boot-cap').textContent='网络好了,桂桂来了…';setTimeout(goDaily,900)}
-const GUIDE_GOTO={render:recordMain,goto:'v-guide'};   /* 断网统一落点:记 down + 跳排查页 */
-const MAIN_NET={render:mainNet},FORM_NET={render:formNet},BOOT_NET={when:function(){return S.configured},render:bootNet};
+function bootNetDrop(e){S.mainState=netToMain(e.state);setTimeout(()=>enterStatus('drop'),900)}
+const GUIDE_GOTO={render:recordMain,goto:'v-guide'};   /* 未配置用户:断网统一落点(09-08 拍板) */
+const MAIN_NET={render:mainNet},FORM_NET={render:formNet},BOOT_NET={when:isConfigured,render:bootNet};
+/* P1-8/P0-7 系统调起(拍板⑪):configured 用户的网态问题由状态页接管 —
+   去重:同一问题态只调起一次(带横幅返回后不再骚扰),logged_in 清标记;
+   A3 豁免:填表中不拽人;排查页(等网者正在处理)/状态页本身不调起 */
+function isConfigured(){return !!S.configured}
+function hubRaise(kind){
+  if(!S.configured)return false;
+  if(S.hubRaised===kind)return false;
+  const cur=currentView();
+  if(cur==='v-form'&&formDirty())return false;
+  if(cur==='v-status')return false;
+  if(cur==='v-guide'&&kind==='wait')return false;
+  enterStatus(kind);
+  return true;
+}
+function hubWait(e){S.mainState=netToMain(e.state);hubRaise('wait')}
+function hubDrop(e){S.mainState=netToMain(e.state);hubRaise('drop')}
+function mainHubWait(e){S.mainState=netToMain(e.state);if(!hubRaise('wait')){renderMain();renderMainData()}}
+function mainHubDrop(e){S.mainState=netToMain(e.state);if(!hubRaise('drop')){renderMain();renderMainData()}}
+const HUB_WAIT={when:isConfigured,render:hubWait,else:GUIDE_GOTO};
+const HUB_DROP={when:isConfigured,render:hubDrop};
 const ROUTE={
-  /* 仪式期:断网落排查页用 show 直转(首装单行道不记来路)+ renderGuide;
-     可达态只认 configured — 未配置时仪式等 firstRun 的 probe 分流,事件不抢路由 */
-  'v-boot':{unreachable:{render:recordMain,goto:'v-guide',via:'show',delay:550,then:renderGuide},
-    logged_in:BOOT_NET,not_logged_in:BOOT_NET},
-  /* 排查页正是不可达落点(重复推:留页,网态由上次可达信息兜底);
-     恢复 not_logged_in 先真探一次再由 probe 路由(P1-3 白板 vguide→pan1
-     「重检/选WiFi后·重探」,与「重新检测」按钮同一漏斗);登上自动回日常 */
+  /* 仪式期:configured 用户网态问题直接进状态页(拍板⑪:launch→巡检→L1/L2 系统调起);
+     未配置维持首装单行道 — 断网落 v-guide(show 直转+renderGuide),可达态等 firstRun 分流 */
+  'v-boot':{unreachable:{when:isConfigured,render:hubWait,
+      else:{render:recordMain,goto:'v-guide',via:'show',delay:550,then:renderGuide}},
+    logged_in:BOOT_NET,
+    not_logged_in:{when:isConfigured,render:bootNetDrop,else:BOOT_NET}},
+  /* 排查页:重复不可达留页(它正是等网落点);恢复走 reProbe 漏斗(P1-3 重探),
+     reProbe 内分岔:已配置 → 状态页(P0-7:不再拽空密码表单),未配置 → v-form 首装路径 */
   'v-guide':{unreachable:{render:recordMain},not_logged_in:{render:guideReprobe},logged_in:{render:guideDaily}},
-  /* 主页有自己的 down 态与「去排查」按钮:任何网态都就地重渲,不自动跳 */
-  'v-main':{unreachable:MAIN_NET,not_logged_in:MAIN_NET,logged_in:MAIN_NET},
-  /* 表单页:状态行实时跟真,mainState 顺手记对(返回主页时 renderMain 才不会
-     拿旧网态渲染);A3 拍板④:unreachable 且已键入 → 不跳页就地转 danger、提交照常
-     (保存配置语义本就允许断网提交);空表单维持统一跳 v-guide(09-08 拍板) */
-  'v-form':{unreachable:{when:formDirty,render:formNet,else:GUIDE_GOTO},
-    not_logged_in:FORM_NET,logged_in:FORM_NET},
-  /* 详情/终态视图(v-success/v-settings/v-log/v-feedback/v-diag):断网统一跳排查页;
-     可达=留页不动(返回时如实)。新增视图自动继承本行(收益断言:新增网态/视图=改表一行) */
-  '*':{unreachable:GUIDE_GOTO}
+  /* 日常主页:网态问题系统调起状态页(拍板⑪);去重拦下时(已调起过/带横幅返回过)
+     就地重渲旧三态(P1-13 两态化落地前保留) */
+  'v-main':{unreachable:{render:mainHubWait},not_logged_in:{render:mainHubDrop},logged_in:MAIN_NET},
+  /* 表单页:A3 拍板④已键入不被拽走(断网/网恢复两半);空表单 configured → 状态页,未配置 → 旧路 */
+  'v-form':{unreachable:{when:formDirty,render:formNet,else:HUB_WAIT},
+    not_logged_in:{when:formDirty,render:formNet,else:{when:isConfigured,render:hubDrop,else:FORM_NET}},
+    logged_in:FORM_NET},
+  /* 状态页在页:网态迁移就地换心境(wait↔drop),登上自动回日常(白板 L2→dailypg) */
+  'v-status':{unreachable:{render:statusNetMood},not_logged_in:{render:statusNetMood},logged_in:{render:statusNetMood}},
+  /* 详情/终态视图:configured 断网/网恢复均调起状态页(P0-7 生效视图含 v-success 保存页);
+     未配置断网维持 v-guide;可达态留页(返回时如实);新增视图自动继承本行 */
+  '*':{unreachable:HUB_WAIT,not_logged_in:HUB_DROP}
 };
 function routeNet(e){
   let cell=(ROUTE[currentView()]||ROUTE['*'])[e.state];
+  /* when 链多级兜底:如 v-form 空表单 → HUB_WAIT(未配置)→ GUIDE_GOTO */
+  while(cell&&cell.when&&!cell.when())cell=cell.else;
   if(!cell)return;
-  if(cell.when&&!cell.when())cell=cell.else;
-  if(!cell)return;   /* 豁免不成立且无 else:留页不动(仪式未配置收可达态) */
   if(cell.render)cell.render(e);
   if(cell.goto){
     const go=cell.via==='show'
@@ -1371,6 +1550,8 @@ GG.on('net:state',e=>{
   if(!e||!e.state)return;
   if(e.state==='waiting')e.state='unreachable';   /* P0-3:waiting 视同不可达,压平后再路由 */
   S.lastNet=Object.assign({},S.lastNet||{server:'10.1.2.3'},e);
+  if(e.state==='logged_in'&&S.hubRaised){S.hubRaised=null;   /* 问题解决:调起标记清,横幅⑧随消 */
+    if(currentView()==='v-main')renderBannersRefresh()}
   routeNet(e);
 });
 GG.on('schedule:changed',e=>{
@@ -1386,6 +1567,12 @@ function setTaskBlocked(b){S.taskBlocked=!!b;renderBannersRefresh()}
 function renderBanners(rec){
   const box=$('main-banners');if(!box)return;
   let h='';
+  /* 横幅⑧(P1-10 入口,拍板⑧并存):未决网态问题(系统调起过、尚未解决)→ 点击回状态页;
+     文案按问题态二分(拟稿) */
+  if(S.configured&&S.hubRaised)
+    h+='<div class="banner banner-hub" onclick="enterStatus(S.hubRaised)"><span>'+
+      (S.hubRaised==='wait'?'网络还没通,桂桂在等 — 点开看看':'网在,还没登录 — 点一下就回来')+
+      '</span><span class="arr">›</span></div>';
   /* 横幅①精确语义(P0-5/A7):「未验证 且(当前不在网 或 最近失败过)」才显示 —
      已在线且最近没失败时不存在「密码没验证」待办(验证=把自己踢下线,不是待办);
      今早真失败(unverified 场景)时密码大概率真错,横幅①有信息,不一刀切隐藏 */
@@ -1594,7 +1781,9 @@ async function reProbe(btn){
   if(p.ok){
     S.lastNet=normNet(p.data.net);
     if(p.data.net.state==='logged_in'){S.mainState='ok';goDaily();return}
-    if(p.data.net.state==='not_logged_in'){S.mainState='out';openDetail('v-form');return}
+    if(p.data.net.state==='not_logged_in'){S.mainState='out';
+      if(S.configured)enterStatus('drop');   /* P0-7:已配置 → 状态页(快登在场),不再拽空密码表单 */
+      else openDetail('v-form');return}
     /* unreachable(waiting 已压平):留在排查页,如实刷新 */
   }
   renderGuide();
@@ -1766,7 +1955,7 @@ function startRandomGaze(){
   }
   tick();
 }
-firstRun();
+firstRun().then(startProbeLoop);   /* P1-8:仪式分流完,探测转后台常驻(5s 一拍) */
 initAllBots();
 startRandomGaze();
 </script>

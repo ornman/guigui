@@ -30,7 +30,10 @@
      diag_app    验证器程序败:logged_in 一切正常但崩溃记录 → 第 5 步 fail → exit=app_fault
      streak     日常·重登连败(2026-09-08 横幅③/验证器链故事):configured+密码存过验证过,
                 但密码已被人改 — 已存凭据重登也拒 wrong_password;diagnose 第 3 步
-                同样真登被拒 → exit=login(文案与 rejected 场景逐字一致) */
+                同样真登被拒 → exit=login(文案与 rejected 场景逐字一致)
+
+   dev 驱动钩子(摆拍/联调):_setNet(state,ssid) 真改网态源;_setRej(reason) 强改
+   「已存凭据登录」的拒绝 reason(P1-12 状态页快登五态摆拍;null=关,恢复按场景) */
 (function(){
 'use strict';
 const LS_SCENE='gg-mock-scene',LS_CFG='gg-mock-cfg';
@@ -89,6 +92,7 @@ if(SCENE==='unverified'){S.configured=true;S.verified=false;
 
 const saveCfg=()=>localStorage.setItem(LS_CFG,JSON.stringify(S.cfg));
 const netEmit=()=>emit('net:state',{state:S.net.state,ssid:S.net.ssid});
+let forcedRej=null;   /* _setRej 驱动位:强改已存凭据登录的拒绝 reason(null=关) */
 
 window.GGMock={
   async probe(){
@@ -106,8 +110,12 @@ window.GGMock={
   },
   async login(a){
     emit('login:progress',{phase:'probe'});
-    if(S.net.state==='unreachable')return ERR('NET_UNREACHABLE',SERVER+' 不可达,先连校园网');
-    if(S.net.state==='waiting')return ERR('NET_UNREACHABLE','网络还没就绪,稍等一下再试');
+    /* 对齐后端(api.py unreachable/waiting 分支):断网/未就绪时提交的密码没被否认,
+       存未验证给明早 — P0-7 验收链(存配置→网恢复→状态页快登)靠这条走通 */
+    if(S.net.state==='unreachable'||S.net.state==='waiting'){
+      if(a&&a.password){S.pwd=a.password;S.configured=true;S.verified=false}
+      return ERR('NET_UNREACHABLE',SERVER+' 不可达,先连校园网');
+    }
     if(a&&a.operator){S.cfg.operator=a.operator;saveCfg()}   /* 登录即存,getConfig 回填胶囊 */
     if(S.net.state==='logged_in'&&SCENE==='other'&&(a&&a.password)){
       /* 验证阶梯:线上是他人学号 → 注销(如实注明)→ 翻转 → 真登一次 */
@@ -144,6 +152,19 @@ window.GGMock={
       return ERR('AUTH_REJECTED','密码不对,改一下再试;已用旧密码把网接回来了,改对再点一次','wrong_password');
     }
     if(S.net.state==='logged_in')return OK({result:'already',uid:UID_MASK,attempts:0,verified:S.verified});
+    /* dev 驱动(_setRej):已存凭据登录(login 无 password)强改拒绝 reason —
+       P1-12 状态页快登五态摆拍;文案与后端 rejection_text 逐字一致 */
+    if(forcedRej&&!(a&&a.password)){
+      if(forcedRej==='throttled'){
+        emit('login:progress',{phase:'throttled',waitsec:10,attempt:1,attempts:1});
+        return ERR('AUTH_REJECTED','登录太频繁,请等 10 秒再试','throttled');
+      }
+      const m={wrong_password:'密码不对,改一下再试',
+        wrong_account:'学号或运营商选错了,核对一下再试',
+        bound:'密码是对的,但这个账号被绑在别处/受限 — 去自助服务平台看看绑定',
+        limit_users:'这个学号已在别的设备上登录(比如在别处登过没下线),那边下线后桂桂会自动登好'}[forcedRej];
+      return ERR('AUTH_REJECTED',m,forcedRej);
+    }
     const pwd=(a&&a.password)!=null&&a.password!==''?a.password:S.pwd;
     if(!pwd)return ERR('NOT_CONFIGURED','还没存密码,先填一次');
     emit('login:progress',{phase:'requesting',attempt:1,attempts:S.cfg.login_retries});
@@ -332,6 +353,11 @@ window.GGMock={
     if(ssid!=null)S.net.ssid=ssid;
     netEmit();
     return OK({...S.net});
+  },
+  async _setRej(reason){
+    /* dev 驱动钩子(P1-12):强改已存凭据登录的拒绝 reason(五态摆拍);null/空=关 */
+    forcedRej=reason||null;
+    return OK({forced:forcedRej});
   },
   async openSelfService(){window.open('https://bcs.guat.edu.cn/Cas/Login?appid=71999680','_blank')}
 };
