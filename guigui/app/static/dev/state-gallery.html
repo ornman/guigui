@@ -400,6 +400,18 @@ const PANELS=[
   {label:'凭据败 · exit=login(预填登录页)',scene:'diag_cred',setup:W=>W.openDetail('v-diag')},
   {label:'任务败 · exit=task_blocked(拦截页)',scene:'diag_task',setup:W=>W.openDetail('v-diag')},
   {label:'程序败 · exit=app_fault(就地说明)',scene:'diag_app',setup:W=>W.openDetail('v-diag')},
+  {label:'体检过期(网络刚变·结果可能过期)',scene:'daily',setup:W=>{
+    /* P1-6 验收帧:体检进行中切网返回 → 旧结果灰化 + 提示 + 重跑入口 */
+    W.openDetail('v-diag');
+    /* 旧结果灰化:v-diag 页的 step 项加 .stale 类 */
+    E(W,'diag-steps').classList.add('stale');
+    /* 提示 + 重跑入口(v-diag 页 footer 区加一行) */
+    const note=document.createElement('div');
+    note.className='diag-stale-note';
+    note.textContent='网络刚变过,结果可能过期,重跑一次';
+    note.style.cssText='margin-top:12px;padding:10px 12px;border:1px solid #c47;border-radius:8px;color:#a35;background:#fff8f6;font-size:13px';
+    E(W,'diag-steps').appendChild(note);
+  }},
 ]},
 ];
 

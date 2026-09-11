@@ -952,7 +952,7 @@
       {
        "type": "rect",
        "id": "intercept",
-       "text": "🔔#拦截页 要求加白名单",
+       "text": "#拦截页 任务被拦 → 要求加白;主出口「重建定时任务」(3 败换「3 次没建成,带上诊断包反馈」附诊断包,P1-15),次出口「先不管,回主页」(P1-1);回归加白杀软后再试通路不断",
        "width": 145,
        "height": 48,
        "fillColor": "#FEE2E2",
@@ -1030,7 +1030,7 @@
       {
        "type": "rect",
        "id": "okpg2",
-       "text": "#成功页 保存配置成功(返回按当前状态·不可达排查页)",
+       "text": "#成功页 保存配置成功(返回按当前状态·不可达排查页)(P1-16 已落)",
        "width": 210,
        "height": 52,
        "fillColor": "#EFE9FC",
@@ -1075,7 +1075,7 @@
         {
          "type": "rect",
          "id": "L1",
-         "text": "📡L1 连通性:每5s→10.1.2.3(后台常驻)",
+         "text": "📡L1 连通性:每5s→10.1.2.3(后台常驻);📡后台常驻(P1-8 已落)",
          "width": 180,
          "height": 48,
          "fillColor": "#DBEAFE",
@@ -1088,7 +1088,7 @@
         {
          "type": "rect",
          "id": "L2",
-         "text": "📡L2 登录态:chkstatus",
+         "text": "📡L2 登录态:chkstatus;📡后台常驻(P1-8 已落)",
          "width": 160,
          "height": 48,
          "fillColor": "#DBEAFE",
@@ -1130,7 +1130,7 @@
         {
          "type": "rect",
          "id": "dailypg",
-         "text": "#日常页 两态:全部正常/带横幅(返回自带)",
+         "text": "#日常页 两态:全部正常/带横幅(返回自带)(P1-13 已落)",
          "width": 200,
          "height": 52,
          "fillColor": "#EFE9FC",
@@ -1199,7 +1199,7 @@
         {
          "type": "rect",
          "id": "bigpage",
-         "text": "#大头状态页 问题中枢:当前问题+实时状态(每5s)+快登+两选项",
+         "text": "#大头状态页 问题中枢:当前问题+实时状态(每5s)+快登+两选项(P1-10 已落)",
          "width": 230,
          "height": 64,
          "fillColor": "#EFE9FC",
@@ -1212,7 +1212,7 @@
         {
          "type": "rect",
          "id": "quicklogin",
-         "text": "🔑快登:存库凭据",
+         "text": "🔑快登:存库凭据(P1-12 已落)",
          "width": 150,
          "height": 44,
          "fillColor": "#DBEAFE",
@@ -1225,7 +1225,7 @@
         {
          "type": "rect",
          "id": "autotest",
-         "text": "🔑检验·进入检测(自适应:未登录真登/已登录对账)",
+         "text": "🔑检验·进入检测(自适应:未登录真登/已登录对账)(P1-14 已落)",
          "width": 165,
          "height": 44,
          "fillColor": "#DBEAFE",
@@ -1238,7 +1238,7 @@
         {
          "type": "diamond",
          "id": "beret",
-         "text": "🅛后端返回(五态)",
+         "text": "🅛后端返回(五态)(后端五态机已落,K 章硬约束)",
          "width": 120,
          "height": 72,
          "fillColor": "#FEF3C7",

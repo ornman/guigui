@@ -295,6 +295,13 @@ input[type=password]::-ms-clear{display:none}
   transition:background .15s,border-color .15s}
 .banner:hover{background:oklch(58% 0.15 295 / 0.12);border-color:var(--accent-2)}
 .banner .arr{margin-left:auto;font-size:12px;opacity:.65}
+/* A6:横幅改 button 后浏览器默认样式(背景/边框/字体)被重置回 div 观感 */
+button.banner{background:oklch(58% 0.15 295 / 0.07);border:1px solid oklch(58% 0.15 295 / 0.22);
+  font:500 12.5px/1.5 Inter,"PingFang SC",sans-serif;color:var(--accent);text-align:left;cursor:pointer}
+/* A5:视图 h1 焦点转移 — tabindex=-1 焦点到达时不显示浏览器默认 outline */
+.v-title:focus{outline:none}
+/* P1-6:体检过期灰化(v-diag 网态变化时旧结果视觉降级) */
+.diag-step.stale{opacity:.45;filter:grayscale(.6)}
 /* 提交等待行(4.1.2):验证中/注销告知/线上他人学号注明 — 提交期间的一行小字 */
 .submit-note{display:flex;align-items:center;gap:6px;margin:8px 0 0;padding:8px 12px;border-radius:10px;
   background:oklch(58% 0.15 295 / 0.06);font:500 12px/1.5 Inter,"PingFang SC",sans-serif;color:var(--ink-2)}
@@ -535,7 +542,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div class="greet">
         <div class="bot bot-greet" id="boot-bot-greet-form" data-state="happy" data-size="58"></div>
         <div>
-          <h1 id="form-title" class="g">早上好。</h1>
+          <h1 id="form-title" class="g v-title" tabindex="-1">早上好。</h1>
           <p id="form-lede" class="tagline">校园网自动登录助手 · 每天 <b>07:00</b> 帮你登好</p>
         </div>
       </div>
@@ -567,7 +574,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
     <div class="v" id="v-success">
       <div class="v-success-stage" id="success-stage">
         <div class="bot bot-success" id="bot-success" data-state="complete" data-size="140"></div>
-        <h1 class="s-line s-1" id="success-title"></h1>
+        <h1 class="s-line s-1 v-title" id="success-title" tabindex="-1"></h1>
         <p class="lede s-line s-2" id="success-time"></p>
         <div class="micro-line s-line s-3" id="success-note"></div>
         <div class="s-line s-4" id="success-actions"></div>
@@ -584,7 +591,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <button class="back" onclick="backFrom('v-status')">‹ 返回</button>
       <div class="v-success-stage st-hub" id="status-stage" data-mood="wait">
         <div class="bot bot-success" id="bot-status" data-state="thinking" data-size="140"></div>
-        <h1 class="s-line s-1" id="status-title"></h1>
+        <h1 class="s-line s-1 v-title" id="status-title" tabindex="-1"></h1>
         <p class="lede s-line s-2" id="status-lede"></p>
         <div class="status s-line s-3" id="status-live"><span class="dot"></span><span id="status-live-text"></span></div>
         <div class="micro-line" id="status-note" style="display:none"></div>
@@ -598,7 +605,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div class="greet">
         <div class="bot bot-greet" id="boot-bot-greet-guide" data-state="angry" data-size="58"></div>
         <div>
-          <h1 style="font-size:22px">这条路今天不通。</h1>
+          <h1 class="v-title" tabindex="-1" style="font-size:22px">这条路今天不通。</h1>
           <p class="lede">到认证服务器的路连不上,桂桂帮你查:</p>
         </div>
       </div>
@@ -615,7 +622,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div class="greet">
         <div class="bot bot-greet" id="boot-bot-greet-main" data-state="happy" data-size="58"></div>
         <div>
-          <h1 class="g" id="main-h1">早上好。</h1>
+          <h1 class="g v-title" id="main-h1" tabindex="-1">早上好。</h1>
           <p class="say" id="main-lede">网的事交给我,你放心忙~</p>
         </div>
       </div>
@@ -642,7 +649,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
     <!-- 历史日志(新增:主页内嵌日志保留,这里看每天的历史) -->
     <div class="v" id="v-log">
       <button class="back" onclick="backFrom('v-log')">‹ 返回</button>
-      <h1 style="font-size:22px">历史日志。</h1>
+      <h1 class="v-title" tabindex="-1" style="font-size:22px">历史日志。</h1>
       <p class="lede">桂桂每天做了什么,都在这里:</p>
       <div id="log-days"></div>
     </div>
@@ -652,7 +659,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
          定时任务行已删(2026-09-08),被拦归主页横幅②就地重建 -->
     <div class="v" id="v-settings">
       <button class="back" onclick="backFrom('v-settings')">‹ 返回</button>
-      <h1 style="font-size:22px">高级设置</h1>
+      <h1 class="v-title" tabindex="-1" style="font-size:22px">高级设置</h1>
 
       <div class="tiny-label">每日自动登录</div>
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:2px 0 4px">
@@ -708,7 +715,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div class="greet">
         <div class="bot bot-greet" id="boot-bot-greet-diag" data-state="thinking" data-size="58"></div>
         <div>
-          <h1 style="font-size:22px">排查问题。</h1>
+          <h1 class="v-title" tabindex="-1" style="font-size:22px">排查问题。</h1>
           <p class="lede">桂桂从头到尾查一遍,每步都给你看到:</p>
         </div>
       </div>
@@ -725,7 +732,7 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
          断网自动入队补发;复制文本降级为链路级次动作 -->
     <div class="v" id="v-feedback">
       <button class="back" onclick="backFrom('v-feedback')">‹ 返回</button>
-      <h1 style="font-size:22px">说给桂桂听。</h1>
+      <h1 class="v-title" tabindex="-1" style="font-size:22px">说给桂桂听。</h1>
       <div class="presets" id="fb-kinds" style="margin:18px 0 14px">
         <button type="button" class="preset on" data-kind="problem" onclick="fbPickKind('problem')">问题</button>
         <button type="button" class="preset" data-kind="suggestion" onclick="fbPickKind('suggestion')">建议</button>
@@ -865,8 +872,12 @@ function show(id){
   if(cur){
     cur.classList.add('leaving');
     setTimeout(()=>cur.classList.remove('on','leaving'),VIEW_MS);
-    setTimeout(()=>{next.classList.add('on')},VIEW_MS);
-  }else{next.classList.add('on')}
+    setTimeout(()=>{next.classList.add('on');
+      /* A5:视图进入后焦点转移到 h1(配合 .v-title tabindex=-1);
+         v-boot 无 .v-title 跳过,避免控制台报错 */
+      const h=next.querySelector('.v-title');if(h)h.focus()},VIEW_MS);
+  }else{next.classList.add('on');
+    const h=next.querySelector('.v-title');if(h)h.focus()}
 }
 /* 来路栈:首次进入时记录,返回后清除(报告 5.5);不再每次覆盖 */
 function openDetail(id){if(!(id in origin))origin[id]=currentView();show(id);if(id==='v-settings')loadSettings();if(id==='v-log')loadLogs();if(id==='v-guide')renderGuide();if(id==='v-form')fillLoginLanding();if(id==='v-feedback')loadFeedback();if(id==='v-diag')startDiag()}
@@ -1178,7 +1189,7 @@ function renderSuccess(){
              用户加白杀软后的再试通路不断 */
           S.rebuildFails=0;renderSuccess();openDetail('v-feedback')}}
       :{label:'重建定时任务',fn:function(){rebuildFromSuccess(this)}};
-    stageEnter('thinking','密码存好了,自动登录还差一步。',
+    stageEnter('thinking','密码没问题,自动登录还差一步。',
       '定时任务被安全软件拦了,'+triggerPrefix()+'还不会自动登录。把桂桂加进杀毒软件信任区,再点下面的按钮。',null,
       [mainAct,
        {label:'先不管,回主页',quiet:true,fn:function(){backFrom('v-success')}}],false,false);
@@ -1492,6 +1503,17 @@ document.querySelectorAll('.dd').forEach(dd=>{
   }));
 });
 document.addEventListener('click',()=>document.querySelectorAll('.dd.open').forEach(o=>o.classList.remove('open')));
+/* A4:Escape 关闭自绘下拉,焦点回到触发按钮(键盘可达闭环) */
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    const open=document.querySelector('.dd.open');
+    if(open){
+      open.classList.remove('open');
+      const btn=open.querySelector('.dd-btn');
+      if(btn)btn.focus();
+    }
+  }
+});
 /* 自定义时间:输入常驻,常用时间一键填充;手动键入自动跳格 + 范围约束。
    选择器必须锁 #time-presets:反馈页分类药丸同用 .preset 类(多选),
    裸 .preset 会把单选逻辑绑过去 — 清选中态 + data-t 抛错,两页互相弄乱 */
@@ -1610,6 +1632,11 @@ GG.on('net:state',e=>{
     if(currentView()==='v-main')renderBannersRefresh()}
   routeNet(e);
   autoVerifyOnRecover(prevNetState,e.state);   /* P1-14 vt2:网恢复∧未验证库 → 自动跑 🔑 */
+  /* P1-6:网从不可达→可达 且 在 v-diag 页 且 体检已完成 > 30s → 旧结果过期灰化 */
+  if(prevNetState==='unreachable'&&(e.state==='not_logged_in'||e.state==='logged_in')&&
+     currentView()==='v-diag'&&S.diagState&&S.diagState.done&&S.lastDiagAt&&
+     (Date.now()-S.lastDiagAt)>30000)
+    markDiagStale();
 });
 /* P1-14 vt2(白板 unvdb→vt2→🔑,拍板⑫):网恢复(不可达→可达)∧ 库中凭据未验证 →
    自动跑 🔑 检验(statusQuickLogin(null,true),与快登/进入检测同一实现)— 这是
@@ -1642,15 +1669,15 @@ function renderBanners(rec){
   /* 横幅⑧(P1-10 入口,拍板⑧并存):未决网态问题(系统调起过、尚未解决)→ 点击回状态页;
      文案按问题态二分(拟稿) */
   if(S.configured&&S.hubRaised)
-    h+='<div class="banner banner-hub" onclick="enterStatus(S.hubRaised)"><span>'+
+    h+='<button type="button" class="banner banner-hub" onclick="enterStatus(S.hubRaised)"><span>'+
       (S.hubRaised==='wait'?'网络还没通,桂桂在等 — 点开看看':'网在,还没登录 — 点一下就回来')+
-      '</span><span class="arr">›</span></div>';
+      '</span><span class="arr">›</span></button>';
   /* 横幅①精确语义(P0-5/A7):「未验证 且(当前不在网 或 最近失败过)」才显示 —
      已在线且最近没失败时不存在「密码没验证」待办(验证=把自己踢下线,不是待办);
      今早真失败(unverified 场景)时密码大概率真错,横幅①有信息,一刀切会错杀 */
   const online=S.lastNet&&S.lastNet.state==='logged_in';
   if(S.configured&&rec&&rec.verified===false&&(!online||rec.outcome==='fail'))
-    h+='<div class="banner" onclick="openDetail(\'v-form\')"><span>密码还没验证过,去改一下</span><span class="arr">›</span></div>';
+    h+='<button type="button" class="banner" onclick="openDetail(\'v-form\')"><span>密码还没验证过,去改一下</span><span class="arr">›</span></button>';
   /* 横幅②拦截态:master 关 = 任务已停用、拦截随之解除(taskStatus 亦回报 ok),
      横幅不再显示;重新开启后由 schedule:changed / 轮询按真实任务态恢复。
      P1-15 重建 3 败(S.rebuildFails≥3)→ 换反馈出口(白板 re3「重建失败3次→
@@ -1658,11 +1685,11 @@ function renderBanners(rec){
      每轮都推)后文案稳定 */
   if(S.configured&&S.taskBlocked&&S.master!==false){
     if(S.rebuildFails>=3)
-      h+='<div class="banner banner-task" onclick="rebuildGiveUpFeedback()"><span>重建 3 次没成 — 带上诊断包反馈</span><span class="arr">›</span></div>';
+      h+='<button type="button" class="banner banner-task" onclick="rebuildGiveUpFeedback()"><span>重建 3 次没成 — 带上诊断包反馈</span><span class="arr">›</span></button>';
     else
-      h+='<div class="banner banner-task" onclick="rebuildTaskBanner()"><span>自动登录还没生效,点此重建</span><span class="arr">›</span></div>'}
+      h+='<button type="button" class="banner banner-task" onclick="rebuildTaskBanner()"><span>自动登录还没生效,点此重建</span><span class="arr">›</span></button>'}
   if(S.configured&&S.loginFailStreak>=2)
-    h+='<div class="banner" onclick="openDetail(\'v-diag\')"><span>反复登录都被拒?完整排查</span><span class="arr">›</span></div>';
+    h+='<button type="button" class="banner" onclick="openDetail(\'v-diag\')"><span>反复登录都被拒?完整排查</span><span class="arr">›</span></button>';
   box.innerHTML=h;
 }
 /* 横幅②就地重建(带 busy,A2:重建期间不可再点);失败变「没建成,再试一次」,
@@ -1719,7 +1746,29 @@ async function startDiag(){
     /* BRIDGE_MISSING / INTERNAL:就地报后端原话,结论区当出气口 */
     S.diagState.done=true;S.diagState.verdict=r.message||'体检没跑完,再试一次';S.diagState.exit=null;
   }
+  S.lastDiagAt=Date.now();   /* P1-6:体检完成时打戳,网态变化时判「刚体检过」用 */
   renderDiag();
+}
+/* P1-6:网态从不可达切到可达时,若体检已 >30s,把当前 v-diag 结果标记过期灰化,
+   并在步骤区底部追加一行提示 + 重跑按钮(用户主动确认 — 与进入即自动开跑不冲突) */
+function markDiagStale(){
+  const box=$('diag-steps');if(!box)return;
+  box.classList.add('stale');
+  box.querySelectorAll('.diag-step').forEach(s=>s.classList.add('stale'));
+  if($('diag-stale-note'))return;   /* 已有提示就跳过(网态多次变化不重复堆) */
+  const note=document.createElement('div');
+  note.id='diag-stale-note';
+  note.className='diag-stale-note';
+  note.innerHTML='<span>网络刚变过,结果可能过期,重跑一次</span>';
+  const btn=document.createElement('button');
+  btn.type='button';
+  btn.className='btn';
+  btn.textContent='重跑一次';
+  btn.style.marginTop='8px';
+  btn.onclick=()=>{box.classList.remove('stale');box.querySelectorAll('.diag-step').forEach(s=>s.classList.remove('stale'));
+    note.remove();startDiag()};
+  note.appendChild(btn);
+  box.appendChild(note);
 }
 /* 出口路由(错误路由总表):凭据→登录页预填结论;任务→拦截终态页;ok→回主页 */
 function diagExit(){
@@ -1785,7 +1834,11 @@ function renderWifiList(box,networks,opts){
     const sel=opts.pick&&opts.selected===n.ssid;
     /* P1-3:排查页挑网列表里,当前连着的项以「当前 · 连着」标记(信号位让位) */
     const cur=!opts.pick&&S.lastNet&&n.ssid===S.lastNet.ssid;
-    return '<div class="ssid'+(opts.pick?' sel-pick':'')+(sel?' on':'')+'"'+(opts.pick?'':' onclick="pickWifi(this)"')+
+    /* A6:挑网项键盘可达(pick 模式是已选状态,无 onclick,纯展示无需角色;
+       非 pick 模式是连接动作,加 role/tabindex/keydown 兼容键鼠) */
+    const a11y=opts.pick?'':' role="button" tabindex="0" onclick="pickWifi(this)"'+
+      ' onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();pickWifi(this)}"';
+    return '<div class="ssid'+(opts.pick?' sel-pick':'')+(sel?' on':'')+'"'+a11y+
       '><span class="n">'+esc(n.ssid)+'</span><span class="q"'+(opts.pick?' data-orig="'+sig+'"':'')+'>'+
       (opts.pick?(sig+(sel?' · 已选':'')):(cur?'当前 · 连着':sig))+'</span></div>';
   }).join('');
