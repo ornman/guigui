@@ -332,6 +332,18 @@ const PANELS=[
   {label:'重登成功(就地反馈)',scene:'daily',setup:W=>{
     W.mood(Q(W,'#boot-bot-greet-main'),'happy');
     E(W,'main-lede').textContent='刚刚把网帮你接回来啦 ✓'}},
+  {label:'重登·线上他人(P0-6 mock 对齐)',scene:'other',setup:W=>{(async()=>{
+    /* P0-6 验收帧:已存凭据重登时 logged_in+线上是他人,后端 chkstatus 抓到 →
+       注销告知 → 真登成功(不是 already)。mock 此场景前会返 already,与真后端
+       相反;修后状态条出现「注销告知」进度后落到 happy。*/
+    const btn=E(W,'main-btn');
+    W.setBusy(btn,false);
+    E(W,'main-lede').textContent='注销线上会话 6503…6503,马上接着办';
+    W.mood(Q(W,'#boot-bot-greet-main'),'thinking');
+    await wait(400);
+    E(W,'main-lede').textContent='刚刚把网帮你接回来啦 ✓';
+    W.mood(Q(W,'#boot-bot-greet-main'),'happy');
+  })()}},
   {label:'门没开 stored(如实不撒花)',scene:'daily',setup:W=>{
     E(W,'main-lede').textContent='时间还没到,密码先存着,到点自动登'}},
   {label:'横幅⑧ 网络还没通(调起后带横幅返回)',scene:'daily',setup:W=>{(async()=>{

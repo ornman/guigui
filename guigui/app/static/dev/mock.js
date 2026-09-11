@@ -15,7 +15,8 @@
      throttled 登录被节流 reason=throttled(契约 1.4.0;QA P1-6:不是密码错,前端走节流展示+phase='throttled' 推送,实机 waitsec 由服务器给)
      blocked   首装·提交密码成功但定时任务被拦 task_ok=false(契约 1.4.0 P0-1:成功页如实文案+重建入口;rebuildTask 一次即修好)
      fbdg      反馈提交走 SUBMITTED_DEGRADED(D1 成功、issue 延后;用户应无感照常「已收到」)
-     other     日常·线上是别人的学号(提交走阶梯:logging_out 带 online_uid → 真登成功)
+     other     日常·线上是别人的学号(已存凭据重登走阶梯:logging_out 带 online_uid
+                → 真登成功;P0-6 mock 对齐后端 _login_stored_credential chkstatus 语义)
      unverified 日常·密码未验证+今早失败(主页两横幅 QA)
      ladder_fail  阶梯翻车·首装(2026-09-07 场景 4):线上他人 → 注销 → 真登 wrong_password
                   拒 → 无旧凭据可恢复 → 信封带「;网先断着,输对马上通」;net 翻为
@@ -155,6 +156,28 @@ window.GGMock={
       S.net.state='logged_in';netEmit();
       return ERR('AUTH_REJECTED','密码不对,改一下再试;已用旧密码把网接回来了,改对再点一次','wrong_password');
     }
+    /* P0-6:对齐后端 _login_stored_credential(api.py:185-193)— 已存凭据重登时
+       logged_in 先 chkstatus 核对线上学号,他人 → 不报 already,改走真登
+       (注销他人会话 → 真登一次);自己/chkstatus 不可得 → already(现状)。
+       此前 mock 一律 already,与真后端相反:other/ladder_back 场景下前端
+       练的「主页重登 = already」在真机不存在,验收基准一直错。 */
+    if(S.net.state==='logged_in'&&!(a&&a.password)){
+      /* 已存凭据重登(login 无 password)= _login_stored_credential,先 chkstatus */
+      const online=(SCENE==='other'||SCENE==='ladder_fail'||SCENE==='ladder_back')?OTHER_UID:UID;
+      if(online!==UID){
+        /* 线上是他人:模拟注销 → 真登一次,与 other 带 password 路径同阶梯 */
+        emit('login:progress',{phase:'logging_out',online_uid:'6503…6503'});
+        await delay(1400);
+        S.net.state='not_logged_in';netEmit();
+        emit('login:progress',{phase:'requesting',attempt:1,attempts:1});
+        await delay(900);
+        S.net.state='logged_in';S.verified=true;netEmit();
+        const e={ts:nowTs(),level:'ok',text:'已登录 · '+UID_MASK};
+        S.logs[0].entries.push(e);
+        emit('log:appended',{day_label:'今天',entry:e});
+        return OK({result:'success',uid:UID_MASK,attempts:1,verified:true,task_ok:S.taskOk});
+      }
+      return OK({result:'already',uid:UID_MASK,attempts:0,verified:S.verified});}
     if(S.net.state==='logged_in')return OK({result:'already',uid:UID_MASK,attempts:0,verified:S.verified});
     /* dev 驱动(_setRej):已存凭据登录(login 无 password)强改拒绝 reason —
        P1-12 状态页快登五态摆拍;文案与后端 rejection_text 逐字一致 */

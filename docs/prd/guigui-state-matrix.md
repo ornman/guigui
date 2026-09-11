@@ -14,6 +14,7 @@
 > 与 NET_UNREACHABLE 行、§1 v-success 行重写、§3 #13、§4 记录。
 > 2026-09-11 第三批续四(P1-15):故障带自愈四链分层落地 — §0 加巡检五维消费
 > 与 🔔 对账/契约缺口注、§1 v-boot/v-main/v-status 行补分诊与 3 败、§3 #14、§4 记录。
+> 2026-09-11 收尾批 P0-6 mock 对齐后端「线上他人」已存凭据路径:`login({})` 无 password + `logged_in` 先 chkstatus,他人 → 注销+真登(不再误返 already);自己/chkstatus 不可得 → already(行为不变);画廊 v-main 卡新增「重登·线上他人」验收帧;后端 0 改动、契约 1.5.0 0 改动;§0 already 行注、§3 #1/#4 链路注、§4 记录。
 > 活的形式见 `guigui/app/static/dev/state-gallery.html`(陈列矩阵 + 场景流程 + 网络切换器)。
 
 ## 0. 两轴状态模型
@@ -36,7 +37,7 @@
 |---|---|---|
 | `success` + verified + task_ok | 真验证通过且任务在岗 | 彩带终态页(四行文案 + 彩带三波) |
 | `success` + verified + task_ok=false | 登上了但定时任务被拦 | 拦截终态页(只留「重建定时任务」;rebuild ok+verified 才重渲为彩带放行) |
-| `already` | 已在线(线上是本人) | verified=true → 彩带;verified=false → 保存配置终态(降级存入文案) |
+| `already` | 已在线(线上是本人)| verified=true → 彩带;verified=false → 保存配置终态(降级存入文案)|**P0-6(2026-09-11)对齐后端 `_login_stored_credential`**:已存凭据重登时 `logged_in` 先 chkstatus 核对线上学号,他人 → **不报 already**,改走真登(注销他人会话 → 真登一次,attempts=1);自己/chkstatus 不可得 → already(行为不变)|
 | `stored` / reason=before_open | 06:50 前被拒,不判密码错,存未验证 | 保存配置终态页(锚前文案);主页重登返 stored → lede 如实「时间还没到,密码先存着」,不撒花(P0-3 开门文案已下线) |
 | `AUTH_REJECTED` reason=`wrong_password` | 密码不对,不存 | 表单页统一警告块(B 基准:与密码空同一组件同一位置) |
 | `AUTH_REJECTED` reason=`wrong_account` | 学号/运营商选错 | 同上(identify 误抓室友学号的自纠出口) |
@@ -141,6 +142,7 @@
 | 2026-09-11 | (本提交) | 第三批 P1-14 🔑 检验自适应服务:`statusQuickLogin(btn,auto)` 收为三入口同一实现(状态页快登/矛盾态「进入检测」改道不再走 v-diag/vt2 自动验证);`autoVerifyOnRecover` 挂 net:state 尾(不可达→可达 ∧ configured ∧ verified=false 现拉 recentResult → 自动跑 🔑,vt2Busy 防叠发);auto 语境:成功不拽人交 ROUTE、already 静默不冒领(verified 不翻)、被拒不在状态页只横幅①;实测 9 组全绿(对账仅 probe 无真登/真登成功/两负样本/失败两分支/already 静默竞态修复/主页重登+手动 sad 回归/down 存配置全链);画廊 contra 帧注记+S9 补已验证库不自动+S10 第 4 步改 vt2;本表 §0 补注/§1 contra/§2 vt2 注/§3 #12 |
 | 2026-09-11 | (本提交) | 第三批 P1-16/P1-17 成功页矩阵 + 任务①②生命周期:okpg2 定稿(不可达语境标题「保存配置成功,今天/明早 HH:MM 见」时间动态 + 「回排查页」唯一出口、高级设置出口收掉对齐白板;锚前/降级变体不动);彩带口径收口(=用户在场的验证通过,无人值守成功不弹彩带——实测 GUI 在场任务成功停 v-main);submitLadder 不可达分支补 taskStatus 只读复询分流拦截页(任务①建成失败落点,信封不带 task_ok 故复询;查询失败按建成放行);任务②侧零结构改动(明早任务跑=FileWatcher 翻译的 net:state/log:appended 走既有 ROUTE/横幅管线,登录失败不进拦截页——实测);mock 加 `_setTaskOk`/`_runMorningTask` 驱动钩子;画廊 v-success 卡 8 帧(新增拦截变体+重建放行)+ S5/S10 文案跟进 + S11 新故事;本表 §0/§1/§3 #13 同步 |
 | 2026-09-11 | (本提交) | 第三批 P1-15 故障带自愈四链(契约纪律分层):**日志链** — 启动巡检日志维度分诊(firstRun configured∧logged_in 拉 recentResult,今早 fail → contra 状态页,P1-10 contra/P1-14「进入检测」自此接通真实入口;silent/throttled 不分诊;②③两路已由网态调起接管);**任务链** — rebuildTask 后端 3 轮重试环(api.py,信封 ok=false 即 3 败,pytest +2=281 全绿)+ 前端拦截页/横幅② 3 败反馈出口(S.rebuildFails 共用计数、renderBanners 正式渲染、点击反馈出口即复位计数复原重建入口);**程序/库链** — 契约 1.6.0 缺口列单待拍板(§0 巡检注含 🔔 J 章表逐行对账);mock `_setTaskOk` 加 sticky;实测 10 组全绿(分诊正负样本/两入口 3 败/反馈出口复原/成功清零/blocked 回归);画廊 contra 帧改 unverified 真开机 + v-main unverified 两帧适配 + 3 败帧 + S8 补第 4 步 + S12 分诊故事(十七→十八);本表 §0/§1/§3 #14 同步 |
+| 2026-09-11 | (本提交) | 收尾批 P0-6 mock 对齐后端「线上他人」已存凭据路径:`login({})` 无 password + `logged_in` 分支先 chkstatus(对照真后端 api.py:185-193),他人 → 注销他人会话 → 真登一次(attempts=1,attempts/verified/task_ok 全套带齐),不再误返 already;自己/chkstatus 不可得 → already(行为不变);契约 1.5.0 + 后端 0 改动;mock 头注 `other` 场景说明更新;画廊 v-main 卡新增「重登·线上他人」验收帧;本表 §0 already 行注 + §3 #1/#4 链路注;P0-6 验收全场景回归零异常 |
 
 ## 5. 执行约定(零上下文可续:新对话或 subagent 接力同规,2026-09-11 拍板)
 
