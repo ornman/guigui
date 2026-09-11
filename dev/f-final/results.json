@@ -330,8 +330,8 @@
         "net": "unreachable",
         "dirty": false
       },
-      "form_pre": "clear",
-      "note": "空表单 + configured → HUB_WAIT 首次调起"
+      "form_pre": null,
+      "note": "空表单(含仅预填)+ configured → HUB_WAIT 首次调起"
     },
     {
       "src": "v-form",
@@ -353,7 +353,7 @@
         "net": "unreachable",
         "dirty": false
       },
-      "form_pre": "clear",
+      "form_pre": null,
       "note": "空表单但同问题已调起 → 去重拦下留页"
     },
     {
@@ -399,7 +399,7 @@
         "net": "logged_in",
         "dirty": false
       },
-      "form_pre": "clear",
+      "form_pre": null,
       "note": "FORM_NET:状态行就地刷新,留页"
     },
     {
@@ -567,10 +567,10 @@
   "ac": {
     "AC-1": {
       "flash_text": "刚刚把网帮你接回来啦 ✓",
-      "appear_ms": 912,
-      "revert_ms": 4915,
-      "duration_ms": 4003,
-      "poll_span_ms": 3924,
+      "appear_ms": 914,
+      "revert_ms": 4914,
+      "duration_ms": 4000,
+      "poll_span_ms": 3917,
       "baseline_after": "网的事交给我,你放心忙~",
       "mutations": [
         {
@@ -582,11 +582,11 @@
           "text": "网的事交给我,你放心忙~"
         },
         {
-          "t": 912,
+          "t": 914,
           "text": "刚刚把网帮你接回来啦 ✓"
         },
         {
-          "t": 4915,
+          "t": 4914,
           "text": "网的事交给我,你放心忙~"
         }
       ],

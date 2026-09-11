@@ -66,7 +66,7 @@ VIEWS = ["v-boot","v-form","v-success","v-status","v-guide","v-main","v-log","v-
 
 # ── ROUTE 路由格走查表(矩阵 §2 逐格)──
 # (源视图, 前置网态 from, 待测事件 to, 期望落点, form 预置, 备注)
-#   form 预置:'clear'=清空表单(空表单格)/ 'dirty'=键入学号(A3 豁免格)/ None=不动
+#   form 预置:'dirty'=键入学号(A3 豁免格)/ None=不动(空表单格 — 仅预填/真空都非 dirty)
 #   前置网态 from 同时决定 hubRaised 前置:
 #     logged_in   → hubRaised=null(测「首次调起」)
 #     unreachable → hubRaised='wait'(测「同问题去重拦下」)
@@ -82,10 +82,12 @@ ROUTE_GRID = [
     ("v-guide","unreachable","logged_in","v-main",None,     "guideDaily:550ms 后回日常"),
     ("v-guide","unreachable","not_logged_in","v-status",None,"guideReprobe → reProbe → configured → 状态页 drop(P0-7)"),
     # ── v-form 行(A3 formDirty 豁免 / 空表单 configured → 调起)──
-    ("v-form","logged_in","unreachable","v-status","clear", "空表单 + configured → HUB_WAIT 首次调起"),
-    ("v-form","unreachable","unreachable","v-form","clear", "空表单但同问题已调起 → 去重拦下留页"),
+    # 注:walkthrough-5 起 formDirty 改「真键入」判定(identify 预填记基准 S.formPrefill,
+    # 清空=动过=dirty)— 空表格因此改为「不动字段」测法:仅预填/真空都非 dirty → 调起
+    ("v-form","logged_in","unreachable","v-status",None,     "空表单(含仅预填)+ configured → HUB_WAIT 首次调起"),
+    ("v-form","unreachable","unreachable","v-form",None,     "空表单但同问题已调起 → 去重拦下留页"),
     ("v-form","logged_in","unreachable","v-form","dirty",   "A3 拍板④:已键入不被拽走"),
-    ("v-form","unreachable","logged_in","v-form","clear",   "FORM_NET:状态行就地刷新,留页"),
+    ("v-form","unreachable","logged_in","v-form",None,      "FORM_NET:状态行就地刷新,留页"),
     # ── v-status 行(在页迁移)──
     ("v-status","unreachable","not_logged_in","v-status",None,"statusNetMood:wait→drop 就地换境"),
     ("v-status","not_logged_in","logged_in","v-main",None,  "statusResolved:清旗回日常"),
@@ -171,10 +173,8 @@ def main():
             page.wait_for_timeout(1500)
             # 3. 手动导航回源视图(模拟用户从状态页「带横幅回日常」再点开详情)
             enter_view(page, src_view)
-            # 4. 表单预置(空表单格 / A3 已键入格)
-            if form_pre == "clear":
-                page.evaluate("$('f-sid').value='';$('f-pwd').value=''")
-            elif form_pre == "dirty":
+            # 4. 表单预置(A3 已键入格;「空表单」格不动字段 — 仅预填/真空都非 dirty,见上注)
+            if form_pre == "dirty":
                 page.evaluate("$('f-sid').value='2025010203';$('f-pwd').value=''")
             pre = hub_state(page)
             pre_view = current_view(page)
