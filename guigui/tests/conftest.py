@@ -26,6 +26,21 @@ def _toast_never_fires(monkeypatch):
     yield fired
 
 
+@pytest.fixture(autouse=True)
+def _com_channel_off(monkeypatch):
+    """安全网(ADR-0001 双通道落地后):scheduler COM 主通道在测试里默认关闭 —
+    现有用例 mock 的是 scheduler._run(schtasks 兜底路径),COM 若放行会在
+    测试机上真连任务计划服务、真注册「GuiGui」任务。COM 层用例自己
+    monkeypatch _com_folder 注入假 folder(后打补丁自然覆盖本网)。"""
+    from guigui.core import scheduler
+
+    def _boom():
+        raise RuntimeError("COM channel disabled in tests")
+
+    monkeypatch.setattr(scheduler, "_com_folder", _boom)
+    yield
+
+
 @pytest.fixture
 def real_notify_send(monkeypatch):
     """恢复真 notify.send(test_notify 的 send 系用例用;自带 subprocess mock)。"""

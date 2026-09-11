@@ -316,51 +316,21 @@ def _mmdd(iso_date: str | None) -> str | None:
         return str(iso_date)
 
 
-_TASK_PS = (
-    "Get-ScheduledTaskInfo -TaskName 'GuiGui','GuiGui-Patrol' "
-    "-ErrorAction SilentlyContinue | Select-Object TaskName,LastRunTime,"
-    "LastTaskResult | ConvertTo-Json -Compress"
-)
-
-
 def _self_tasks() -> list[dict]:
-    """schtasks 实查:registered 走 scheduler.query_xml;last_run/last_result
-    走 PowerShell(GitHub JSON 输出,免本地化表头解析)。"""
+    """任务在岗 + 最近运行:registered 走 scheduler.query_xml(COM 主/schtasks
+    兜底);last_run/last_result 走 scheduler.task_runtime_info(COM 读
+    RegisteredTask 属性,ADR-0001:撤 powershell Get-ScheduledTaskInfo 通道)。
+    COM 不可用 → last_run 允许缺失,registered 判定不受损。"""
     tasks: list[dict] = []
-    info: dict[str, dict] = {}
-    try:
-        raw = _run(["powershell", "-NoProfile", "-Command", _TASK_PS])
-        data = json.loads(raw or "null")
-        for row in (data if isinstance(data, list) else [data] if data else []):
-            info[str(row.get("TaskName"))] = row
-    except Exception:
-        pass
     for name in (scheduler.TASK_MAIN, scheduler.TASK_PATROL):
-        row = info.get(name, {})
-        last_result = row.get("LastTaskResult")
+        info = scheduler.task_runtime_info(name) or {}
         tasks.append({
             "name": name,
             "registered": scheduler.query_xml(name) is not None,
-            "last_run": _fmt_ps_time(row.get("LastRunTime")),
-            "last_result": (f"0x{int(last_result) & 0xFFFFFFFF:X}"
-                            if last_result is not None else None),
+            "last_run": info.get("last_run"),
+            "last_result": info.get("last_result"),
         })
     return tasks
-
-
-def _fmt_ps_time(v) -> str | None:
-    """PowerShell 时间(/Date(ts)/ 或 ISO)→ 'MM-DD HH:MM:SS'。"""
-    if not v:
-        return None
-    try:
-        if isinstance(v, str) and v.startswith("/Date("):
-            ts = int(v[6:v.index(")")])
-            when = dt.datetime.fromtimestamp(ts / 1000)
-        else:
-            when = dt.datetime.fromisoformat(str(v).replace("Z", "+00:00")).replace(tzinfo=None)
-        return when.strftime("%m-%d %H:%M:%S")
-    except Exception:
-        return None
 
 
 def _collect_self(cfg: dict) -> dict:

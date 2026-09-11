@@ -190,3 +190,167 @@ def test_drop_logon_trigger():
     out = drop_logon_trigger(xml)
     assert "<LogonTrigger>" not in out
     assert "<CalendarTrigger>" in out
+
+
+# ── COM 主通道(fake folder 注入 + 降级链)────────────────
+
+
+class _FakeType:
+    """复刻迟绑定形态:obj.GetType().InvokeMember(name, flags, binder, obj, args)。"""
+
+    def __init__(self, obj):
+        self._obj = obj
+
+    def InvokeMember(self, name, flags, binder, target, args):
+        return self._obj.com_call(name, args)
+
+
+_FileNotFoundException = type("FileNotFoundException", (Exception,), {})
+_TargetInvocationException = type("TargetInvocationException", (Exception,), {})
+
+
+def _raise_not_found():
+    """模拟反射包装:InnerException 才是 FileNotFound(真机探针实测形态)。"""
+    wrapper = _TargetInvocationException("调用的目标发生了异常")
+    wrapper.InnerException = _FileNotFoundException("系统找不到指定的文件")
+    raise wrapper
+
+
+class FakeCom:
+    """通用迟绑定假对象:方法走 methods,属性走 props。"""
+
+    def __init__(self, props=None, methods=None):
+        self.props = props or {}
+        self.methods = methods or {}
+
+    def GetType(self):
+        return _FakeType(self)
+
+    def com_call(self, name, args):
+        if name in self.methods:
+            return self.methods[name](*args)
+        return self.props[name]
+
+
+def make_folder(tasks=None, *, fail_register=False, fail_get=False,
+                fail_delete=False):
+    """假根 folder:tasks 为 name→xml;三个 fail 开关模拟 COM 环节异常。"""
+    state = {"tasks": dict(tasks or {})}
+
+    def register(name, xml, flags, user, pw, logon, sddl):
+        if fail_register:
+            raise RuntimeError("HRESULT 0x80070005 拒绝访问")
+        state["tasks"][name] = xml
+
+    def get(name):
+        if fail_get:
+            raise RuntimeError("COM GetTask boom")
+        if name not in state["tasks"]:
+            _raise_not_found()
+        return FakeCom({"Xml": state["tasks"][name],
+                        "LastRunTime": None, "LastTaskResult": None})
+
+    def delete(name, flags):
+        if fail_delete:
+            raise RuntimeError("COM DeleteTask boom")
+        if name not in state["tasks"]:
+            _raise_not_found()
+        del state["tasks"][name]
+
+    folder = FakeCom(methods={"RegisterTask": register, "GetTask": get,
+                              "DeleteTask": delete})
+    return folder, state
+
+
+@pytest.fixture
+def com_off_spy(monkeypatch):
+    """记录 _run 调用并一律视为失败(降级链用例里 schtasks 只需被叫到)。"""
+    calls = []
+    monkeypatch.setattr(scheduler, "_run",
+                        lambda args, timeout=30: calls.append(args)
+                        or subprocess.CompletedProcess(args, 0, "", ""))
+    return calls
+
+
+def test_com_create_registers_without_schtasks(monkeypatch, com_off_spy):
+    """COM 主通道:注册 + GetTask 回读全走 COM,_run(schtasks)零调用。"""
+    folder, state = make_folder()
+    monkeypatch.setattr(scheduler, "_com_folder", lambda: folder)
+    xml = scheduler.build_boot_task_xml(_cfg(), rev=9)
+    assert scheduler.create_task(scheduler.TASK_BOOT, xml) is True
+    assert state["tasks"][scheduler.TASK_BOOT] == xml
+    assert not com_off_spy                              # schtasks 兜底没被叫到
+
+
+def test_com_create_failure_falls_back_to_schtasks(monkeypatch, com_off_spy):
+    folder, _ = make_folder(fail_register=True)
+    monkeypatch.setattr(scheduler, "_com_folder", lambda: folder)
+    assert scheduler.create_task("GuiGui-Test", "<Task/>") is True
+    assert com_off_spy and com_off_spy[0][0] == "/create"   # 降级被叫到
+
+
+def test_com_create_verify_failure_falls_back(monkeypatch, com_off_spy):
+    """「注册成功但回读失败」也要降级 schtasks 重试(ADR-0001 第 3 点)。"""
+    folder, _ = make_folder(fail_get=True)
+    monkeypatch.setattr(scheduler, "_com_folder", lambda: folder)
+    assert scheduler.create_task("GuiGui-Test", "<Task/>") is True
+    assert any(a[0] == "/create" for a in com_off_spy)
+
+
+def test_com_query_hit_and_miss(monkeypatch, com_off_spy):
+    folder, _ = make_folder({"GuiGui": "<Description>rev=1</Description>"})
+    monkeypatch.setattr(scheduler, "_com_folder", lambda: folder)
+    assert "rev=1" in scheduler.query_xml("GuiGui")
+    assert scheduler.query_xml("GuiGui-None") is None     # 不存在 = COM 定论
+    assert not com_off_spy                                  # 不再走 schtasks
+
+
+def test_com_query_failure_falls_back(monkeypatch, fake):
+    folder, _ = make_folder(fail_get=True)
+    monkeypatch.setattr(scheduler, "_com_folder", lambda: folder)
+    fake.xml_to_return["GuiGui"] = "<Description>rev=2</Description>"
+    assert "rev=2" in scheduler.query_xml("GuiGui")       # 降级 schtasks 读回
+
+
+def test_com_delete_missing_is_success(monkeypatch, com_off_spy):
+    folder, _ = make_folder()
+    monkeypatch.setattr(scheduler, "_com_folder", lambda: folder)
+    assert scheduler.remove_task("GuiGui-None") is True   # 幂等,零 schtasks
+    assert not com_off_spy
+
+
+def test_com_delete_failure_falls_back(monkeypatch, com_off_spy):
+    folder, _ = make_folder(fail_delete=True)
+    monkeypatch.setattr(scheduler, "_com_folder", lambda: folder)
+    assert scheduler.remove_task("GuiGui-Test") is True
+    assert any(a[0] == "/delete" for a in com_off_spy)
+
+
+def _fake_dt(**over):
+    p = dict(Year=2026, Month=9, Day=7, Hour=7, Minute=0, Second=3)
+    p.update(over)
+    return FakeCom(props=p)
+
+
+def test_task_runtime_info_formats(monkeypatch):
+    folder, _ = make_folder()
+    folder.methods["GetTask"] = lambda name: FakeCom(
+        {"LastRunTime": _fake_dt(), "LastTaskResult": 267011})
+    monkeypatch.setattr(scheduler, "_com_folder", lambda: folder)
+    info = scheduler.task_runtime_info("GuiGui")
+    assert info == {"last_run": "09-07 07:00:03", "last_result": "0x41303"}
+
+
+def test_task_runtime_info_never_run_sentinel(monkeypatch):
+    folder, _ = make_folder()
+    folder.methods["GetTask"] = lambda name: FakeCom(
+        {"LastRunTime": _fake_dt(Year=1601), "LastTaskResult": 267011})
+    monkeypatch.setattr(scheduler, "_com_folder", lambda: folder)
+    info = scheduler.task_runtime_info("GuiGui")
+    assert info["last_run"] is None                    # 哨兵年(从未运行)
+    assert info["last_result"] == "0x41303"
+
+
+def test_task_runtime_info_com_down_returns_none():
+    """COM 不可用(conftest 默认关闸)→ None,不抛、不降级 schtasks。"""
+    assert scheduler.task_runtime_info("GuiGui") is None

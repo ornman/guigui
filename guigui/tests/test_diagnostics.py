@@ -43,12 +43,10 @@ TASKLIST_OUT = '''
 "explorer.exe","9012","Console","1","60,000 K"
 '''
 
-TASKINFO_JSON = (
-    '[{"TaskName":"GuiGui","LastRunTime":"2026-09-07T07:00:03",'
-    '"LastTaskResult":0},'
-    '{"TaskName":"GuiGui-Patrol","LastRunTime":"2026-09-07T07:15:00",'
-    '"LastTaskResult":1}]'
-)
+TASKINFO = {   # scheduler.task_runtime_info 桩返回值(COM 通道,ADR-0001 后)
+    "GuiGui": {"last_run": "09-07 07:00:03", "last_result": "0x0"},
+    "GuiGui-Patrol": {"last_run": "09-07 07:15:00", "last_result": "0x1"},
+}
 
 ROUTE_OUT = """
 ===========================================================================
@@ -79,8 +77,6 @@ def canned(monkeypatch):
             return TASKLIST_OUT
         if key == "route print":
             return ROUTE_OUT
-        if cmd[0] == "powershell":
-            return TASKINFO_JSON
         return ""
     config.save(dict(config.DEFAULTS, uid="2025000000001"))
     monkeypatch.setattr(diagnostics, "_run", fake_run)
@@ -89,6 +85,8 @@ def canned(monkeypatch):
     monkeypatch.setattr(diagnostics.scheduler, "query_xml",
                         lambda name: "<Description>rev=3</Description>"
                         if name == "GuiGui" else None)
+    monkeypatch.setattr(diagnostics.scheduler, "task_runtime_info",
+                        lambda name: TASKINFO.get(name))
     monkeypatch.setattr(diagnostics, "_env_clock_skew", lambda cfg: 2.1)
     monkeypatch.setattr(diagnostics, "_latest_ver", lambda: "2.1.2")
     monkeypatch.setattr(diagnostics, "_env_webview2", lambda: "120.0.2210.61")
@@ -199,6 +197,18 @@ def test_last_fail_when(canned):
     later = now + dt.timedelta(minutes=1)
     logstore.append("fail", "又失败了", when=later)
     assert diagnostics.last_fail_when() == f"{later:%m-%d} {later:%H:%M}"
+
+
+def test_self_tasks_com_down_keeps_registered(canned, monkeypatch):
+    """ADR-0001:COM 不可用(task_runtime_info=None)→ last_run/last_result
+    允许缺失;registered 判定不受损(query_xml 双通道照跑)。"""
+    monkeypatch.setattr(diagnostics.scheduler, "task_runtime_info",
+                        lambda name: None)
+    bundle = diagnostics.collect(["problem"])
+    tasks = {t["name"]: t for t in bundle["self"]["tasks"]}
+    assert tasks["GuiGui"]["registered"] is True        # query_xml 桩仍在岗
+    assert tasks["GuiGui"]["last_run"] is None
+    assert tasks["GuiGui"]["last_result"] is None
 
 
 # ── server / crashes 区(S3)─────────────────────

@@ -1,7 +1,10 @@
-"""任务计划 — 任务 XML 生成 + schtasks CRUD + L1 起点公式。
+"""任务计划 — 任务 XML 生成 + CRUD(COM 主通道 + schtasks 兜底)+ L1 起点公式。
 
 - v2 改用完整任务 XML(v1 用 PS cmdlets):生成物可单元测试,且 L5 唤醒
   EventTrigger 在 cmdlets 里没有一等支持(技术方案 §3.3)。
+- CRUD 传输层双通道(ADR-0001,2026-09-11):pythonnet 迟绑定 Schedule.Service
+  为主(未签名 exe 不再 spawn schtasks.exe — 杀软 T1053.005 进程树特征),
+  COM 任何环节异常自动降级 schtasks,对外签名/行为不变。
 - rev 版本标记写在任务 Description(config.tasks_rev 每次调度字段变更 +1),
   selfheal 以「任务存在 && rev 匹配 && Action 目标存在」判对齐。
 - 窗口公式(修 v1 反向 bug):起点 = T − 30min,六拍,时长 = 5×步长。
@@ -230,7 +233,7 @@ def build_patrol_task_xml(cfg: dict, rev: int, now=None) -> str:
     )
 
 
-# ── schtasks CRUD ────────────────────────────────────────
+# ── schtasks CRUD(COM 主通道 + schtasks 兜底,ADR-0001)──
 
 
 def _run(args: list[str], timeout: int = 30) -> subprocess.CompletedProcess:
@@ -242,8 +245,144 @@ def _run(args: list[str], timeout: int = 30) -> subprocess.CompletedProcess:
     )
 
 
+# ── COM 主通道(pythonnet 迟绑定 Schedule.Service)─────────
+
+_BF_CACHE: list = []   # [InvokeMethod|GetProperty, GetProperty],首用后缓存
+
+
+def _com_bf() -> list:
+    """反射 BindingFlags(迟绑定 COM 对象只能走 InvokeMember)。
+
+    System.* 魔法模块由 pythonnet 的 import 钩子提供 — 须先 import clr 装钩子
+    (已装过则零成本);否则 No module named 'System'。"""
+    if not _BF_CACHE:
+        import clr                                # noqa: F401
+        import System
+        bf = System.Reflection.BindingFlags
+        _BF_CACHE[:] = [bf.InvokeMethod | bf.GetProperty, bf.GetProperty]
+    return _BF_CACHE
+
+
+def _com_folder():
+    """迟绑定连接任务计划服务,返回 "\\" 根 folder 对象;失败抛异常(调用方降级)。
+
+    模块级工厂 seam:测试 monkeypatch 本函数注入假 folder 或强制走 schtasks。
+    不缓存连接 — 本地 RPC,对齐一拍 ≤ 8 次调用,Connect 开销可忽略。
+    """
+    import clr                                    # noqa: F401 — pythonnet 随 pywebview 在运行时内
+    import System
+    svc = System.Activator.CreateInstance(
+        System.Type.GetTypeFromProgID("Schedule.Service"))
+    st = svc.GetType()
+    st.InvokeMember("Connect", _com_bf()[0], None, svc, [None, None, None, None])
+    return st.InvokeMember("GetFolder", _com_bf()[0], None, svc, ["\\"])
+
+
+def _com_is_not_found(exc) -> bool:
+    """异常链里是否 FILE_NOT_FOUND(0x80070002)。
+
+    迟绑定经反射,HRESULT 异常包在 TargetInvocationException.InnerException
+    里(2026-09-11 探针实测:冒出的是 System.IO.FileNotFoundException)。"""
+    seen: set[int] = set()
+    e = exc
+    while e is not None and id(e) not in seen:
+        seen.add(id(e))
+        if type(e).__name__ == "FileNotFoundException":
+            return True
+        hr = getattr(e, "HResult", None)
+        if hr is not None and (int(hr) & 0xFFFFFFFF) == 0x80070002:
+            return True
+        e = getattr(e, "InnerException", None)
+    return False
+
+
+def _com_register(folder, task_name: str, xml: str) -> None:
+    """RegisterTask 直接吃现有 XML 字符串;成功后 GetTask 回读确认存在
+    (防「返回成功但任务未落」),任何环节异常上抛 → 调用方降级 schtasks。
+
+    7 参可空位(None×2 + 末位)实测直接封送即可,无需 Type.Missing(探针)。"""
+    bf_call = _com_bf()[0]
+    ft = folder.GetType()
+    # (name, xml, TASK_CREATE_OR_UPDATE=6, userId, password,
+    #  TASK_LOGON_INTERACTIVE_TOKEN=3, sddl)
+    ft.InvokeMember("RegisterTask", bf_call, None, folder,
+                    [task_name, xml, 6, None, None, 3, None])
+    ft.InvokeMember("GetTask", bf_call, None, folder, [task_name])
+
+
+def _com_query(folder, task_name: str) -> str | None:
+    """GetTask 读回任务 XML;任务不存在 → None(定论,不必再走 schtasks)。"""
+    bf_call, bf_prop = _com_bf()
+    try:
+        task = folder.GetType().InvokeMember(
+            "GetTask", bf_call, None, folder, [task_name])
+    except Exception as e:
+        if _com_is_not_found(e):
+            return None
+        raise
+    return str(task.GetType().InvokeMember("Xml", bf_prop, None, task, []))
+
+
+def _com_delete(folder, task_name: str) -> None:
+    """DeleteTask(name, flags=0);不存在视为成功(幂等,与 schtasks 通道同语义)。"""
+    try:
+        folder.GetType().InvokeMember(
+            "DeleteTask", _com_bf()[0], None, folder, [task_name, 0])
+    except Exception as e:
+        if not _com_is_not_found(e):
+            raise
+
+
+def task_runtime_info(task_name: str) -> dict | None:
+    """COM 读 RegisteredTask 的 LastRunTime/LastTaskResult(诊断包专用,
+    ADR-0001:diagnostics 撤 powershell Get-ScheduledTaskInfo 通道)。
+
+    COM 不可用/任务不存在/读失败 → None(last_run 允许缺失,不降级 schtasks —
+    schtasks /query 的本地化表头解析正是要消灭的脆弱面)。"""
+    try:
+        folder = _com_folder()
+        bf_call, bf_prop = _com_bf()
+        task = folder.GetType().InvokeMember(
+            "GetTask", bf_call, None, folder, [task_name])
+        tt = task.GetType()
+        when = tt.InvokeMember("LastRunTime", bf_prop, None, task, [])
+        code = tt.InvokeMember("LastTaskResult", bf_prop, None, task, [])
+    except Exception:
+        return None
+    return {
+        "last_run": _fmt_com_time(when),
+        "last_result": f"0x{int(code) & 0xFFFFFFFF:X}" if code is not None else None,
+    }
+
+
+def _fmt_com_time(dt_obj) -> str | None:
+    """System.DateTime → 'MM-DD HH:MM:SS';从未运行的哨兵时间(1601 年)→ None。
+
+    逐属性读而非 ToString:免 culture 依赖(与旧 powershell 通道输出同格式)。"""
+    bf_prop = _com_bf()[1]
+    try:
+        wt = dt_obj.GetType()
+        p = {n: int(wt.InvokeMember(n, bf_prop, None, dt_obj, []))
+             for n in ("Year", "Month", "Day", "Hour", "Minute", "Second")}
+    except Exception:
+        return None
+    if p["Year"] <= 1900:
+        return None
+    return (f"{p['Month']:02d}-{p['Day']:02d} "
+            f"{p['Hour']:02d}:{p['Minute']:02d}:{p['Second']:02d}")
+
+
+# ── 对外 CRUD(COM 主通道;异常自动降级 schtasks,对外签名不变)──
+
+
 def create_task(task_name: str, xml: str) -> bool:
-    """用 XML 注册/覆盖任务(/f 幂等)。"""
+    """用 XML 注册/覆盖任务(幂等)。"""
+    try:
+        _com_register(_com_folder(), task_name, xml)
+        log.info("scheduler: 任务已注册(COM) %s", task_name)
+        return True
+    except Exception as e:
+        log.warning("scheduler: COM 注册 %s 失败,降级 schtasks: %s", task_name, e)
     tmp: str | None = None
     try:
         # Task Scheduler 规范格式是 UTF-16(带 BOM);声明与文件编码必须一致,
@@ -272,6 +411,12 @@ def create_task(task_name: str, xml: str) -> bool:
 def remove_task(task_name: str) -> bool:
     """删除任务;「找不到」视为成功(幂等)。"""
     try:
+        _com_delete(_com_folder(), task_name)
+        log.info("scheduler: 任务已删除(COM) %s", task_name)
+        return True
+    except Exception as e:
+        log.warning("scheduler: COM 删除 %s 失败,降级 schtasks: %s", task_name, e)
+    try:
         r = _run(["/delete", "/tn", task_name, "/f"], timeout=15)
         if r.returncode == 0:
             log.info("scheduler: 任务已删除 %s", task_name)
@@ -288,6 +433,10 @@ def remove_task(task_name: str) -> bool:
 
 def query_xml(task_name: str) -> str | None:
     """读任务 XML;不存在/查询失败返回 None。"""
+    try:
+        return _com_query(_com_folder(), task_name)
+    except Exception as e:
+        log.warning("scheduler: COM 查询 %s 失败,降级 schtasks: %s", task_name, e)
     try:
         r = _run(["/query", "/tn", task_name, "/xml"], timeout=15)
     except Exception as e:
