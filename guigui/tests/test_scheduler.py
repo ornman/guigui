@@ -343,11 +343,12 @@ def test_task_runtime_info_formats(monkeypatch):
 
 def test_task_runtime_info_never_run_sentinel(monkeypatch):
     folder, _ = make_folder()
+    # Task Scheduler 从未运行哨兵 = 1999-11-30(真机实测,非 1601/1899)
     folder.methods["GetTask"] = lambda name: FakeCom(
-        {"LastRunTime": _fake_dt(Year=1601), "LastTaskResult": 267011})
+        {"LastRunTime": _fake_dt(Year=1999, Month=11, Day=30), "LastTaskResult": 267011})
     monkeypatch.setattr(scheduler, "_com_folder", lambda: folder)
     info = scheduler.task_runtime_info("GuiGui")
-    assert info["last_run"] is None                    # 哨兵年(从未运行)
+    assert info["last_run"] is None                    # 哨兵日期 → 未运行
     assert info["last_result"] == "0x41303"
 
 

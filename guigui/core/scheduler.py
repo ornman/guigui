@@ -366,8 +366,8 @@ def _fmt_com_time(dt_obj) -> str | None:
              for n in ("Year", "Month", "Day", "Hour", "Minute", "Second")}
     except Exception:
         return None
-    if p["Year"] <= 1900:
-        return None
+    if p["Year"] <= 1900 or (p["Year"], p["Month"], p["Day"]) == (1999, 11, 30):
+        return None   # 从未运行哨兵:1601(FILETIME 0)或 1999-11-30(Task Scheduler 惯用,实测)
     return (f"{p['Month']:02d}-{p['Day']:02d} "
             f"{p['Hour']:02d}:{p['Minute']:02d}:{p['Second']:02d}")
 
