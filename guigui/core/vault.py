@@ -50,6 +50,11 @@ class VaultError(RuntimeError):
 # ── advapi32 直调(降级层,与 WinVaultKeyring 同 CRED_TYPE_GENERIC)──
 
 _CRED_TYPE_GENERIC = 1
+# Persist 只决定「存储寿命」,不改变用户隔离 — CredWriteW/CredReadW 永远
+# 落当前用户的凭据库,LOCAL_MACHINE(=2)意为「存本机、跨重启、直至显式删除」,
+# 不是「全机共享」;与 keyring WinVault 的兼容要点在 CRED_TYPE_GENERIC(同一
+# 条凭据两路互写),其 25.x 默认 Persist=ENTERPRISE(=3),无域个人机上两者
+# 存储行为一致(均本机持久、按用户隔离),此处取语义最直白的一档。
 _CRED_PERSIST_LOCAL_MACHINE = 2
 
 
