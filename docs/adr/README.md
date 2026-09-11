@@ -12,10 +12,10 @@
 
 | 编号 | 标题 | 状态 | 关联 |
 |---|---|---|---|
-| [ADR-0001](0001-task-scheduler-com-transport.md) | 任务调度传输层改 COM 主通道 + schtasks 兜底 | **已批准·待实施**(2026-09-11 用户指令) | R1;含诊断 powershell 点 |
-| [ADR-0002](0002-toast-channel-winrt.md) | 通知通道 WinRT 化(powershell 降兜底) | 提议(spike 前置) | R2 / S4 自救单点 |
-| [ADR-0003](0003-system-info-inprocess.md) | 系统信息采集进程内化 | 提议 | R3 / S1 反模式 |
-| [ADR-0004](0004-uninstall-lifecycle-completeness.md) | 卸载补删全部四个任务 | 建议采纳·纯执行 | R5 |
+| [ADR-0001](0001-task-scheduler-com-transport.md) | 任务调度传输层改 COM 主通道 + schtasks 兜底 | **已接受**(2026-09-11 实施完成) | R1;含诊断 powershell 点 |
+| [ADR-0002](0002-toast-channel-winrt.md) | 通知通道 WinRT 化(powershell 降兜底) | **已接受**(2026-09-11 spike 通过·实施完成) | R2 / S4 自救单点 |
+| [ADR-0003](0003-system-info-inprocess.md) | 系统信息采集进程内化 | **已接受**(2026-09-11 三点全通·实施完成) | R3 / S1 反模式 |
+| [ADR-0004](0004-uninstall-lifecycle-completeness.md) | 卸载补删全部四个任务 | **已接受**(2026-09-11 纯执行落地) | R5 |
 | [ADR-0005](0005-code-signing-strategy.md) | 代码签名策略 | **待拍板**(预算) | R4 / S2 放大器 |
 | [ADR-0006](0006-scheduling-surface-and-backoff.md) | Wake 降级 + 对齐退避 | 提议·文案待过目 | R6 / S3 |
 
@@ -24,3 +24,4 @@
 - **纯执行可接力**:ADR-0001(已批准)、ADR-0004(无决策点)、ADR-0002/0003(spike 通过即视为可执行,spike 不通则回填 ADR 关闭)。
 - **拍板项不代拍**:ADR-0005(预算)、ADR-0006(文案+阈值)。
 - 验证基准统一:pytest 从仓库根(`.venv-guigui`),279 测为回归底线;真机项按各 ADR 实施清单执行。
+- **2026-09-11 执行批次**:ADR-0001/0002/0003/0004 已全部实施收口(见各文状态行与回填);回归底线随 1.6.0 契约合入升至 303,本批实施后为 322(新增 19 测全绿)。ADR-0005/0006 仍待用户拍板。

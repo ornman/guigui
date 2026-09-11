@@ -1,6 +1,6 @@
 # ADR-0003:系统信息采集进程内化(外部命令仅兜底/无等价时保留)
 
-- **状态**:提议(技术选型已定,建议采纳)
+- **状态**:已接受(2026-09-11 三点 spike 全通·实施完成;commit 23fd34d)
 - **日期**:2026-09-11
 - **关联**:审计 R3 / S1 反模式(「把系统 API 当外部命令调」);吸收 ADR-0001 未覆盖的诊断侧全部 shell-out 点
 
@@ -42,3 +42,10 @@
 ## 验证基准
 
 同 ADR-0001。
+
+## 实施回填(2026-09-11)
+
+- **spike 三点全通**(本机 .venv-guigui):`clr.AddReference("System.Management")` + SecurityCenter2 `AntiVirusProduct.displayName`(读到 Windows Defender);`Win32_IP4RouteTable` 默认路由(Destination='0.0.0.0' 带 InterfaceIndex/Metric);`NetworkInterface.GetAllNetworkInterfaces()` 网卡/DNS 全量。全部落地,无保留点。
+- 落地形态:新增 `guigui/core/sysinfo.py` 共用 seam(`wmi_rows()` 折纯 Python dict、`net_interfaces()` 网卡摘要含 index/is_wireless),diagnostics 四采集点与 `detect._default_route_exists` 全部换进程内,信封字段与类型零变更。
+- **spec 确认结论**:System.Management 是 .NET Framework GAC 程序集,`clr.AddReference` 运行时从 GAC 解析,PyInstaller 无需(也无法)收集 — hiddenimports 加了只会得 modulegraph 假警告;pythonnet 本体已随 pywebview 打包。spec 内已加注释在案。
+- 附带发现两处旧缺陷(随通道重写一并修正,均有测试锁定):① `route print` 通道的 `if mask` 守卫使 0.0.0.0/0 默认路由从未参与最长前缀匹配;② COM `LastRunTime` 从未运行哨兵实测是 **1999-11-30**(非 1601/1899),task_runtime_info 据此过滤。

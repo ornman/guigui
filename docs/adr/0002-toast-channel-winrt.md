@@ -1,6 +1,6 @@
 # ADR-0002:通知通道 WinRT 化(pythonnet 直调,powershell 降为兜底)
 
-- **状态**:提议(建议采纳;实施前 spike 前置,见「实施清单」第 0 步)
+- **状态**:已接受(2026-09-11 spike 通过·实施完成;commit bb37af0)
 - **日期**:2026-09-11
 - **关联**:审计 R2 / S4(自救链单点)
 
@@ -31,6 +31,12 @@
 ## 实施清单
 
 0. **spike**(半小时级):`.venv-guigui` 下验证 pythonnet 能否激活 ToastNotificationManager 并发出一条真实 Toast;不通则按备选 A 走 ctypes 探针;结论写回本节。
+
+   > **spike 结论(2026-09-11 实测回填)**:**通过,走 pythonnet 直调路线,无需备选 A/B**。
+   > - `Type.GetType("<类>, <winmd 名>, ContentType=WindowsRuntime")` 加载 .NET 4.5+ WinRT 投影类型全通(与 powershell 通道激活的是同一套 API);
+   > - `InvokeMember` 迟绑定**不可用**(「COM 目标不会实现 IDispatch」— WinRT 对象无 IDispatch),必须 pythonnet 早绑定点调用(`doc.LoadXml(xml)` / `notifier.Show(toast)`),静态方法经 `MethodInfo.Invoke(None, [appId])`;
+   > - 真机实测发出真 Toast(通知中心可见),`Activator.CreateInstance(toast_t, doc)` 带参构造可用;
+   > - 零新增依赖(pythonnet 随 pywebview 已在运行时内),ctypes `RoGetActivationFactory` 备选 A 未启用。
 1. `notify.py`:`send()` 改双通道结构(主 WinRT / 兜底 powershell),`_xml_escape` 与 Toast 模板拼装复用。
 2. 测试:现有 notify 相关用例全绿;新增「主通道失败 → powershell 兜底被调」单测。
 3. 真机验证:dev 模式手工触发 task_blocked/recovered 各一条,通知中心可见、点击路由正确。
