@@ -1,29 +1,44 @@
-"""通知 — Windows Toast(PowerShell WinRT)+ guigui:// 协议激活 + 决策去重纯函数。
+"""通知 — Windows Toast(PowerShell WinRT)+ guigui:// 协议激活 + 决策纯函数。
 
 - 通道移植 v1 src/notify.py(ShellExperienceHost AppId,零依赖生产验证);
   升级:toast 带 activationType=protocol,点击按路由唤起 GUI(技术方案 §9)。
-- decide_notify 是纯函数:PRD §4.5 语义(2026-09-06 重梳理)—
-  开门后明确被拒当拍即弹(每日≤1)/ 维护页连续≥3拍才弹(每日≤1)/
-  断→通每日 1 次 / 锚前(06:50 前)一切失败永不通知。
+- decide_notify 是纯函数:1.6.0 通知矩阵(用户拍板 2026-09-11 重写)—
+  任务成功=发(默认开、设置可关)/ 凭据类失败=发带原因 / 连不上=也发(纯诊断)/
+  维护页连续≥3拍=发 / 锚前一切失败永不通知 / 节流、库降级=静默;
+  冷却:同类 30 分钟合并 + 每类每天 ≤1(账本经 ensure_state 持久化)。
+  假期模式的进出由 ensure 判定(连续 3 天不可达进 / 恢复可达退),
+  本函数只收 vacation 布尔(假期中失败类全静默,任务照跑日志照记)。
 """
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-RECOVERED = "recovered"
-FAILED = "failed"            # 开门后明确被拒 → 当拍即弹(PRD 4.5)
-MAINTENANCE = "maintenance"  # 维护页连续 ≥3 拍(PRD 4.5)
-TASK_LOST = "task_lost"      # 任务被拦/丢失(ensure 自检发现,QA P1-5)
+SUCCESS = "success"              # 任务成功(1.6.0:默认开、设置可关)
+FAILED = "fail_cred"             # 任务失败·凭据类(带原因)
+NET_FAIL = "fail_net"            # 任务失败·连不上(1.6.0:纯诊断也发)
+MAINTENANCE = "maintenance"      # 维护页连续 ≥3 拍
+TASK_LOST = "task_lost"          # 任务被拦/丢失(ensure 自检发现,QA P1-5)
+
+COOLDOWN_S = 30 * 60             # 拍板 #5:同类 30 分钟内合并为一条
 
 LAUNCH_MAIN = "guigui://main"
 LAUNCH_CREDS = "guigui://creds"
 LAUNCH_SETTINGS = "guigui://settings"
+# 1.6.0 深链(契约 §4 open_route):通知落点直达四视图
+LAUNCH_FORM = "guigui://v-form"        # 登录页(凭据类失败通知)
+LAUNCH_STATUS = "guigui://v-status"    # 状态页(成功/连不上/维护页通知)
+LAUNCH_SUCCESS = "guigui://v-success"  # 成功/拦截页
+LAUNCH_FEEDBACK = "guigui://v-feedback"
+# 启动路由枚举(契约 §4;壳层与 __main__ 共用白名单)
+OPEN_ROUTES = ("v-form", "v-status", "v-success", "v-feedback")
 
 
 def _xml_escape(text: str) -> str:
@@ -79,11 +94,33 @@ def send(title: str, message: str, launch: str = LAUNCH_MAIN) -> None:
 # ── 去重决策(纯函数,AC-04)──────────────────────────────
 
 
+_direct_last: dict[str, dict] = {}   # 直发类(task_blocked 等)进程内冷却账本
+
+
+def _direct_gate(kind: str) -> bool:
+    """直发类冷却(拍板 #5 同口径:同类 30 分钟合并 + 每天每类 ≤1)。
+
+    task_blocked / task_linger / task_lost 由用户动作(GUI 保存/启动对齐)
+    或 ensure 自检触发,不在 ensure 冷却账本里;用进程内账本挡同一 GUI
+    会话内的连拍刷屏(保存 5 次 = 最多 1 条 toast)。"""
+    now = time.time()
+    today = dt.date.today().isoformat()
+    rec = _direct_last.get(kind) or {}
+    if rec.get("date") == today:
+        return False
+    if rec.get("ts") and now - rec["ts"] < COOLDOWN_S:
+        return False
+    _direct_last[kind] = {"date": today, "ts": now}
+    return True
+
+
 def task_blocked() -> None:
     """建任务被安全软件拦时的指引通知(点开直达设置页)。
 
     仅在用户主动动作(保存设置/切总开关/GUI 启动对齐)后调用,
     --ensure 定时路径不建任务,不会每天刷屏。"""
+    if not _direct_gate("task_blocked"):
+        return
     send(
         "桂桂",
         "安全软件拦住了定时任务的创建,自动登录还没生效。"
@@ -97,6 +134,8 @@ def task_linger() -> None:
 
     开着被拦是「没动静」;关着删不掉 = 任务还在、明早照常登录 —
     背着用户干活更伤信任,必须告知;回设置页再关一次即重试删除。"""
+    if not _direct_gate("task_linger"):
+        return
     send(
         "桂桂",
         "没关干净:定时任务还在,明早还会自动登录。"
@@ -113,6 +152,8 @@ def task_lost() -> None:
     必须告知,否则「每天 07:00」最大长期承诺已死无人知晓;回设置页点
     「点此重建」即可(契约 §2.14 rebuildTask 仅用户点击触发,绝不在
     --ensure 静默进程里重建,避免静默进程和管理侧抢)。"""
+    if not _direct_gate("task_lost"):
+        return
     send(
         "桂桂",
         "定时任务不见了,自动登录可能已经停了。"
@@ -121,51 +162,71 @@ def task_lost() -> None:
     )
 
 
+def _cooldown_gate(kind: str, sent: dict, *, today: str, now: float) -> bool:
+    """冷却闸(纯):同类 30 分钟内合并为一条(不重发)+ 每类每天 ≤1。
+
+    通过则当场记账(写回 sent),调用方把 sent 持久化进 ensure_state。"""
+    rec = sent.get(kind) or {}
+    if rec.get("date") == today:
+        return False
+    if rec.get("ts") and now - rec["ts"] < COOLDOWN_S:
+        return False
+    sent[kind] = {"date": today, "ts": now}
+    return True
+
+
 def decide_notify(prev_state: str | None, *, connected: bool,
                   outcome: str | None = None,
                   before_anchor: bool = False, maintenance_streak: int = 0,
-                  last_recovered_date: str | None = None,
-                  fail_notify_date: str | None = None,
-                  maintenance_notify_date: str | None = None,
-                  today: str = "",
+                  sent: dict | None = None,
+                  today: str = "", now: float = 0.0,
+                  vacation: bool = False,
                   ) -> tuple[str | None, dict]:
-    """根据上次持久化状态与本次结果,决定通知种类与状态更新(PRD 4.5)。
+    """1.6.0 通知矩阵(纯函数,用户拍板 2026-09-11)。
 
     Args:
-        outcome: 本拍失败形态 — "rejected"(服务器明确拒绝)| "unexpected"(维护页)
-                 | None(不可达/未尝试登录)。
+        outcome: 本拍失败形态 — "rejected"(凭据类被拒)| "unexpected"(维护页)
+                 | None(连不上/未尝试登录)。
         before_anchor: 06:50 开门前 → 一切失败只算「还没开门」,不算断网事件。
+        sent: 冷却账本(kind → {date, ts}),来自 ensure_state["notify_sent"]。
+        vacation: 假期模式(ensure 判定:连续 3 天不可达自动进 / 恢复可达退,
+                 手动开关任一生效)— 假期中失败类全静默;成功类在恢复可达
+                 (=假期自动退出)之后才判,故此处 vacation 只压失败类。
 
     Returns:
-        (notify_kind, updates):kind ∈ recovered | failed | maintenance | None;
-        updates 为需要合并进 ensure_state 的键值(last_net_state 等)。
+        (notify_kind, updates):kind ∈ success | fail_cred | fail_net |
+        maintenance | None;updates 合并进 ensure_state(notify_sent 含新账本)。
     """
-    if connected:
-        updates = {"last_net_state": "up"}
-        kind = None
-        if prev_state in ("down", "failed"):
-            # 断→通:每天只报一次;同日已报过只记状态
-            if last_recovered_date != today:
-                kind = RECOVERED
-                updates["last_recovered_notify_date"] = today
+    book = {k: dict(v) for k, v in (sent or {}).items()}
+
+    def out(kind, updates):
+        updates["notify_sent"] = book
         return kind, updates
+
+    if connected:
+        # 任务成功 = 发(1.6.0;默认开,设置 notifications 可关 — 开关在调用方)
+        updates = {"last_net_state": "up"}
+        if _cooldown_gate(SUCCESS, book, today=today, now=now):
+            return out(SUCCESS, updates)
+        return out(None, updates)
     if before_anchor:
         # 锚前被拒/不可达:不判失败、不发通知、不动 net_state(防窗口期错怪,AC-12)
         return None, {}
     if outcome == "rejected":
-        # 开门后明确被拒:当拍即弹,每日 ≤1 次(AC-13)
-        updates = {"last_net_state": "failed"}
-        if fail_notify_date != today:
-            return FAILED, {**updates, "fail_notify_date": today}
-        return None, updates
+        # 凭据类失败:发带原因(文案由调用方拼),当拍即判 + 冷却闸
+        if not vacation and _cooldown_gate(FAILED, book, today=today, now=now):
+            return out(FAILED, {"last_net_state": "failed"})
+        return out(None, {"last_net_state": "failed"})
     if outcome == "unexpected":
-        # 维护页:连续 ≥3 拍才弹,每日 ≤1 次
-        updates = {"last_net_state": "failed"}
-        if maintenance_streak >= 3 and maintenance_notify_date != today:
-            return MAINTENANCE, {**updates, "maintenance_notify_date": today}
-        return None, updates
-    # 不可达(未尝试登录):只记 down,不通知(防刷屏)
-    return None, {"last_net_state": "down"}
+        # 维护页:连续 ≥3 拍才弹(质量闸)+ 冷却闸
+        if (not vacation and maintenance_streak >= 3
+                and _cooldown_gate(MAINTENANCE, book, today=today, now=now)):
+            return out(MAINTENANCE, {"last_net_state": "failed"})
+        return out(None, {"last_net_state": "failed"})
+    # 连不上(未尝试登录):也发,纯诊断(1.6.0;假期中静默)
+    if not vacation and _cooldown_gate(NET_FAIL, book, today=today, now=now):
+        return out(NET_FAIL, {"last_net_state": "down"})
+    return out(None, {"last_net_state": "down"})
 
 
 # ── guigui:// 协议注册(HKCU,免管理员)─────────────────

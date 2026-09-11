@@ -37,7 +37,13 @@
    _setTaskOk(ok,sticky) 强改任务在岗位(P1-17 任务①:断网存配置的拦截分流摆拍;
    sticky=true 时 rebuildTask 修不好 — P1-15 重建 3 败→反馈出口的摆拍,模拟杀软
    持续拦截;不还原,复位传 true 或重载场景);
-   _runMorningTask('ok'|'fail') 模拟明早任务真跑(P1-17 任务②三结局摆拍) */
+   _runMorningTask('ok'|'fail') 模拟明早任务真跑(P1-17 任务②三结局摆拍);
+   _setVault('ok'|'rebuilding'|'degraded'|'failed') 强改凭据库健康态(1.6.0 —
+   recentResult.vault_state 随动;通知静默是后端行为,mock 只管信封);
+   _setVacation(on) 强置假期模式标记(1.6.0 — 通知全静默属后端,mock 仅记状态供走查)
+   ?launch=v-form|v-status|v-success|v-feedback(或 main/creds/settings)模拟壳层
+   __guigui_launch 注入(1.6.0 深链;mock 模式下代替后端 evaluate_js,app 消费点
+   在启动路由完成后,时序天然满足) */
 (function(){
 'use strict';
 const LS_SCENE='gg-mock-scene',LS_CFG='gg-mock-cfg';
@@ -56,6 +62,8 @@ const UID='2025000000001',UID_MASK='2025…7209',OTHER_UID='2025000000002',SERVE
 
 const S={
   configured:false,pwd:null,verified:false,taskOk:true,
+  vault:'ok',                    /* 1.6.0 凭据库健康四态(契约 §2.10;_setVault 可摆拍) */
+  vacation:false,                /* 1.6.0 假期模式标记(_setVacation 可强置;通知静默属后端) */
   net:{state:'logged_in',ssid:'Campus-WiFi',server:SERVER},
   cfg:JSON.parse(localStorage.getItem(LS_CFG)||'null')||{
     trigger_time:'07:00',boot_login:true,heartbeat_minutes:5,operator:'校园用户',
@@ -102,6 +110,10 @@ if(SCENE==='unverified'){S.configured=true;S.verified=false;S.pwd='secret';
 
 const saveCfg=()=>localStorage.setItem(LS_CFG,JSON.stringify(S.cfg));
 const netEmit=()=>emit('net:state',{state:S.net.state,ssid:S.net.ssid});
+/* 1.6.0 深链摆拍:?launch=v-* → 对象形 {open_route}(契约 §4);main/creds/settings
+   → 旧字符串形。等价于壳层 loaded 前的 evaluate_js 注入,applyLaunch 消费 */
+const launch=qs.get('launch');
+if(launch)window.__guigui_launch=/^v-/.test(launch)?{open_route:launch}:launch;
 
 window.GGMock={
   async probe(){
@@ -245,7 +257,7 @@ window.GGMock={
     const n=Math.min(Math.max((a&&a.days)||14,1),90);
     return OK({days:S.logs.slice(0,n)});
   },
-  async recentResult(){await delay(50);return OK({...S.last,verified:S.verified})},
+  async recentResult(){await delay(50);return OK({...S.last,verified:S.verified,vault_state:S.vault})},
   async taskStatus(){await delay(80);return S.cfg.master?OK({ok:S.taskOk}):OK({ok:true,note:'off'})},
   /* ── 2.18 diagnose(1.5.0 验证器):五步与后端逐字一致(diag_* 四场景);
      与 _setNet 联动:当前网态真改第 1-3 步走向 ── */
@@ -372,6 +384,23 @@ window.GGMock={
     S.taskOk=!!ok;
     S.taskSticky=!!sticky;
     return OK({taskOk:S.taskOk,sticky:S.taskSticky});
+  },
+  async _setVault(state){
+    /* dev 驱动钩子(1.6.0 库链摆拍):强改凭据库健康态 — recentResult 的
+       vault_state 字段随动(契约 §2.10 四态)。库降级不发通知、前端不弹
+       横幅是拍板行为,本钩子只摆信封,验证透传链路 */
+    const ok4=['ok','rebuilding','degraded','failed'];
+    if(ok4.indexOf(state)<0)return ERR('INTERNAL','vault_state ∈ '+ok4.join('|'));
+    S.vault=state;
+    return OK({vault_state:S.vault});
+  },
+  async _setVacation(on){
+    /* dev 驱动钩子(1.6.0 假期模式摆拍):强置假期标记。通知静默全在
+       后端(Toast 不经桥),mock 侧仅记账 — 走查时用本钩子表达「此刻
+       后端已进假期」,顺带联动手动开关 vacation_silence 供设置页核对 */
+    S.vacation=!!on;
+    S.cfg.vacation_silence=!!on;saveCfg();
+    return OK({vacation:S.vacation,vacation_silence:S.cfg.vacation_silence});
   },
   async _runMorningTask(outcome){
     /* dev 驱动钩子(P1-17 任务②):模拟明早 07:00 定时任务真跑一次(GUI 在场视角),

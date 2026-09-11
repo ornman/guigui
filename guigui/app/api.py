@@ -742,6 +742,15 @@ class GuiGuiApi:
             vault.has_password(cfg.get("uid") or "")
         except Exception:
             app_issues.append("系统凭据管理器不可用")
+        # 1.6.0 库链可见性走本步(拍板:程序维不新增 inspect,复用 diagnose)
+        try:
+            vstate = vault.get_state()
+        except Exception:
+            vstate = vault.STATE_OK
+        if vstate == vault.STATE_DEGRADED:
+            app_issues.append("凭据库降级中(备份接管,不影响自动登录)")
+        elif vstate == vault.STATE_FAILED:
+            app_issues.append("凭据库与备份都不可用")
         try:
             crashes = crashlog.recent()
         except Exception:
@@ -773,9 +782,16 @@ class GuiGuiApi:
         try:
             state = ensure.load_state()
             lr = state.get("last_result")
+            # 1.6.0 库维可见性:vault_state 四态(ok/rebuilding/degraded/failed),
+            # 拍板 — 前端只透传不弹横幅,库的事后端自动处理
+            try:
+                vault_state = vault.get_state()
+            except Exception:
+                vault_state = vault.STATE_OK
             if not lr:
                 return _ok({"when": None, "time": None, "tries": 0,
-                            "outcome": "none", "verified": bool(state.get("cred_verified"))})
+                            "outcome": "none", "verified": bool(state.get("cred_verified")),
+                            "vault_state": vault_state})
             import datetime as dt
 
             date = lr.get("date", "")
@@ -792,7 +808,8 @@ class GuiGuiApi:
                 when = None
             return _ok({"when": when, "time": lr.get("time"),
                         "tries": lr.get("tries", 0), "outcome": lr.get("outcome", "none"),
-                        "verified": bool(state.get("cred_verified"))})
+                        "verified": bool(state.get("cred_verified")),
+                        "vault_state": vault_state})
         except Exception:
             log.exception("api.recentResult")
             return _err(INTERNAL, "昨晚的记录读不出来")

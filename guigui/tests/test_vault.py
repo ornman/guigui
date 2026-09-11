@@ -165,3 +165,104 @@ def test_delete_all_enum_failure_raises_vault_error():
     with pytest.raises(vault.VaultError):
         vault.delete_all_service_entries(enum_targets=boom,
                                          delete_target=lambda t: True)
+
+
+# ── 1.6.0 库链:备份镜像 / 重建×3 / 3 败降级 / failed ──────────
+
+
+def test_set_mirrors_backup_and_state_ok(fake_keyring):
+    vault.set_password("2025000000001", "pw123")
+    import json as _json
+    backup = _json.loads(vault.backup_path().read_text(encoding="utf-8"))
+    assert backup == {"uid": "2025000000001", "password": "pw123"}
+    assert vault.get_state() == vault.STATE_OK
+
+
+def test_get_rebuilds_from_backup_and_recovers(fake_keyring, fake_advapi, monkeypatch):
+    """两层读都抛(库坏)→ 重建轮重存后读通 → vault_state 回 ok,密码可用。"""
+    vault.set_password("u1", "p1")                    # 正常期:条目 + 备份镜像
+    # 模拟「读坏写好」:第 1 次读两层都抛 → 触发库链;重建轮里 _store 写得进、
+    # _fetch 第 2 次起读得回
+    reads = {"n": 0}
+
+    def flaky_keyring_get(service, uid):
+        raise RuntimeError("keyring lib broken")
+
+    def flaky_direct_get(target):
+        reads["n"] += 1
+        if reads["n"] <= 1:
+            raise OSError(1008)
+        return "p1"
+
+    monkeypatch.setattr(vault.keyring, "get_password", flaky_keyring_get)
+    monkeypatch.setattr(vault, "_direct_get", flaky_direct_get)
+    assert vault.get_password("u1") == "p1"
+    assert vault.get_state() == vault.STATE_OK
+
+
+def test_three_failed_rebuilds_degrade_to_backup(fake_keyring, fake_advapi):
+    """3 轮重建全败 → 降级:备份库接管,密码照常读出,vault_state=degraded。"""
+    vault.set_password("u1", "p1")
+    fake_keyring.broken = True
+    fake_advapi.broken = True
+    assert vault.get_password("u1") == "p1"           # 备份接管,登录不断
+    assert vault.get_state() == vault.STATE_DEGRADED
+    # 恢复后下一次读自愈回 ok
+    fake_keyring.broken = False
+    fake_advapi.broken = False
+    assert vault.get_password("u1") == "p1"
+    assert vault.get_state() == vault.STATE_OK
+
+
+def test_broken_vault_without_backup_is_failed(fake_keyring, fake_advapi):
+    """库坏且无备份 → vault_state=failed(不发通知,状态可见走 diagnose)。"""
+    fake_keyring.broken = True
+    fake_advapi.broken = True
+    assert vault.get_password("nobody") is None
+    assert vault.get_state() == vault.STATE_FAILED
+
+
+def test_corrupt_backup_with_broken_vault_is_failed(fake_keyring, fake_advapi):
+    """库坏且备份 JSON 损坏 → failed(备份读不出就不算备份)。"""
+    vault.set_password("u1", "p1")
+    vault.backup_path().write_text("{corrupt", encoding="utf-8")
+    fake_keyring.broken = True
+    fake_advapi.broken = True
+    assert vault.get_password("u1") is None
+    assert vault.get_state() == vault.STATE_FAILED
+
+
+def test_rebuild_serves_only_requested_uid(fake_keyring, fake_advapi, monkeypatch):
+    """降级时备份 uid ≠ 请求 uid(换过学号的旧备份)→ 不串号,返回 None。"""
+    vault.set_password("old-uid", "p1")
+    fake_keyring.broken = True
+    fake_advapi.broken = True
+    assert vault.get_password("new-uid") is None
+    assert vault.get_state() == vault.STATE_DEGRADED
+
+
+def test_delete_password_clears_matching_backup(fake_keyring):
+    """删凭据同步清备份(同 uid 才清;密码不残留磁盘)。"""
+    vault.set_password("u1", "p1")
+    assert vault.backup_path().exists()
+    vault.delete_password("u1")
+    assert not vault.backup_path().exists()
+
+
+def test_rekey_keeps_new_backup_only(fake_keyring):
+    """换学号:备份镜像跟随新学号;清旧条目不误删新备份。"""
+    vault.set_password("old", "p1")
+    vault.rekey("old", "new", "p2")
+    import json as _json
+    backup = _json.loads(vault.backup_path().read_text(encoding="utf-8"))
+    assert backup == {"uid": "new", "password": "p2"}
+
+
+def test_delete_all_service_entries_also_wipes_backup_and_state(fake_keyring):
+    """卸载全删:凭据条目 + 备份库 + 状态文件一锅端。"""
+    vault.set_password("u1", "p1")
+    n = vault.delete_all_service_entries(enum_targets=lambda: ["u1@GuiGui"],
+                                         delete_target=lambda t: True)
+    assert n == 1
+    assert not vault.backup_path().exists()
+    assert not vault._state_path().exists()

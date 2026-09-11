@@ -120,7 +120,8 @@ def test_settle_writes_three_rows_and_state(monkeypatch):
     assert state["last_settle_date"] == "2026-08-31"
     assert state["last_net_state"] == "up"
     assert state["last_result"]["outcome"] == "ok"
-    assert h.sent == []                      # 首跑在线不通知
+    # 1.6.0:任务成功 = 发(默认开),落点状态页深链
+    assert h.sent == [("自动登录成功 ✓", "guigui://v-status")]
 
 
 def test_settle_idempotent_same_day(monkeypatch):
@@ -137,13 +138,13 @@ def test_early_success_uses_open_door_line(monkeypatch):
 
 
 def test_rejected_notifies_immediately_once_per_day(monkeypatch):
-    """AC-13:开门后被拒当拍即弹(不再等 3 次),每日 ≤1。"""
+    """AC-13 延续:开门后被拒当拍即弹(不再等 3 次);1.6.0 落点 = 登录页深链。"""
     h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
                 login_seq=[("rejected", "userid error2")])
     h.run()
-    assert len(h.sent) == 1 and h.sent[0][1] == "guigui://creds"
+    assert len(h.sent) == 1 and h.sent[0][1] == "guigui://v-form"
     state = ensure.load_state()
-    assert state["fail_notify_date"] == "2026-08-31"
+    assert state["notify_sent"]["fail_cred"]["date"] == "2026-08-31"
     assert h.today_entries()[-1]["text"] == "登录被拒:密码不对,改一下再试"
     h.run()                                          # 同日第二拍:不再弹
     assert len(h.sent) == 1
@@ -153,12 +154,14 @@ def test_success_resets_fail_gate(monkeypatch):
     h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
                 login_seq=[("rejected", "userid error2")])
     h.run()
-    assert ensure.load_state()["fail_notify_date"] == "2026-08-31"
+    assert ensure.load_state()["notify_sent"]["fail_cred"]["date"] == "2026-08-31"
     h.probes = [{"state": "not_logged_in"}]
     h.logins = [("success", "")]
     h.run()
     state = ensure.load_state()
-    assert state["fail_notify_date"] is None and state["maintenance_streak"] == 0
+    # 冷却账本持久化保留(历史上发过就发过);下一拍的成功/失败按各自闸门判
+    assert state["maintenance_streak"] == 0
+    assert state["last_net_state"] == "up"
 
 
 def test_before_anchor_rejection_quarantined(monkeypatch):
@@ -215,13 +218,13 @@ def test_unknown_rejection_passthrough_keeps_verified(monkeypatch):
 
 
 def test_maintenance_page_three_beats_then_notify(monkeypatch):
-    """维护页:连续 ≥3 拍才弹(点开看主面板),每日一次。"""
+    """维护页:连续 ≥3 拍才弹(点开看主面板),每天一次;1.6.0 落点 = 状态页。"""
     h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
                 login_seq=[("unexpected", "维护页")])
     h.run(); h.run()
     assert h.sent == []
     h.run()
-    assert len(h.sent) == 1 and h.sent[0][1] == "guigui://main"
+    assert len(h.sent) == 1 and h.sent[0][1] == "guigui://v-status"
     h.run()
     assert len(h.sent) == 1
 
@@ -233,59 +236,94 @@ def test_waiting_then_gate_opens_then_settle(monkeypatch):
     assert len(h.today_entries()) == 3                 # 开门即登,收工
 
 
-def test_vacation_silence_two_days(monkeypatch):
+def test_auto_vacation_enters_on_third_unreachable_day(monkeypatch):
+    """1.6.0 假期模式自动判定:连续 3 天连不上自动进入;前两天照发诊断通知。"""
     h = Harness(monkeypatch, probe_seq=[{"state": "unreachable"}])
-    h.run()                                             # 第 1 天:普通不可达
+    h.run()                                             # 第 1 天:普通不可达 + 诊断通知
     day1 = [e["text"] for e in h.today_entries()]
     assert day1 == ["连不上校园网"]
     assert ensure.load_state()["unreachable_streak"] == 1
-    # 第 2 天(昨天有不可达记录)→ streak=2 → 静默
+    assert len(h.sent) == 1 and h.sent[0][1] == "guigui://v-status"
     h.now = FIXED + dt.timedelta(days=1)
-    h.run()
-    assert ensure.load_state()["silent"] is True
-    days = logstore.query(2)
+    h.run()                                             # 第 2 天:还没进假期,新的一天再发一条
+    assert ensure.load_state()["silent"] is False
+    assert len(h.sent) == 2
+    h.now = FIXED + dt.timedelta(days=2)
+    h.run()                                             # 第 3 天:自动假期 → 静默
+    state = ensure.load_state()
+    assert state["silent"] is True and state["vacation_auto"] is True
+    days = logstore.query(4)
     labels = [d["label"] for d in days]
     assert any(l.endswith("· 假期静默") for l in labels)
     # 同日第 2 拍:不再记日志
-    n_before = len([e for d in logstore.query(2) for e in d["entries"]])
+    n_before = len([e for d in logstore.query(4) for e in d["entries"]])
     h.run()
-    n_after = len([e for d in logstore.query(2) for e in d["entries"]])
+    n_after = len([e for d in logstore.query(4) for e in d["entries"]])
     assert n_before == n_after
 
 
+def test_manual_vacation_silences_from_day_one(monkeypatch):
+    """手动开关(任一生效即静默):第 1 天不可达就静默,零通知。"""
+    h = Harness(monkeypatch, cfg_over={"vacation_silence": True},
+                probe_seq=[{"state": "unreachable"}])
+    h.run()
+    assert ensure.load_state()["silent"] is True
+    assert h.sent == []
+
+
 def test_silence_recovers_next_day(monkeypatch):
+    """假期中恢复可达(登上)= 自动退出;退出后成功通知照发。"""
     h = Harness(monkeypatch, probe_seq=[{"state": "unreachable"}])
     h.run()                                             # 第 1 天:普通不可达
     h.now = FIXED + dt.timedelta(days=1)
-    h.run()                                             # 第 2 天 → 静默
+    h.run()                                             # 第 2 天
+    h.now = FIXED + dt.timedelta(days=2)
+    h.run()                                             # 第 3 天 → 自动假期
     assert ensure.load_state()["silent"] is True
-    h.now = FIXED + dt.timedelta(days=2)                # 第 3 天回校 → 恢复
+    h.now = FIXED + dt.timedelta(days=3)                # 第 4 天回校 → 恢复
     h.probes = [{"state": "logged_in"}]
     h.run()
     state = ensure.load_state()
     assert state["silent"] is False and state["unreachable_streak"] == 0
+    assert state["vacation_auto"] is False
+    assert h.sent[-1] == ("自动登录成功 ✓", "guigui://v-status")
 
 
 def test_silent_same_day_beat_probes_nothing(monkeypatch):
     """AC-10:静默日同日后续拍零探测(每天只探 1 次的字面兑现)。"""
-    h = Harness(monkeypatch, probe_seq=[{"state": "unreachable"}])
+    h = Harness(monkeypatch, cfg_over={"vacation_silence": True},
+                probe_seq=[{"state": "unreachable"}])
     h.run()
     h.now = FIXED + dt.timedelta(days=1)
-    h.run()                                             # 进入静默
+    h.run()                                             # 手动假期:仍静默
     n_probes = h.probe_calls
     h.run()                                             # 同日下一拍
     assert h.probe_calls == n_probes                    # 一发探测都没发
 
 
-def test_recovered_notify_once_per_day(monkeypatch):
+def test_unreachable_diagnostic_notify_daily_once(monkeypatch):
+    """1.6.0:连不上也发(纯诊断);同日后续拍冷却闸合并,不重发。"""
     h = Harness(monkeypatch, probe_seq=[{"state": "unreachable"}])
-    h.run()                                             # down,无通知
-    assert h.sent == []
-    h.probes = [{"state": "logged_in"}]
-    h.run()                                             # 断→通:通知一次
-    assert len(h.sent) == 1 and h.sent[0][1] == "guigui://main"
-    h.run()                                             # 同日:不再
+    h.run()
+    assert len(h.sent) == 1 and h.sent[0][0] == "连不上校园网"
+    h.run()                                             # 同日第 2 拍:合并
     assert len(h.sent) == 1
+    assert ensure.load_state()["last_net_state"] == "down"
+
+
+def test_vault_degraded_does_not_notify(monkeypatch):
+    """拍板 #4:库降级 = 不发任何通知(后端自动处理,不打扰用户)。
+
+    回归闸:即便凭据由备份库接管(vault_state=degraded),ensure 全程
+    不产生任何「库」相关通知 — 只有任务结果类通知。"""
+    from guigui.core import vault as vault_mod
+    h = Harness(monkeypatch, probe_seq=[{"state": "not_logged_in"}],
+                login_seq=[("rejected", "userid error2")])
+    monkeypatch.setattr(ensure.vault, "get_password", lambda uid: "pw123")
+    monkeypatch.setattr(vault_mod, "get_state", lambda: vault_mod.STATE_DEGRADED)
+    h.run()
+    # 只有凭据类失败这一条(带原因);没有任何库降级通知
+    assert [s[0] for s in h.sent] == ["自动登录没成功"]
 
 
 def test_l4_fallback_connects_then_settles(monkeypatch):
@@ -353,7 +391,8 @@ def test_settle_other_uid_recorded_not_disturbing(monkeypatch):
     assert state["last_result"]["outcome"] == "ok"
     assert state["last_result"]["tries"] == 1
     assert state["cred_verified"] is True           # 换回自己的 = 真验证过
-    assert h.sent == []                             # 换成功,不打扰
+    # 1.6.0:任务成功 = 发(换会话成功也是收工成功)
+    assert h.sent == [("自动登录成功 ✓", "guigui://v-status")]
 
 
 def test_settle_other_uid_rejected_reports_honestly(monkeypatch):
@@ -363,7 +402,7 @@ def test_settle_other_uid_rejected_reports_honestly(monkeypatch):
     h.run()
     state = ensure.load_state()
     assert state["last_result"]["outcome"] == "fail"
-    assert len(h.sent) == 1 and h.sent[0][1] == "guigui://creds"
+    assert len(h.sent) == 1 and h.sent[0][1] == "guigui://v-form"
     assert ensure.load_state()["cred_verified"] is False
 
 
@@ -424,15 +463,15 @@ def test_error2_rejection_still_resets_cred_verified(monkeypatch):
 
 
 def test_task_in_place_silent_zero_overhead(monkeypatch):
-    """任务在岗 → 零开销:不写 task_lost_notify_date,不弹通知。"""
+    """任务在岗 → 零开销:不写 task_lost_notify_date,不弹任务通知。"""
     st = ensure.load_state(); st.pop("task_lost_notify_date", None)
     ensure.save_state(st)
     h = Harness(monkeypatch)                 # 默认 task_xml 在岗
     h.run()
     state = ensure.load_state()
     assert state.get("task_lost_notify_date") is None
-    # 主线通知决策(recovered/fail/maintenance)不因自检产生新条目
-    assert h.sent == []
+    # 1.6.0:收工成功通知照发(任务结果类);自检本身不产生新条目
+    assert h.sent == [("自动登录成功 ✓", "guigui://v-status")]
 
 
 def test_task_missing_records_and_notifies_once(monkeypatch):

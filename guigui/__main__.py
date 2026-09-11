@@ -53,11 +53,21 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     deep = next((a for a in argv if a.startswith("guigui://")), None)
-    view = deep.split("guigui://", 1)[1].strip("/ ").lower() or None if deep else None
+    rest = deep.split("guigui://", 1)[1].strip("/ ").lower() if deep else ""
+    # 1.6.0 深链:guigui://v-form|v-status|v-success|v-feedback → open_route
+    # (通知落点四视图);旧 main/creds/settings 仍走 view
+    from guigui.core.notify import OPEN_ROUTES
+    open_route = rest if rest in OPEN_ROUTES else None
+    # 显式启动路由参数(快捷方式/CLI):--open-route v-xxx,与协议深链二选一均可
+    if "--open-route" in argv:
+        i = argv.index("--open-route")
+        if i + 1 < len(argv) and argv[i + 1].strip("/ ").lower() in OPEN_ROUTES:
+            open_route = argv[i + 1].strip("/ ").lower()
+    view = None if open_route else (rest or None)
     if view not in (None, "main", "creds", "settings"):
         view = None
     from guigui.app import gui  # 延迟导入:--ensure 路径不碰 GUI 依赖
-    return gui.run(view)
+    return gui.run(view, open_route)
 
 
 def _pump_feedback_queue() -> None:

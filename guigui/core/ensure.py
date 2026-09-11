@@ -1,12 +1,16 @@
-"""--ensure 静默执行体 — 探测 → 必要时登录 → 状态翻转才通知 + 假期静默状态机。
+"""--ensure 静默执行体 — 探测 → 必要时登录 → 通知状态机(1.6.0 重写)+ 假期模式。
 
 移植 v1 src/ensure.py 骨架(原子写 state);v2 新增:
-等门(waiting→轮询 30s/上限 10min)、L4 WiFi 兜底、假期静默
-(连续 48h 不可达 → 每天只探 1 次不通知,silent 级日志)、
+等门(waiting→轮询 30s/上限 10min)、L4 WiFi 兜底、假期模式
+(1.6.0:连续 3 天不可达自动进入,恢复可达自动退出;手动 vacation_silence
+保留,两者任一生效即静默 — 假期中通知全静默,任务照跑日志照记)、
 收工幂等(last_settle_date,后续拍秒退)、last_result(recentResult 数据源)。
 2026-09-06 重梳理:开门锚点 06:50(锚前失败三不管)、被拒当拍即弹、
 凭证可信度仅 error2 置假、线上他人学号如实记录并换回自己的(QA P0-2:
 别人的成功不冒领)、日志 >90 天清理。
+2026-09-11(契约 1.6.0):通知矩阵重写 — 任务成功=发 / 凭据类失败=发带
+原因 / 连不上=也发(纯诊断)/ 假期静默;冷却账本 notify_sent(同类 30
+分钟合并 + 每天每类 ≤1)入 state。
 """
 
 from __future__ import annotations
@@ -39,17 +43,16 @@ def before_anchor(when: dt.datetime | None = None) -> bool:
 def _default_state() -> dict:
     return {
         "last_net_state": None,          # up | down | failed | None(首跑)
-        "last_recovered_notify_date": None,
-        "fail_notify_date": None,        # 当拍即弹的每日闸(AC-13)
         "maintenance_streak": 0,         # 维护页(格式不认识)连续拍数
-        "maintenance_notify_date": None,
-        "unreachable_streak": 0,
+        "unreachable_streak": 0,         # 连续不可达天数(1.6.0:≥3 自动假期)
         "last_unreachable_date": None,
+        "vacation_auto": False,          # 假期模式·自动判定(1.6.0):3 天进/可达退
         "silent": False,
         "last_settle_date": None,
         "last_result": None,             # {date, time, tries, outcome}
         "cred_verified": False,          # 凭证是否经服务器真验证(仅 error2 置假,§7.3)
         "task_lost_notify_date": None,   # 定时任务失联通知每日闸(QA P1-5)
+        "notify_sent": {},               # 通知冷却账本(1.6.0):kind → {date, ts}
     }
 
 
@@ -193,28 +196,36 @@ def _settle_rows(cfg: dict, uid: str, tries: int) -> None:
 
 
 def _apply_notify(cfg: dict, state: dict, *, connected: bool,
-                  outcome: str | None = None) -> None:
-    """去重决策 + 发送 + 状态合并(connected 分支由调用方先置好其他键)。
+                  outcome: str | None = None, reason_text: str | None = None,
+                  vacation: bool = False) -> None:
+    """通知矩阵决策 + 发送 + 冷却账本合并(1.6.0 重写)。
 
     锚前分支不会走到这(run() 已提前收线);此处 outcome 仅传失败形态。
-    """
+    假期中失败类静默(decide_notify 内压);任务成功在恢复可达
+    (=假期自动退出)后才判,永远可发。库降级不发通知(拍板:后端自动
+    处理 — vault 库链在 vault.py 内自愈,不经本函数)。"""
     kind, updates = notify.decide_notify(
         state.get("last_net_state"), connected=connected,
         outcome=outcome, before_anchor=False,
         maintenance_streak=state.get("maintenance_streak", 0),
-        last_recovered_date=state.get("last_recovered_notify_date"),
-        fail_notify_date=state.get("fail_notify_date"),
-        maintenance_notify_date=state.get("maintenance_notify_date"),
-        today=_today(),
-    )
+        sent=state.get("notify_sent"), today=_today(),
+        now=_now().timestamp(), vacation=vacation)
     state.update(updates)
-    if kind and cfg.get("notifications", True):
-        if kind == notify.RECOVERED:
-            notify.send("已连上 ✓", "网络回来了", notify.LAUNCH_MAIN)
-        elif kind == notify.MAINTENANCE:
-            notify.send("桂桂一直登不上", "点开看看", notify.LAUNCH_MAIN)
-        else:
-            notify.send("登录失败,密码改了?", "点这里改一下密码", notify.LAUNCH_CREDS)
+    if not (kind and cfg.get("notifications", True)):
+        return
+    if kind == notify.SUCCESS:
+        notify.send("自动登录成功 ✓", "今天的网已经登好",
+                    notify.LAUNCH_STATUS)
+    elif kind == notify.FAILED:
+        notify.send("自动登录没成功",
+                    reason_text or "登录被拒,密码可能改了",
+                    notify.LAUNCH_FORM)
+    elif kind == notify.NET_FAIL:
+        notify.send("连不上校园网",
+                    "今天没登上 — 够不着学校服务器,连上校园网后桂桂自动接着办",
+                    notify.LAUNCH_STATUS)
+    elif kind == notify.MAINTENANCE:
+        notify.send("桂桂一直登不上", "点开看看", notify.LAUNCH_STATUS)
 
 
 def _today() -> str:
@@ -257,9 +268,9 @@ def _apply_settle(cfg: dict, state: dict, today: str, uid: str, tries: int) -> N
     _settle_rows(cfg, uid, tries)
     state.update({
         "last_settle_date": today,
-        "fail_notify_date": None, "maintenance_streak": 0,
-        "maintenance_notify_date": None,
+        "maintenance_streak": 0,
         "unreachable_streak": 0, "silent": False,
+        "vacation_auto": False,     # 1.6.0:恢复可达 = 假期模式自动退出
         "last_result": {"date": today, "time": _now().strftime("%H:%M"),
                         "tries": tries, "outcome": "ok"},
     })
@@ -386,15 +397,19 @@ def run(trigger: str = "calendar") -> int:
             state["cred_verified"] = False
         state["last_result"] = {"date": today, "time": _now().strftime("%H:%M"),
                                 "tries": tries, "outcome": "fail"}
-        _apply_notify(cfg, state, connected=False, outcome=outcome)
+        # 服务器可达(能被拒/能回话)= 探测恢复可达 → 假期自动退出(1.6.0)
+        state["vacation_auto"] = False
+        _apply_notify(cfg, state, connected=False, outcome=outcome,
+                      reason_text=text, vacation=bool(cfg.get("vacation_silence")))
         return _persist(state, cfg, today)
 
-    # unreachable:假期静默状态机(AC-10)
+    # unreachable:假期模式状态机(1.6.0:连续 3 天自动进 / 手动开关任一生效)
     if state.get("last_unreachable_date") != today:
         prev = state.get("last_unreachable_date")
         yesterday = (_now() - dt.timedelta(days=1)).strftime("%Y-%m-%d")
         streak = state.get("unreachable_streak", 0) + 1 if prev == yesterday else 1
-        silent = bool(cfg.get("vacation_silence", True)) and streak >= 2
+        vacation_auto = streak >= 3
+        silent = bool(cfg.get("vacation_silence")) or vacation_auto
         if silent:
             logstore.append("silent", "连不上,今天先不打扰,明天再试一次", when=_now())
         else:
@@ -402,10 +417,13 @@ def run(trigger: str = "calendar") -> int:
         state.update({
             "unreachable_streak": streak,
             "last_unreachable_date": today,
+            "vacation_auto": vacation_auto,
             "silent": silent,
             "last_result": {"date": today, "time": _now().strftime("%H:%M"),
                             "tries": 0, "outcome": "silent" if silent else "fail"},
         })
-    # 同日后续拍:不重复记日志/不更新 last_result,只走通知判断(永不通知)
-    _apply_notify(cfg, state, connected=False, outcome=None)
+    # 同日后续拍:不重复记日志/不更新 last_result,只走通知判断(冷却闸限每天 1 条)
+    _apply_notify(cfg, state, connected=False, outcome=None,
+                  vacation=bool(cfg.get("vacation_silence"))
+                  or bool(state.get("vacation_auto")))
     return _persist(state, cfg, today)

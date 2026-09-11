@@ -74,7 +74,11 @@ DEFAULTS: dict = {
     "patrol_minutes": 30,
     # PRD §5 默认关;契约 §2.6 示例为 true,分歧登记于技术方案 §14.5
     "wake_login": False,
-    "vacation_silence": True,
+    # 1.6.0 语义收紧:假期模式主判定改为自动(连续 3 天连不上进入,恢复可达
+    # 退出);本开关 = 手动宣告假期(立即静默失败类通知)。默认随语义翻转
+    # False — 否则默认配置下「连不上也发(纯诊断)」永远被静默,新通知矩阵
+    # 对多数用户失效。已存配置里的 true 继续生效(两者任一生效即静默)。
+    "vacation_silence": False,
     "notifications": True,
     "show_gui": True,
     "master": True,

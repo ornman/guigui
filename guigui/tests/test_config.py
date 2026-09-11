@@ -11,7 +11,8 @@ def test_load_defaults_when_missing():
     cfg = config.load()
     assert cfg["trigger_time"] == "07:00"
     assert cfg["wake_login"] is False          # PRD §5 默认关(技术方案 §14.5)
-    assert cfg["vacation_silence"] is True
+    assert cfg["vacation_silence"] is False    # 1.6.0:假期主判定改自动(3 天进/可达退),
+                                               # 手动开关默认关 — 否则「连不上也发」被默认静默
     assert cfg["tasks_rev"] == 0
 
 

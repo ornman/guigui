@@ -1,4 +1,4 @@
-"""notify:去重决策全表(PRD 4.5,2026-09-06 换代)+ Toast 脚本 + XML 转义 + 协议注册。"""
+"""notify:1.6.0 通知矩阵全表(用户拍板 2026-09-11)+ Toast 脚本 + XML 转义 + 协议注册。"""
 
 import sys
 import types
@@ -6,56 +6,63 @@ import types
 from guigui.core import notify
 
 
-# ── decide_notify(PRD 4.5 全表)─────────────────────────────
+# ── decide_notify(1.6.0 通知矩阵)─────────────────────────
 
 
-def test_first_run_online_no_notify():
-    kind, updates = notify.decide_notify(None, connected=True, today="2026-09-06")
-    assert kind is None and updates["last_net_state"] == "up"
-
-
-def test_broken_to_online_recovers_once_per_day():
-    kw = dict(connected=True, today="2026-09-06")
-    kind, updates = notify.decide_notify(
-        "down", last_recovered_date=None, **kw)
-    assert kind == notify.RECOVERED
-    assert updates["last_recovered_notify_date"] == "2026-09-06"
-    # 同日第二次翻转:不再发
-    kind2, _ = notify.decide_notify(
-        "down", last_recovered_date="2026-09-06", **kw)
+def test_success_notifies_daily_once():
+    """任务成功 = 发(1.6.0);同类每天 ≤1。"""
+    kind, updates = notify.decide_notify(None, connected=True,
+                                         today="2026-09-11", now=1000.0)
+    assert kind == notify.SUCCESS
+    assert updates["last_net_state"] == "up"
+    sent = updates["notify_sent"]
+    assert sent[notify.SUCCESS]["date"] == "2026-09-11"
+    # 同日第二拍:不再发
+    kind2, _ = notify.decide_notify(None, connected=True, today="2026-09-11",
+                                    now=1200.0, sent=sent)
     assert kind2 is None
-    # 次日再断→通:再发
-    kind3, _ = notify.decide_notify(
-        "failed", last_recovered_date="2026-09-06", connected=True, today="2026-09-07")
-    assert kind3 == notify.RECOVERED
+    # 次日:闸门重开,再弹
+    kind3, _ = notify.decide_notify(None, connected=True, today="2026-09-12",
+                                    now=1000.0 + 86400, sent=sent)
+    assert kind3 == notify.SUCCESS
 
 
 def test_rejected_notifies_immediately_once_per_day():
-    """AC-13:开门后明确被拒当拍即弹,每日 ≤1 次(不再等连败×3)。"""
-    kw = dict(connected=False, outcome="rejected", today="2026-09-06")
-    kind, updates = notify.decide_notify("failed", fail_notify_date=None, **kw)
-    assert kind == notify.FAILED and updates["fail_notify_date"] == "2026-09-06"
+    """AC-13 延续:开门后明确被拒当拍即判;同类每天 ≤1。"""
+    kw = dict(connected=False, outcome="rejected", today="2026-09-11", now=1000.0)
+    kind, updates = notify.decide_notify("failed", **kw)
+    assert kind == notify.FAILED and updates["last_net_state"] == "failed"
     # 同日第二拍:不再发
-    kind2, _ = notify.decide_notify("failed", fail_notify_date="2026-09-06", **kw)
+    kind2, _ = notify.decide_notify("failed", sent=updates["notify_sent"], **kw)
     assert kind2 is None
     # 次日:闸门重开,再弹
     kind3, _ = notify.decide_notify(
-        "failed", fail_notify_date="2026-09-06", connected=False,
-        outcome="rejected", today="2026-09-07")
+        "failed", connected=False, outcome="rejected",
+        today="2026-09-12", now=1000.0 + 86400, sent=updates["notify_sent"])
     assert kind3 == notify.FAILED
 
 
 def test_maintenance_needs_three_beats_then_daily_once():
-    """维护页(格式不认识):连续 ≥3 拍才弹,每日 ≤1 次。"""
-    kw = dict(connected=False, outcome="unexpected", today="2026-09-06")
+    """维护页(格式不认识):连续 ≥3 拍才弹,每天 ≤1 次。"""
+    kw = dict(connected=False, outcome="unexpected", today="2026-09-11", now=1000.0)
     for streak in (1, 2):
         kind, _ = notify.decide_notify("failed", maintenance_streak=streak, **kw)
         assert kind is None
     kind, updates = notify.decide_notify("failed", maintenance_streak=3, **kw)
     assert kind == notify.MAINTENANCE
-    assert updates["maintenance_notify_date"] == "2026-09-06"
     kind2, _ = notify.decide_notify(
-        "failed", maintenance_streak=4, maintenance_notify_date="2026-09-06", **kw)
+        "failed", maintenance_streak=4, sent=updates["notify_sent"], **kw)
+    assert kind2 is None
+
+
+def test_unreachable_notifies_pure_diagnostic():
+    """1.6.0:连不上 = 也发(纯诊断);同类每天 ≤1。"""
+    kind, updates = notify.decide_notify(
+        "down", connected=False, outcome=None, today="2026-09-11", now=1000.0)
+    assert kind == notify.NET_FAIL and updates["last_net_state"] == "down"
+    kind2, _ = notify.decide_notify(
+        "down", connected=False, outcome=None, today="2026-09-11", now=1200.0,
+        sent=updates["notify_sent"])
     assert kind2 is None
 
 
@@ -64,14 +71,31 @@ def test_before_anchor_never_notifies():
     for outcome in ("rejected", "unexpected", None):
         kind, updates = notify.decide_notify(
             "down", connected=False, outcome=outcome, before_anchor=True,
-            today="2026-09-06")
+            today="2026-09-11")
         assert kind is None and updates == {}
 
 
-def test_unreachable_never_notifies():
-    kind, updates = notify.decide_notify(
-        "down", connected=False, outcome=None, today="2026-09-06")
-    assert kind is None and updates["last_net_state"] == "down"
+def test_vacation_silences_all_failure_kinds():
+    """假期模式:失败类全静默(任务照跑、日志照记,只是不弹)。"""
+    for outcome in ("rejected", "unexpected", None):
+        kind, updates = notify.decide_notify(
+            "down", connected=False, outcome=outcome, vacation=True,
+            today="2026-09-11", now=1000.0)
+        assert kind is None
+        assert updates["last_net_state"] in ("down", "failed")
+
+
+def test_cooldown_30min_merge_across_midnight():
+    """拍板 #5:同类 30 分钟内合并为一条(不重发),跨午夜也压。"""
+    sent = {notify.NET_FAIL: {"date": "2026-09-10", "ts": 1000.0}}
+    kind, _ = notify.decide_notify(
+        "down", connected=False, outcome=None, today="2026-09-11",
+        now=1000.0 + 1200, sent=sent)      # 20 分钟前发过(昨天):合并
+    assert kind is None
+    kind2, _ = notify.decide_notify(
+        "down", connected=False, outcome=None, today="2026-09-11",
+        now=1000.0 + 2000, sent=sent)      # 超过 30 分钟:可发
+    assert kind2 == notify.NET_FAIL
 
 
 # ── Toast 脚本 ────────────────────────────────────────────
@@ -142,7 +166,7 @@ def test_protocol_registered_reads_hkcu(monkeypatch):
 
 
 def test_task_linger_copy_is_honest(monkeypatch):
-    """P0-3:幽灵任务文案必须说清「任务还在、明早还会登录」并给动作(直达设置)。"""
+    """P0-3:幽灵任务文案必须说清「任务还在、明早还会自动登录」并给动作(直达设置)。"""
     sent = []
     monkeypatch.setattr(notify, "send",
                         lambda t, m, launch=None: sent.append((t, m, launch)))
@@ -150,6 +174,18 @@ def test_task_linger_copy_is_honest(monkeypatch):
     assert sent and "定时任务还在" in sent[0][1]
     assert "明早还会自动登录" in sent[0][1]
     assert sent[0][2] == notify.LAUNCH_SETTINGS
+
+
+def test_direct_helpers_cooldown_same_kind(monkeypatch):
+    """拍板 #5 同口径:直发类(task_blocked 等)同类 30 分钟合并,不同类各自计。"""
+    sent = []
+    monkeypatch.setattr(notify, "send",
+                        lambda t, m, launch=None: sent.append((t, m, launch)))
+    notify.task_blocked()
+    notify.task_blocked()   # 同类 30 分钟内:合并,不重发
+    assert len(sent) == 1
+    notify.task_linger()    # 不同类:各自记账
+    assert len(sent) == 2
 
 
 def test_send_swallows_errors(monkeypatch):

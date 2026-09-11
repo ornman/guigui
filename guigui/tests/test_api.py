@@ -352,7 +352,9 @@ def test_logs_days_shape(ctx):
 
 
 def test_recent_result_none_when_no_record(ctx):
-    assert ctx.api.recentResult()["data"]["outcome"] == "none"
+    out = ctx.api.recentResult()
+    assert out["data"]["outcome"] == "none"
+    assert out["data"]["vault_state"] == "ok"      # 1.6.0:库维可见性恒在场
 
 
 def test_recent_result_when_labels(ctx):
@@ -364,6 +366,17 @@ def test_recent_result_when_labels(ctx):
                                        "time": "07:00", "tries": 3, "outcome": "fail"}})
     data = ctx.api.recentResult()["data"]
     assert data["when"] == "昨天" and data["outcome"] == "fail"
+
+
+def test_recent_result_carries_vault_state(ctx):
+    """1.6.0 降级信封:vault_state 四态原样下行(前端只透传不弹横幅)。"""
+    from guigui.core import vault
+    vault._set_state(vault.STATE_DEGRADED)
+    assert ctx.api.recentResult()["data"]["vault_state"] == "degraded"
+    vault._set_state(vault.STATE_REBUILDING)
+    assert ctx.api.recentResult()["data"]["vault_state"] == "rebuilding"
+    vault._set_state(vault.STATE_OK)
+    assert ctx.api.recentResult()["data"]["vault_state"] == "ok"
 
 
 # ── 窗口控制 ──────────────────────────────────────────────
@@ -797,6 +810,21 @@ def test_diagnose_wrong_password_exit_login_with_reason(ctx):
     assert s3["detail"] == "密码不对,改一下再试"          # rejection_text 单一来源
     assert s3["reason"] == "wrong_password"               # 登录页警告块预填用
     assert out["data"]["exit"] == "login"
+
+
+def test_diagnose_step5_surfaces_vault_degraded(ctx):
+    """1.6.0:库链可见性走 diagnose 第 5 步(拍板 #1,不新增 inspect)。"""
+    from guigui.core import vault
+    ctx.chk_uid = "2025000000001"
+    vault._set_state(vault.STATE_DEGRADED)
+    out = ctx.api.diagnose()
+    s5 = out["data"]["steps"][4]
+    assert s5["state"] == "fail"
+    assert "凭据库降级中(备份接管,不影响自动登录)" in s5["detail"]
+    assert out["data"]["exit"] == "app_fault"
+    vault._set_state(vault.STATE_FAILED)
+    out2 = ctx.api.diagnose()
+    assert "凭据库与备份都不可用" in out2["data"]["steps"][4]["detail"]
 
 
 def test_diagnose_real_login_success_emits_net_state(ctx):

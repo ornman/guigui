@@ -14,6 +14,16 @@ def tmp_data_dir(tmp_path, monkeypatch):
     yield tmp_path
 
 
+@pytest.fixture(autouse=True)
+def _notify_direct_reset():
+    """清 notify 直发类(task_blocked 等)进程内冷却账本(1.6.0)—
+    同一 pytest 进程里多个测试触发同类直发,账本不清会串场吞掉后测的 toast。"""
+    from guigui.core import notify
+    notify._direct_last.clear()
+    yield
+    notify._direct_last.clear()
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _repo_on_path():
     """确保 `import guigui` 可用(pytest 从任意目录启动)。"""

@@ -1,4 +1,4 @@
-# 桂桂 v2 · JS↔Python 桥接契约 v1.5.0
+# 桂桂 v2 · JS↔Python 桥接契约 v1.6.0
 
 > **地位**:前后端通信协议的**唯一权威**(《guigui-work-split.md》§一.2)。后端 bridge 实现以此为准;`static/dev/mock.js` 是它的可执行规范(仅开发)。
 > **绑定**:命名空间 `window.guigui.*`。pywebview 经 `js_api` 暴露,实现侧自行决定 camelCase 方法名或 snake_case+映射(契约只锁 JS 侧名字)。
@@ -171,9 +171,16 @@ cred_verified 不置假,拒绝现场四件入日志 data 与诊断包 server 区
 ### 2.10 recentResult() — 「昨晚」一行(主页第三行体检)
 
 ```jsonc
-{ "when": "今早", "time": "07:00", "tries": 1, "outcome": "ok", "verified": true }
+{ "when": "今早", "time": "07:00", "tries": 1, "outcome": "ok", "verified": true,
+  "vault_state": "ok" }
 // outcome: ok | fail | silent | none(无记录)
 // verified = 凭证可信度单一真源(1.2.0):驱动主页横幅①「密码还没验证过 — 去改一下」
+// vault_state = 凭据库健康四态(1.6.0,库维可见性唯一信封出口):
+//   ok         = 凭据管理器正常
+//   rebuilding = 损坏自动重建中(3 轮重存,轮间不 sleep;瞬态,通常观察不到)
+//   degraded   = 已降级用备份库(vault_backup.json 接管,登录照常,后端自动处理)
+//   failed     = 凭据管理器与备份都不可用(不发通知;日志 + diagnose 第 5 步可见)
+// 前端只透传存储、不弹横幅不打扰 — 库的事后端自己管(拍板 2026-09-11)
 // 前端映射示例:ok+tries=1 →「07:00 第一次就登好了 ✓」
 ```
 
@@ -292,12 +299,36 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
 | `schedule:changed` | `{master, trigger_time, task_ok}` | selfheal 对齐/外部变更后,前端同步两处开关与 desc;`task_ok`=任务在岗(1.2.0,主页横幅②数据源) |
 | `diag:progress` | `{step, key, state, detail}`;state ∈ running\|ok\|fail\|skip | `diagnose()` 执行中逐步推进(1.5.0);前端 v-diag 链路实时渲染,未知步骤忽略 |
 
+### 3.1 通知语义(1.6.0 重写;后端 Toast 正本 — 非桥接方法,前端零参与)
+
+通知全部由后端发出(Windows Toast,`notifications` 设置为总开关);本节为语义正本,mock/测试以此为基准。
+
+**判定矩阵(非假期)**:
+
+| 事件 | 发/不发 | 文案方向 / 深链落点 |
+|---|---|---|
+| 任务成功(当日首次收工) | **发**(默认开、设置可关) | 「自动登录成功 ✓」→ `guigui://v-status` |
+| 任务失败·凭据类(被拒) | **发,带原因**(拒绝四态文案单一来源) | 「自动登录没成功」→ `guigui://v-form` |
+| 任务失败·连不上(不可达/等门超时) | **也发(纯诊断)** — 1.6.0 起不再静默 | 「连不上校园网」→ `guigui://v-status` |
+| 维护页连续 ≥3 拍 | 发(质量闸延续) | → `guigui://v-status` |
+| 拦截(杀软拦任务) | 发,要求加白(task_blocked / task_linger / task_lost) | → `guigui://settings` |
+| **库降级(vault degraded/failed)** | **不发**(后端自动处理,不打扰用户;可见性走 §2.10 vault_state + diagnose 第 5 步) | — |
+| 网断等网(waiting)、探测循环、节流、自愈进行中、矛盾态、纯状态变化 | 静默 | — |
+| 锚前(06:50 前)一切失败 | 静默(AC-12 延续) | — |
+
+**假期模式(1.6.0 自动判定)**:连续 3 天连不上 10.1.2.3 **自动进入**;进入后**所有通知静默**(任务照跑、日志照记,只是不弹);**连上网(探测恢复可达,含被拒/维护页等服务器可达的失败)自动退出**。既有 `vacation_silence` 手动开关保留,**两者任一生效即静默**(手动开关语义收紧为「立即静默失败类通知」,默认值 true→false — 否则默认配置下「连不上也发」永远被静默;已存配置的 true 继续生效)。
+
+**通知冷却(1.6.0)**:同类 30 分钟内合并为一条(不重发)+ **每类每天 ≤1 条**(账本 `notify_sent` 随 ensure state 持久化;task_blocked 等用户动作直发类用进程内账本,挡同会话连拍刷屏)。
+
 ## 4. 启动时序(约定,非方法)
 
 1. 前端加载 → 立即 `probe()`(期间 v-boot 仪式照常播)。
 2. `configured=false` → 首装单行道(仪式→三分支);`configured=true` → 日常页,`net.state=waiting` 时停在等门 UI 等 `net:state`。
 3. 首装「开启每日自动登录」= `saveConfig`(学号+触发时间等)→ `login`(带密码)→ 成功进庆祝页;`AUTH_REJECTED` → 密码警告,不进庆祝。
-4. **深链注入(1.0.2 收编)**:壳可在页面 loaded 前注入 `window.__guigui_launch`(一次性,`'main'|'creds'|'settings'`),前端在启动路由完成后消费并清除;未完成首装时忽略(单行道优先)。通知点击路由(`guigui://main` / `guigui://creds`)依赖此机制。
+4. **深链注入(1.0.2 收编;1.6.0 扩 `open_route`)**:壳可在页面 loaded 前注入 `window.__guigui_launch`(一次性),前端在启动路由完成后消费并清除;未完成首装时忽略(单行道优先)。形状两种:
+   - 旧字符串:`'main' | 'creds' | 'settings'`(1.0.2 起,通知点击路由);
+   - 对象(1.6.0):`{ view?: 'main'|'creds'|'settings', open_route?: 'v-form'|'v-status'|'v-success'|'v-feedback' }` — `open_route` 直取前端视图 id(登录页/状态页/拦截页/反馈页)。
+   优先级:`open_route` 只影响「启动后进哪个视图」;网态问题调起状态页的 ROUTE 逻辑照常兜底(深链让位,与 creds/settings 同口径)。启动来源:协议深链 `guigui://<open_route>`(通知点击)或显式参数 `--open-route <v-xxx>`(快捷方式/CLI);二实例场景经 pending 文件转发,两种形状都过白名单校验。
 
 ## 5. 版本与变更记录
 
@@ -315,7 +346,7 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
 | 1.4.2 | 2026-09-07 | 补登记票(零行为变化):§2.3 `reason` 枚举 + §3 `login:progress` 补登 `throttled`/`waitsec` — 1.4.0 随 QA P1-6 实装于后端与 mock,当时漏改本文;本次随前端适配(节流按「稍后再试」中性渲染)一并入册 | 前端已接(fb0723c;?dev=1&scene=throttled 可验)— **生效** |
 | 1.4.3 | 2026-09-07 | §2.2 撤销「首装表单 chkstatus 旁注确认提示」强制(1.4.1 引入)— 用户拍板:这行文字没必要,按零摩擦原则移除;`source` 三态语义保留(后端/mock 零变化),误抓由登录被拒(wrong_account 文案)自纠 | 前端已接(旁注已移除,e95beb8;mock 无需改,`other` 场景仍验信封)— **生效** |
 | 1.5.0 | 2026-09-08 | 验证器落地(计划 `docs/plans/ui-routing-rework-2026-09-08.md` P1):新增 §2.18 `diagnose()`(五步信封 + `exit` 枚举;第 3 步含真登副作用,**仅用户显式进 v-diag 触发**,启动静默体检不碰);§3 新增事件 `diag:progress`;§2.3 补「呈现映射」说明(`verified:false` → 保存配置终态页,信封零变化);方法 18 个 | 后端已实现(api.diagnose + 11 测);mock 同步(diagnose + `diag_ok/diag_cred/diag_task/diag_app` 四场景,与后端逐字一致);前端已接(v-diag 页 + 横幅③/设置「立即体检」两入口 + 登录页带结论预填)— **生效** |
-| **1.6.0** | **2026-09-11** | **删除 §2.12 `feedback()`**(1.3.0 起废弃,保留期已过两个版本周期):后端 `api.feedback` + mock `feedback()` + 契约本文档整段一并移除(`2a6203c`);前端零调用方(画廊+runner+index.html 全仓库 grep 0 引用);同步清死代码(setAllBots 死函数 / S.hasPwd 死字段 / app-overrides 死 id / .tb-* 三段 CSS / mock _setRej 死钩子 + forcedRej 分支);前端 mock 老用户场景补 `pwd='secret'`(`9267692`,防 login({}) 假报 NOT_CONFIGURED);**剩余 1.6.0 缺口待用户拍板**(库链/程序链/通知语义/完整冷却/P1-11 深链,见计划 `docs/plans/ui-interaction-rework-2026-09-09.md` §G341-346);方法 17→16 | **生效**(本批先落地清死代码 + 删 feedback);1.6.0 余项待拍板 |
+| **1.6.0** | **2026-09-11** | 四案落地(用户拍板 2026-09-11,同批先行的清死代码+删 `feedback()` 见 `2a6203c`/`418323f`):① **§2.10 recentResult 响应新增 `vault_state` 四态**(ok/rebuilding/degraded/failed)— 库维可见性唯一信封出口,程序维走 §2.18 diagnose 第 5 步(不新增 inspect();前端只透传不弹横幅);② **vault 库链真做**:备份库 JSON(`%LOCALAPPDATA%\GuiGui\vault_backup.json`,uid+密码,与 advapi32 降级层同口径不混淆 — 依赖用户目录 ACL,注释说明安全边界)+ 损坏自动重建 ×3(轮间不 sleep)+ 3 败降级切备份库(登录照常,vault_state=degraded,**不发通知**;备份也坏 = failed,走日志+诊断可见);③ **§3.1 通知语义重写**:任务成功=发(默认开、设置可关)/ 凭据类失败=发带原因 / **连不上=也发(纯诊断)** / 拦截=发要求加白 / 库降级=不发 / 网断等网、探测循环、节流、自愈进行中、矛盾态、纯状态变化=静默;**假期模式 = 连续 3 天连不上 10.1.2.3 自动进入**(进入后所有通知静默,任务照跑日志照记)、**探测恢复可达自动退出**,与既有 `vacation_silence` 手动开关任一生效即静默(手动语义收紧为立即静默失败类,默认 true→false,已存配置不动);**冷却:同类 30 分钟合并 + 每类每天 ≤1**;④ **§4 深链注入扩 `open_route`**(v-form/v-status/v-success/v-feedback),通知落点新增 `guigui://v-*` 协议路由 + `--open-route` 启动参数;**方法数不变(16)** | 后端已实现(vault 库链 + notify 矩阵/假期/冷却 + ensure 状态机 + 壳层透传,303 测全绿);mock 同步(vault_state + `_setVault`/`_setVacation`/`?launch` 注入);前端已接(applyLaunch 对象形 open_route + S 透传,通知零前端改动)— **生效** |
 
 ## 6. 集成待办(联调问题记这里)
 

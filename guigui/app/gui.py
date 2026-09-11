@@ -6,7 +6,8 @@
   翻译成契约事件(net:state / log:appended / schedule:changed),诚实边界
   为 ≤2s 延迟(技术方案 §6)。
 - deep link:启动参数 guigui://view → loaded 后注入 window.__guigui_launch
-  (形状未入契约,已登记集成待办)。
+  (契约 §4;1.6.0 扩 open_route — 注入形状 {view?, open_route?},
+  open_route ∈ v-form|v-status|v-success|v-feedback 直取前端视图 id)。
 """
 
 from __future__ import annotations
@@ -123,7 +124,10 @@ class FileWatcher(threading.Thread):
         self._today_lines = len(entries)
 
     def _check_pending_view(self) -> None:
-        """深链转发文件:消费即删;过期/白名单外静默丢弃。"""
+        """深链转发文件:消费即删;过期/白名单外静默丢弃。
+
+        1.6.0:除旧 view(main/creds/settings)外可带 open_route
+        (v-form/v-status/v-success/v-feedback,契约 §4);两者都白名单校验。"""
         import time as _time
 
         p = paths.data_dir() / PENDING_VIEW_NAME
@@ -137,19 +141,35 @@ class FileWatcher(threading.Thread):
         try:
             item = json.loads(raw)
             view = item.get("view")
+            open_route = item.get("open_route")
             fresh = _time.time() - float(item.get("ts") or 0) <= PENDING_VIEW_TTL
         except (ValueError, TypeError, AttributeError):
             return
-        if fresh and view in ("main", "creds", "settings"):
+        if not fresh:
+            return
+        payload = {}
+        if view in ("main", "creds", "settings"):
+            payload["view"] = view
+        if open_route in notify_mod.OPEN_ROUTES:
+            payload["open_route"] = open_route
+        if payload:
             # 与冷启动同一条路:壳注入 __guigui_launch → applyLaunch 消费
             self.api._eval(
-                f"window.__guigui_launch={json.dumps(view)};"
+                f"window.__guigui_launch={json.dumps(payload)};"
                 "applyLaunch&&applyLaunch()")
 
 
-def _inject_launch(window, view: str) -> None:
+def _inject_launch(window, view: str | None, open_route: str | None = None) -> None:
+    """契约 §4(1.6.0):注入 {view?, open_route?};至少一项有值才注入。"""
+    payload = {}
+    if view:
+        payload["view"] = view
+    if open_route:
+        payload["open_route"] = open_route
+    if not payload:
+        return
     try:
-        window.evaluate_js(f"window.__guigui_launch = {json.dumps(view)}")
+        window.evaluate_js(f"window.__guigui_launch = {json.dumps(payload)}")
     except Exception as e:
         log.warning("deep link 注入失败: %s", e)
 
@@ -170,18 +190,23 @@ def _activate_existing_window() -> None:
         log.warning("gui: 激活已有窗口失败: %s", e)
 
 
-def _forward_deep_link(view: str) -> None:
+def _forward_deep_link(view: str | None, open_route: str | None = None) -> None:
     """单实例抢锁失败时的深链转发:pending 文件 + 激活旧窗口。
 
     主实例 FileWatcher 2s 轮询消费 pending 文件并注入 applyLaunch;
-    带 ts 是为了丢弃「GUI 关闭前没消费完」的隔夜残留。"""
+    带 ts 是为了丢弃「GUI 关闭前没消费完」的隔夜残留;
+    1.6.0 起可转发 open_route(与 view 同批白名单校验)。"""
     import time as _time
 
     try:
         p = paths.data_dir() / PENDING_VIEW_NAME
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps({"view": view, "ts": _time.time()}),
-                     encoding="utf-8")
+        item = {"ts": _time.time()}
+        if view:
+            item["view"] = view
+        if open_route:
+            item["open_route"] = open_route
+        p.write_text(json.dumps(item), encoding="utf-8")
     except OSError as e:
         log.warning("gui: 深链转发落盘失败: %s", e)
     _activate_existing_window()
@@ -325,8 +350,11 @@ def _pump_feedback(delay_s: float = 2.5) -> None:
         log.exception("gui: 反馈补发失败")
 
 
-def run(view: str | None = None) -> int:
-    """启动 GUI;返回进程退出码。重复启动直接退出(单实例)。"""
+def run(view: str | None = None, open_route: str | None = None) -> int:
+    """启动 GUI;返回进程退出码。重复启动直接退出(单实例)。
+
+    open_route(1.6.0 启动路由参数):v-form|v-status|v-success|v-feedback,
+    loaded 后经 __guigui_launch 注入,前端启动路由完成后直达对应视图。"""
     import webview
 
     from guigui.core import crashlog
@@ -336,8 +364,8 @@ def run(view: str | None = None) -> int:
     lock = instance.SingleInstance()
     if not lock.acquire():
         log.info("gui: 已有实例在跑,本次启动退出")
-        if view:
-            _forward_deep_link(view)   # 通知点击落到已开的 GUI 时不再石沉大海
+        if view or open_route:
+            _forward_deep_link(view, open_route)   # 通知点击落到已开的 GUI 时不再石沉大海
         return 0
     notify_mod.register_protocol()   # 幂等:guigui:// 唤回通道
 
@@ -374,8 +402,8 @@ def run(view: str | None = None) -> int:
 
     window.events.before_show += _on_before_show
 
-    if view:
-        window.events.loaded += lambda: _inject_launch(window, view)
+    if view or open_route:
+        window.events.loaded += lambda: _inject_launch(window, view, open_route)
 
     watcher = FileWatcher(api)
     watcher.start()

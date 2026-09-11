@@ -805,7 +805,8 @@ const S={
   probeTimer:null,probeCount:0,   /* P1-8 探测定时器句柄(单链)+ 可观测拍数 */
   vt2Busy:false,                  /* P1-14 vt2 自动验证进行中(防叠发) */
   rebuildFails:0,                 /* P1-15 任务重建连败计数(拦截页+横幅②共用):成功清零,≥3 → 反馈出口 */
-  formPrefill:null                /* A3 基准:identify 自动预填的学号(formMode 清零/预填时记)— formDirty 据此区分「预填」与「用户键入」,密码永不预填(契约 §0) */
+  formPrefill:null,               /* A3 基准:identify 自动预填的学号(formMode 清零/预填时记)— formDirty 据此区分「预填」与「用户键入」,密码永不预填(契约 §0) */
+  vaultState:'ok'                 /* 1.6.0 凭据库健康四态(recentResult 透传):只存不弹,库的事后端自己管 */
 };
 function formatTriggerTime(h,m){return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
 function renderTriggerTime(){
@@ -933,7 +934,11 @@ async function firstRun(){
       if(morningFail){
         document.body.classList.remove('setup');
         setTimeout(()=>{enterStatus('contra')},wait);return}
-      setTimeout(()=>{goDaily();applyLaunch()},wait);return
+      setTimeout(()=>{goDaily();
+        /* 深链消费让过转场:goDaily 的 show(v-main) 经 VIEW_MS 定时挂 .on,
+           立刻再 show(目标视图) 会与那枚定时器叠车(两视图同 .on,DOM 靠后的
+           v-main 盖住目标)— 让过一个转场周期再 applyLaunch(creds 同吃此修) */
+        setTimeout(applyLaunch,VIEW_MS+60)},wait);return
     }
   }else{S.mainState='down'}
   setTimeout(()=>{mood(b,S.mainState==='ok'?'idle':(S.mainState==='out'?'sad':'cry'))},Math.max(0,700-el));
@@ -972,14 +977,32 @@ async function probeTick(){
   S.probeTimer=setTimeout(probeTick,PROBE_MS);
 }
 function startProbeLoop(){if(!S.probeTimer)probeTick()}
-/* 深链(契约 §4):壳在 loaded 前注入 window.__guigui_launch('main'|'creds'|'settings'),
-   前端启动路由完成后消费一次即清除;未完成首装时忽略,单行道优先 */
+/* 深链(契约 §4;1.6.0 扩 open_route):壳在 loaded 前注入 window.__guigui_launch —
+   旧字符串形('main'|'creds'|'settings')或对象形({view?,open_route?},
+   open_route ∈ v-form|v-status|v-success|v-feedback 直取视图 id)。
+   前端启动路由完成后消费一次即清除;未完成首装时忽略,单行道优先;
+   网态问题调起状态页的 ROUTE 逻辑照常兜底(深链只影响「进哪个视图」) */
 function applyLaunch(){
   const L=window.__guigui_launch;
   if(!L)return;
   try{delete window.__guigui_launch}catch(e){window.__guigui_launch=undefined}
-  if(L==='creds')openDetail('v-form');
-  else if(L==='settings')openDetail('v-settings')
+  const obj=(L&&typeof L==='object');
+  const route=obj?(L.open_route||null):null;
+  const view=obj?(L.view||null):L;
+  if(route){
+    if(route==='v-form')openDetail('v-form');
+    else if(route==='v-status'){
+      const st=(S.lastNet||{}).state;
+      if(st==='unreachable'||st==='waiting'||!st)enterStatus('wait');
+      else if(st==='not_logged_in')enterStatus('drop');
+      /* logged_in:状态页是问题中枢,网好好的无事可陈 — 深链让位日常页
+         (v-status 落点主要服务「连不上/成功后想看现场」的通知点击) */
+    }
+    else if(route==='v-success'){renderSuccess();show('v-success')}
+    else if(route==='v-feedback')openDetail('v-feedback');
+    return}
+  if(view==='creds')openDetail('v-form');
+  else if(view==='settings')openDetail('v-settings')
 }
 function goSetup(){
   if(S.mainState==='down')show('v-guide');
@@ -1956,7 +1979,8 @@ async function renderMainData(){
   }
   if(ts.ok)S.taskBlocked=!ts.data.ok;   /* 主页发现任务被拦 → 横幅②(master 关时后端报 ok,不冤枉) */
   if(S.lastNet)$('main-net').textContent=netText(S.lastNet);
-  if(l.ok){$('main-last-t').textContent=l.data.when||'昨晚';$('main-last').textContent=lastText(l.data);
+  if(l.ok){if(l.data.vault_state)S.vaultState=l.data.vault_state;   /* 1.6.0 透传存储,不打扰 */
+    $('main-last-t').textContent=l.data.when||'昨晚';$('main-last').textContent=lastText(l.data);
     renderBanners(l.data)}
   /* 主页日志是「钉底最近几条」,全天完整历史在 v-log;不裁剪会把
      「历史日志 →」顶出可视区(2026-08-31 实测) */
