@@ -573,12 +573,24 @@ class GuiGuiApi:
             return _err(INTERNAL, "任务状态查不出来,再试一次")
 
     def rebuildTask(self) -> dict:
-        """一键重建定时任务 — 仅用户点击触发(8.5.2),绝不后台静默重建。"""
+        """一键重建定时任务 — 仅用户点击触发(8.5.2),绝不后台静默重建。
+
+        P1-15(白板 intercept2「重建直到正常」):用户点击的这一轮内未达成时
+        补试,最多 3 轮 reconcile(每轮本身是 schtasks 调用、秒级粒度,轮间
+        不另睡);仍 misaligned → ok=false,即「3 败」— 前端拦截页/横幅②
+        以此切换反馈出口(白板 re3)。信封 ok = 对齐后 is_task_current 判定,
+        即「重建成功·回巡检复查」的复查结论,调用方不必再复询。"""
         try:
             cfg = config.load()
             if cfg.get("master", True) and not _configured(cfg):
                 return _err(NOT_CONFIGURED, "还没完成首次开启,先去开启每日自动登录")
-            changed, misaligned = selfheal.reconcile(cfg)
+            changed = False
+            misaligned = False
+            for _attempt in range(3):
+                c, misaligned = selfheal.reconcile(cfg)
+                changed |= c
+                if not misaligned:
+                    break
             if misaligned:
                 notify.task_blocked()
             self._emit("schedule:changed",

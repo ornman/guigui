@@ -55,6 +55,7 @@ class Ctx:
         self.connect_ok = True
         self.reconciled = []
         self.reconcile_ret = (False, False)   # selfheal.reconcile 桩返回 (changed, misaligned)
+        self.reconcile_seq = None             # 同 probe_seq:设为 [(changed, misaligned), …] 时逐次弹出
         self.task_blocked_calls = []
         self.task_linger_calls = []
         self.task_current = True   # scheduler.is_task_current 桩返回值
@@ -119,6 +120,8 @@ class Ctx:
 
     def _reconcile_stub(self, cfg):
         self.reconciled.append(cfg["master"])
+        if self.reconcile_seq:
+            return tuple(self.reconcile_seq.pop(0))
         return self.reconcile_ret
 
 
@@ -692,6 +695,29 @@ def test_rebuild_task_unconfigured_refuses(ctx, monkeypatch):
     c = Ctx(monkeypatch, cfg_over={"uid": ""})
     monkeypatch.setattr(api_mod.vault, "has_password", lambda uid: False)
     assert c.api.rebuildTask()["code"] == "NOT_CONFIGURED"
+
+
+def test_rebuild_task_retries_until_aligned(ctx):
+    """P1-15 重试环(白板 intercept2「重建直到正常」):首轮被拦、第二轮
+    建成 → 补试一轮即达成,信封 ok=true。"""
+    ctx.reconcile_seq = [(False, True), (True, False)]
+    out = ctx.api.rebuildTask()
+    assert out["ok"] is True and out["data"]["ok"] is True
+    assert out["data"]["changed"] is True
+    assert ctx.reconciled == [True, True]        # 恰好两轮
+    assert ctx.task_blocked_calls == []          # 达成不弹拦截通知
+
+
+def test_rebuild_task_retry_exhausts_at_three(ctx):
+    """持续被拦 → 恰 3 轮收线(ok=false 即「3 败」)+ 拦截指引通知。"""
+    ctx.reconcile_ret = (False, True)
+    out = ctx.api.rebuildTask()
+    assert out["ok"] is True and out["data"]["ok"] is False
+    assert ctx.reconciled == [True, True, True]  # 上限 3 轮,不多烧
+    assert ctx.task_blocked_calls == [1]
+    kinds = [t for t, p in parse_emitted(ctx.window)
+             if t == "schedule:changed" and p.get("task_ok") is False]
+    assert kinds                                       # 事件如实带 task_ok=false
 
 
 def test_recent_result_carries_verified(ctx):

@@ -34,7 +34,9 @@
 
    dev 驱动钩子(摆拍/联调):_setNet(state,ssid) 真改网态源;_setRej(reason) 强改
    「已存凭据登录」的拒绝 reason(P1-12 状态页快登五态摆拍;null=关,恢复按场景);
-   _setTaskOk(ok) 强改任务在岗位(P1-17 任务①:断网存配置的拦截分流摆拍);
+   _setTaskOk(ok,sticky) 强改任务在岗位(P1-17 任务①:断网存配置的拦截分流摆拍;
+   sticky=true 时 rebuildTask 修不好 — P1-15 重建 3 败→反馈出口的摆拍,模拟杀软
+   持续拦截;不还原,复位传 true 或重载场景);
    _runMorningTask('ok'|'fail') 模拟明早任务真跑(P1-17 任务②三结局摆拍) */
 (function(){
 'use strict';
@@ -301,10 +303,12 @@ window.GGMock={
     return OK({steps,verdict,exit});
   },
   async rebuildTask(){
+    /* 对齐后端 P1-15 重试环语义:一次点击内部补试,常规拦一下就能建成(600ms);
+       sticky(杀软持续拦)= 3 轮全败,信封 ok=false → 前端 3 败反馈出口 */
     await delay(600);
-    S.taskOk=true;   /* QA:重建一次就修好 */
-    emit('schedule:changed',{master:S.cfg.master,trigger_time:S.cfg.trigger_time,task_ok:true});
-    return OK({ok:true,changed:true});
+    if(!S.taskSticky)S.taskOk=true;
+    emit('schedule:changed',{master:S.cfg.master,trigger_time:S.cfg.trigger_time,task_ok:S.taskOk});
+    return OK({ok:S.taskOk,changed:!S.taskSticky});
   },
   async feedback(){
     /* 1.3.0 废弃路径(保留一个版本周期):复制文本的旧入口 */
@@ -361,12 +365,14 @@ window.GGMock={
     forcedRej=reason||null;
     return OK({forced:forcedRej});
   },
-  async _setTaskOk(ok){
-    /* dev 驱动钩子(P1-17 任务①):强改任务在岗位 — 断网存配置后 submitLadder
-       补询 taskStatus 的分流摆拍(false=杀软拦了建成失败 → 拦截页;不还原,
-       需要复位就传 true 或重载场景) */
+  async _setTaskOk(ok,sticky){
+    /* dev 驱动钩子(P1-17 任务①/P1-15):强改任务在岗位 — 断网存配置后
+       submitLadder 补询 taskStatus 的分流摆拍(false=杀软拦了建成失败 → 拦截页);
+       sticky=true 时 rebuildTask 也不修好(3 败→反馈出口摆拍)。
+       不还原,需要复位就传 true 或重载场景 */
     S.taskOk=!!ok;
-    return OK({taskOk:S.taskOk});
+    S.taskSticky=!!sticky;
+    return OK({taskOk:S.taskOk,sticky:S.taskSticky});
   },
   async _runMorningTask(outcome){
     /* dev 驱动钩子(P1-17 任务②):模拟明早 07:00 定时任务真跑一次(GUI 在场视角),

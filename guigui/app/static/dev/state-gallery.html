@@ -260,8 +260,9 @@ const PANELS=[
     const b=Q(W,'#success-actions .btn');if(b)b.textContent='没建成,再试一次'}},
 ]},
 {view:'v-status',name:'大头状态页(P1-10 问题中枢:三心境 + 快登 + 实时状态行)',frames:[
-  /* 摆拍走真事件/产品入口:_setNet 触发系统调起(ROUTE hub 维度),sad/contra 用
-     enterStatus 直达(巡检分诊入口属 P1-15,先以函数入口摆拍) */
+  /* 摆拍走真事件/产品入口:_setNet 触发系统调起(ROUTE hub 维度),sad 用
+     enterStatus 直达;contra = P1-15 启动巡检·日志维度分诊的真实入口
+     (unverified 底座开机自动落,不再函数摆拍) */
   {label:'等网 wait(L1 还不通 · 琥珀)',scene:'daily',setup:W=>W.GGMock._setNet('unreachable','iphone17 pro max')},
   {label:'蓝变红 drop(网在 · 登录掉了)',scene:'daily',setup:W=>W.GGMock._setNet('not_logged_in','Campus-WiFi')},
   {label:'沮丧 sad · 密码不对(去登录页改)',scene:'daily',setup:W=>{W.GGMock._setNet('not_logged_in','Campus-WiFi');
@@ -271,7 +272,7 @@ const PANELS=[
   {label:'换账号?揭示(换 / 不换两键)',scene:'daily',setup:W=>{W.GGMock._setNet('not_logged_in','Campus-WiFi');
     W.enterStatus('sad',{reason:'limit_users',message:'这个学号已在别的设备上登录(比如在别处登过没下线),那边下线后桂桂会自动登好'});
     W.statusSwap()}},
-  {label:'矛盾 contra(今早没登上 · 进入检测走 🔑)',scene:'daily',setup:W=>W.enterStatus('contra')},
+  {label:'矛盾 contra(今早没登上 · P1-15 启动分诊真入口)',scene:'unverified',setup:W=>{}},
   {label:'快登节流(中性提示 · 可再试)',scene:'daily',setup:W=>{W.GGMock._setNet('not_logged_in','Campus-WiFi');
     W.statusNote('登录太频繁,请等 10 秒再试')}},
 ]},
@@ -284,18 +285,30 @@ const PANELS=[
 {view:'v-main',name:'日常主页',frames:[
   {label:'两态① 全部正常(无横幅)',scene:'daily',setup:W=>{}},
   {label:'总开关关(桂桂睡觉)',scene:'daily',setup:W=>W.setAuto(false)},
-  {label:'横幅① 密码还没验证过(未验证+今早失败)',scene:'unverified',setup:W=>{}},
+  {label:'横幅① 密码还没验证过(未验证+今早失败)',scene:'unverified',setup:W=>
+    /* P1-15 起 unverified 开机被分诊调进 contra 状态页(今早失败∧当下全好),
+       本帧从状态页回日常摆横幅①(分诊真入口帧在 v-status 卡) */
+    setTimeout(()=>W.goDaily(),300)},
   {label:'两态② 带横幅 · ①+⑧并存(断网未解 · 事实在网络行)',scene:'unverified',setup:W=>{(async()=>{
-    /* P1-13 两态:断网 → 系统调起状态页 → 带横幅回日常;标题恒问候语,
-       网络行如实「连不上」,横幅⑧在等 + 横幅①未验证同屏(放在纯①帧后,同场景复用) */
+    /* P1-13 两态 + P1-15 适配:开机先落 contra(分诊)→ 回日常(横幅①在场)→
+       断网 → 系统调起等网 → 带横幅⑧回日常;网络行如实「连不上」,
+       横幅⑧在等 + 横幅①未验证同屏(放在纯①帧后,同场景复用) */
+    await new Promise(r=>setTimeout(r,300));
+    W.goDaily();await new Promise(r=>setTimeout(r,400));
     await W.GGMock._setNet('unreachable','iphone17 pro max');
     setTimeout(()=>W.backFrom('v-status'),450);
   })()}},
   {label:'横幅② 自动登录还没生效',scene:'daily',setup:W=>W.setTaskBlocked(true)},
-  {label:'横幅② 重建失败(再试一次)',scene:'daily',setup:W=>{W.setTaskBlocked(true);
-    /* setTaskBlocked 的刷横幅是异步(recentResult ~50ms 后 innerHTML 重写),
-       文案改写须等重渲落定再落笔,否则被覆盖回原文案 */
-    setTimeout(()=>{const b=Q(W,'#main-banners .banner span');if(b)b.textContent='没建成,再试一次'},150)}},
+  {label:'横幅② 重建 3 败 → 反馈出口(P1-15)',scene:'daily',setup:W=>{(async()=>{
+    /* 真路径三连败:sticky(杀软持续拦,mock._setTaskOk 第二参)下 rebuildTaskBanner×3
+       → 横幅②换反馈版(renderBanners 正式渲染,重渲稳定);点它=复位计数+跳反馈页
+       (附诊断包),返回后横幅回「点此重建」— 加白杀软后的再试通路不断 */
+    W.GGMock._setTaskOk(false,true);W.setTaskBlocked(true);
+    await new Promise(r=>setTimeout(r,250));
+    await W.rebuildTaskBanner();await new Promise(r=>setTimeout(r,120));
+    await W.rebuildTaskBanner();await new Promise(r=>setTimeout(r,120));
+    await W.rebuildTaskBanner();await new Promise(r=>setTimeout(r,120));
+  })()}},
   {label:'横幅② · 总开关关联动隐退(P1-13)',scene:'daily',setup:W=>{(async()=>{
     /* 摆拍口径(不走 toggleAuto 真路径,免把 master=false 持久化进 localStorage 污染后续帧;
        联动真路径已在产品页验收):横幅②在场 → 总开关关 → 任务停用,横幅即时隐退。
@@ -450,6 +463,7 @@ const STORIES=[
   {t:'开机仪式(体检并行)',d:'diag_task 底座:网正常但定时任务不在岗。仪式期间并行跑 taskStatus(只读、秒回、2s 超时保护),用户全程无感 — 验证器铁律的另一半:只有只读检查才许静默,全量五步必须显式进 v-diag 才跑。',scene:'diag_task',setup:W=>bootPose(W,'桂桂伸了个懒腰,正在检查网络…','sleep',0)},
   {t:'落主页 · 横幅②已亮',d:'仪式结束照常落主页:静默体检发现任务不在岗 → 横幅②「自动登录还没生效,点此重建」。不弹窗、不跳页、不打断。',scene:'diag_task',setup:W=>W.goDaily()},
   {t:'就地重建',d:'亲手:点横幅② → busy「重建中…」→ mock 一次修好 → schedule:changed 推 task_ok=true → 横幅消失。全程不离开主页。',scene:'diag_task',free:'点横幅② 试试重建'},
+  {t:'重建 3 败 → 反馈出口(P1-15)',d:'亲手:重载本步,在控制台跑 GGMock._setTaskOk(false,true) 模拟杀软持续拦截,再点横幅②三次 — 单次失败横幅保持原样可再点;三连败后换「重建 3 次没成 — 带上诊断包反馈」(白板 re3):点击跳反馈页附诊断包,返回后横幅回「点此重建」(计数已复位,加白杀软后仍可再试)。后端 rebuildTask 单次点击内自带 3 轮重试环,三连败才是真 3 败。',scene:'diag_task'},
 ]},
 {t:'S9 快登被拒→沮丧→排查→反馈',s:'状态页快登 wrong_password → 沮丧 → 验证器 → 兜底反馈',steps:[
   {t:'开机即状态页(streak 底座)',d:'streak 底座:密码存过也验证过,但已被人在别处改掉 — 已存凭据重登必被拒。P1-8 第三批:开机探测 L2 发现未登录,系统直接调起状态页(蓝变红心境),「快速登录」在场。P1-14:库已验证 → 网态问题不自动验证(自动动作仅限未验证库),快登键等手动。',scene:'streak'},
@@ -479,6 +493,11 @@ const STORIES=[
   })()},free:'点「重建定时任务」'},
   {t:'任务②:明早登录失败(GUI 在场)',d:'切日常底座,mock 模拟明早 07:00 任务真跑、重试穷尽没登上:日志落「登录被拒」行,网态翻未登录 → 系统调起状态页·蓝变红递快登(🅛 五态分流复用,拍板B);任务仍在岗 — 不进拦截页、横幅②不亮(亲手点「带横幅回日常」看:只有横幅⑧,最近结果行如实「没能登上」)。',scene:'daily',setup:W=>W.GGMock._runMorningTask('fail'),free:'点「带横幅回日常」看横幅与最近结果'},
   {t:'任务②:明早登上(GUI 不弹彩带)',d:'mock 模拟明早任务一次登好:P1-16 彩带规则 — 彩带只属于用户在场的验证通过(首装/日常改密),无人值守成功 = 后端通知 + 日常页状态刷新,页面停在主页;状态页在页则自动收场回日常。',scene:'daily',setup:W=>W.GGMock._runMorningTask('ok')},
+]},
+{t:'S12 巡检分诊:今早没登上(P1-15)',s:'启动巡检·日志维度 → 矛盾态状态页 → 进入检测收场',steps:[
+  {t:'开机即矛盾态状态页',d:'unverified 底座:今早真失败(日志「登录被拒」),但现在网全好(logged_in)— 启动巡检日志维度分诊(白板 logskip→diag 三路之①「全好=矛盾」):开机直接落状态页 contra 心境(紫染):「今早没登上,但现在都正常。」不弹窗、不等用户自己发现;分诊另两路(②没登录→drop/③网不通→wait)由网态调起接管,是 S7f/S10 已验的路径。silent/throttled 不分诊(假期静默有意不打扰、节流中性留任务重试)。',scene:'unverified'},
+  {t:'进入检测(🔑 对账收场)',d:'亲手:点「进入检测」→ 🔑 检验(与快登同一实现):已登录 → chkstatus 对账不触发登录;线上是自己 → 对账通过自动回日常(lede 闪「登好了,网的事继续交给我 ✓」)。注:对账验不了密码盲区,verified 不翻 — 横幅①继续在场提醒,盲区由下一未登录时刻自然暴露(P1-14 语义)。',scene:'unverified',free:'点「进入检测」看收场'},
+  {t:'带横幅回日常(横幅①在场)',d:'亲手(重载本步):「带横幅回日常」→ 主页横幅①「密码还没验证过,去改一下」在场 — 矛盾态的两条出路:当场检测(上一步)或去改密码验证;「最近」行如实「07:00 没能登上」,网络行「已连上 ✓」,三个信号时态自洽(A7)。',scene:'unverified',free:'点「带横幅回日常」看横幅①'},
 ]},
 ];
 

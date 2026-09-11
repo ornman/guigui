@@ -965,7 +965,7 @@
       {
        "type": "rect",
        "id": "re3",
-       "text": "重建失败3次→反馈/检测器",
+       "text": "重建失败3次→反馈/检测器(P1-15已落)",
        "width": 175,
        "height": 44,
        "fillColor": "#DBEAFE",
@@ -1356,7 +1356,7 @@
         {
          "type": "rect",
          "id": "vault",
-         "text": "库:损坏/解密失败",
+         "text": "库:损坏/解密失败(待1.6.0拍板)",
          "width": 135,
          "height": 42,
          "fillColor": "#FEE2E2",
@@ -1382,7 +1382,7 @@
         {
          "type": "rect",
          "id": "degrade",
-         "text": "🔔降级:切备份库JSON",
+         "text": "🔔降级:切备份库JSON(待1.6.0拍板)",
          "width": 145,
          "height": 42,
          "fillColor": "#DBEAFE",
@@ -1408,7 +1408,7 @@
         {
          "type": "rect",
          "id": "intercept2",
-         "text": "🔔#拦截页 重建直到正常",
+         "text": "🔔#拦截页 重建直到正常(P1-15已落·3败→反馈)",
          "width": 135,
          "height": 48,
          "fillColor": "#EFE9FC",
@@ -1421,7 +1421,7 @@
         {
          "type": "rect",
          "id": "logskip",
-         "text": "日志:今早没登上",
+         "text": "日志:今早没登上(P1-15已落:启动分诊)",
          "width": 125,
          "height": 42,
          "fillColor": "#DBEAFE",
@@ -1434,7 +1434,7 @@
         {
          "type": "diamond",
          "id": "diag",
-         "text": "当日实况分诊(调全局探测)",
+         "text": "当日实况分诊(调全局探测·P1-15已落)",
          "width": 160,
          "height": 80,
          "fillColor": "#FEF3C7",
@@ -1446,7 +1446,7 @@
         {
          "type": "rect",
          "id": "progfail",
-         "text": "程序:损坏/被隔离",
+         "text": "程序:损坏/被隔离(待1.6.0拍板)",
          "width": 135,
          "height": 42,
          "fillColor": "#FEE2E2",
@@ -1459,7 +1459,7 @@
         {
          "type": "rect",
          "id": "proggrep",
-         "text": "自动修复(自校验还原)",
+         "text": "自动修复(自校验还原·待1.6.0拍板)",
          "width": 160,
          "height": 42,
          "fillColor": "#DBEAFE",
