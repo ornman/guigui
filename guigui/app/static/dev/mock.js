@@ -33,8 +33,7 @@
                 但密码已被人改 — 已存凭据重登也拒 wrong_password;diagnose 第 3 步
                 同样真登被拒 → exit=login(文案与 rejected 场景逐字一致)
 
-   dev 驱动钩子(摆拍/联调):_setNet(state,ssid) 真改网态源;_setRej(reason) 强改
-   「已存凭据登录」的拒绝 reason(P1-12 状态页快登五态摆拍;null=关,恢复按场景);
+   dev 驱动钩子(摆拍/联调):_setNet(state,ssid) 真改网态源;
    _setTaskOk(ok,sticky) 强改任务在岗位(P1-17 任务①:断网存配置的拦截分流摆拍;
    sticky=true 时 rebuildTask 修不好 — P1-15 重建 3 败→反馈出口的摆拍,模拟杀软
    持续拦截;不还原,复位传 true 或重载场景);
@@ -103,7 +102,6 @@ if(SCENE==='unverified'){S.configured=true;S.verified=false;S.pwd='secret';
 
 const saveCfg=()=>localStorage.setItem(LS_CFG,JSON.stringify(S.cfg));
 const netEmit=()=>emit('net:state',{state:S.net.state,ssid:S.net.ssid});
-let forcedRej=null;   /* _setRej 驱动位:强改已存凭据登录的拒绝 reason(null=关) */
 
 window.GGMock={
   async probe(){
@@ -185,19 +183,6 @@ window.GGMock={
       }
       return OK({result:'already',uid:UID_MASK,attempts:0,verified:S.verified});}
     if(S.net.state==='logged_in')return OK({result:'already',uid:UID_MASK,attempts:0,verified:S.verified});
-    /* dev 驱动(_setRej):已存凭据登录(login 无 password)强改拒绝 reason —
-       P1-12 状态页快登五态摆拍;文案与后端 rejection_text 逐字一致 */
-    if(forcedRej&&!(a&&a.password)){
-      if(forcedRej==='throttled'){
-        emit('login:progress',{phase:'throttled',waitsec:10,attempt:1,attempts:1});
-        return ERR('AUTH_REJECTED','登录太频繁,请等 10 秒再试','throttled');
-      }
-      const m={wrong_password:'密码不对,改一下再试',
-        wrong_account:'学号或运营商选错了,核对一下再试',
-        bound:'密码是对的,但这个账号被绑在别处/受限 — 去自助服务平台看看绑定',
-        limit_users:'这个学号已在别的设备上登录(比如在别处登过没下线),那边下线后桂桂会自动登好'}[forcedRej];
-      return ERR('AUTH_REJECTED',m,forcedRej);
-    }
     const pwd=(a&&a.password)!=null&&a.password!==''?a.password:S.pwd;
     if(!pwd)return ERR('NOT_CONFIGURED','还没存密码,先填一次');
     emit('login:progress',{phase:'requesting',attempt:1,attempts:S.cfg.login_retries});
@@ -339,16 +324,6 @@ window.GGMock={
     emit('schedule:changed',{master:S.cfg.master,trigger_time:S.cfg.trigger_time,task_ok:S.taskOk});
     return OK({ok:S.taskOk,changed:!S.taskSticky});
   },
-  async feedback(){
-    /* 1.3.0 废弃路径(保留一个版本周期):复制文本的旧入口 */
-    await delay(400);
-    return OK({text:[
-      '桂桂 v2.1.0 诊断信息(预览)',
-      '系统:Windows 11 26200 x64 · Python 3.12.8',
-      '网络:WiFi Campus-WiFi · HTTP 200 · 340ms',
-      '—— 最近 7 天 ——','09-01 ✓ · 09-02 ✓ · 09-03 ✗'
-    ].join('\n')});
-  },
   /* ── 1.3.0 真通道:提交三态 / 诊断预览 / 队列状态 ── */
   async feedbackSend(a){
     await delay(700);
@@ -388,11 +363,6 @@ window.GGMock={
     if(ssid!=null)S.net.ssid=ssid;
     netEmit();
     return OK({...S.net});
-  },
-  async _setRej(reason){
-    /* dev 驱动钩子(P1-12):强改已存凭据登录的拒绝 reason(五态摆拍);null/空=关 */
-    forcedRej=reason||null;
-    return OK({forced:forcedRej});
   },
   async _setTaskOk(ok,sticky){
     /* dev 驱动钩子(P1-17 任务①/P1-15):强改任务在岗位 — 断网存配置后

@@ -797,16 +797,6 @@ class GuiGuiApi:
             log.exception("api.recentResult")
             return _err(INTERNAL, "昨晚的记录读不出来")
 
-    # ── 2.12 feedback(1.1.0;1.3.0 起废弃,保留一个版本周期)──
-
-    def feedback(self) -> dict:
-        """复印机时代的复制文本;实现由 render(collect()) 派生,形状不变。"""
-        try:
-            return _ok({"text": diagnostics.render(diagnostics.collect(["problem"]))})
-        except Exception:
-            log.exception("api.feedback")
-            return _err(INTERNAL, "诊断信息没生成出来,再试一次")
-
     # ── 2.15–2.17 feedback*(1.3.0 新增:真通道)──
 
     def feedbackSend(self, payload=None) -> dict:

@@ -369,25 +369,6 @@ def test_recent_result_when_labels(ctx):
 # ── 窗口控制 ──────────────────────────────────────────────
 
 
-def test_feedback_deprecated_path_still_renders(ctx, monkeypatch):
-    from guigui.core import diagnostics as diag_mod
-
-    monkeypatch.setattr(diag_mod, "collect", lambda kind: {"env": {"os": "x"}})
-    monkeypatch.setattr(diag_mod, "render", lambda bundle: "预览文本(已打码)")
-    out = ctx.api.feedback()
-    assert out["ok"] is True and out["data"]["text"].startswith("预览文本")
-
-
-def test_feedback_internal_on_failure(ctx, monkeypatch):
-    from guigui.core import diagnostics as diag_mod
-
-    def boom(kind):
-        raise RuntimeError("diag down")
-    monkeypatch.setattr(api_mod.diagnostics, "collect", boom)
-    out = ctx.api.feedback()
-    assert out["ok"] is False and out["code"] == "INTERNAL"
-
-
 # ── 2.15–2.17 feedback*(1.3.0 真通道)─────────────────────
 
 

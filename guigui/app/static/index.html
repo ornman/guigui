@@ -462,15 +462,12 @@ button.banner{background:oklch(58% 0.15 295 / 0.07);border:1px solid oklch(58% 0
   background:oklch(28% 0.02 265 / 0.55);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
   border-top:1px solid oklch(100% 0 0 / 0.08)}
 body.backdrop-black .taskbar{display:none}
-.tb-center{display:flex;align-items:center;gap:10px}
 .tb-start{width:34px;height:34px;border-radius:8px;display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:9px}
 .tb-start i{background:oklch(78% 0.11 255);border-radius:2px}
 .tb-search{width:150px;height:32px;border-radius:16px;background:oklch(100% 0 0 / 0.09);
   display:flex;align-items:center;gap:8px;padding:0 14px;
   font:500 11px/1 Inter,"PingFang SC",sans-serif;color:oklch(85% 0.005 265)}
 .tb-search i{width:11px;height:11px;border:1.5px solid oklch(85% 0.005 265);border-radius:50%}
-.tb-app{width:30px;height:30px;border-radius:7px;background:oklch(100% 0 0 / 0.10)}
-.tb-clock{position:absolute;right:16px;text-align:right;font:500 11px/1.5 Inter,sans-serif;color:oklch(88% 0.005 265)}
 .demo{position:fixed;left:22px;bottom:60px;z-index:50;display:flex;gap:6px;flex-wrap:wrap;max-width:460px}
 .demo button{padding:6px 11px;border:1px dashed oklch(55% 0.01 295 / .55);border-radius:99px;
   background:oklch(20% 0.01 295 / .72);color:oklch(85% 0.005 295);
@@ -487,7 +484,7 @@ body.backdrop-black .taskbar{display:none}
   #boot-bot,#boot-bot-greet-form,#boot-bot-greet-main{animation:none !important;opacity:1!important;transform:none!important}
 }
 </style>
-<style id="app-overrides">
+<style>
 /* ═══ 应用模式增量(唯一允许的 CSS 差异区,其余与 PRD 原型逐字节一致) ═══ */
 /* 字体内嵌:分发机器没有思源宋体/Inter 也能同渲染;两个族名别名同一文件,匹配顺序无关 */
 @font-face{font-family:"Source Han Serif SC";src:url("fonts/NotoSerifSC-VF.ttf") format("truetype-variations");font-weight:100 900}
@@ -783,7 +780,7 @@ const origin={};   /* 详情视图来路:返回必回原处 */
    lede 都读这个值(报告 1.4);lastNet 一律经 normNet/事件入口压平 waiting(P0-3) */
 const S={
   mainState:'ok',                 /* ok/out/down 内部语境(netToMain 唯一压缩点):未配置首装分流/boot 心境用;P1-13 起不再驱动主页渲染 */
-  configured:false,hasPwd:false,
+  configured:false,
   master:true,                    /* 总开关镜像(setAuto 唯一写入):false=停自动登录,横幅②联动条件(P1-13) */
   currentTriggerTime:'07:00',
   flashUntil:0,flashTimer:null,   /* A1 瞬时反馈:过期时刻 + 归位定时器 */
@@ -853,11 +850,6 @@ function initBot(el,opts){
   return inst;
 }
 function setBotState(el,state){const b=bots[el.id];if(b)b.setState(state);botAria(el,state)}
-/* 给定 selector 设置所有匹配 bot 的状态(情绪联动) */
-function setAllBots(mood){
-  const state=MOOD2STATE[mood];if(!state)return;
-  Object.values(bots).forEach(b=>b.setState(state));
-}
 /* 通用 mood:更新所有 bot 状态 + 触发容器 pop 反馈 */
 function mood(el,m){
   el.dataset.mood=m;
@@ -1371,7 +1363,7 @@ async function submitLadder(){
   if(ctx==='firstRun')await GG.api.saveConfig({trigger_time:S.currentTriggerTime});
   const r=await GG.api.login({sid:sidVal||undefined,password:ctx==='firstRun'?pwd:(rawPwd||undefined),operator:pickedOperator()});
   setBusy(btn,false);hideSubmitNotes();
-  if(r.ok){S.configured=true;S.hasPwd=true;S.loginFailStreak=0;
+  if(r.ok){S.configured=true;S.loginFailStreak=0;
     showSuccess(r.data.verified===true,r.data.reason,r.data.task_ok);renderBannersRefresh();return}
   if(r.code==='AUTH_REJECTED'){
     if(r.reason==='throttled'){
@@ -1386,7 +1378,7 @@ async function submitLadder(){
        没提交密码只跳排查页。mainState 一并记 down,返回主页如实渲染 */
     S.mainState='down';
     if(pwd){
-      S.configured=true;S.hasPwd=true;
+      S.configured=true;
       const ts=await GG.api.taskStatus();
       showSuccess(false,'unreachable',!(ts.ok&&ts.data&&ts.data.ok===false))}
     else openDetail('v-guide');
