@@ -1,0 +1,605 @@
+{
+  "scenes": [
+    {
+      "scene": "ok",
+      "expect": "v-form",
+      "actual": "v-form",
+      "ok": true,
+      "note": "首装已连已登 → v-form firstRun"
+    },
+    {
+      "scene": "out",
+      "expect": "v-form",
+      "actual": "v-form",
+      "ok": true,
+      "note": "首装连上未认证 → v-form login"
+    },
+    {
+      "scene": "down",
+      "expect": "v-guide",
+      "actual": "v-guide",
+      "ok": true,
+      "note": "首装不可达 → v-guide"
+    },
+    {
+      "scene": "rejected",
+      "expect": "v-form",
+      "actual": "v-form",
+      "ok": true,
+      "note": "首装被拒 → v-form login"
+    },
+    {
+      "scene": "bind",
+      "expect": "v-form",
+      "actual": "v-form",
+      "ok": true,
+      "note": "bind 被拒 → v-form login(警告块)"
+    },
+    {
+      "scene": "limit",
+      "expect": "v-form",
+      "actual": "v-form",
+      "ok": true,
+      "note": "limit_users 被拒 → v-form login"
+    },
+    {
+      "scene": "throttled",
+      "expect": "v-form",
+      "actual": "v-form",
+      "ok": true,
+      "note": "节流 → v-form note"
+    },
+    {
+      "scene": "blocked",
+      "expect": "v-form",
+      "actual": "v-form",
+      "ok": true,
+      "note": "首装·定时任务被拦(配置前) → firstRun 落地,提交后才拦截"
+    },
+    {
+      "scene": "fbdg",
+      "expect": "v-form",
+      "actual": "v-form",
+      "ok": true,
+      "note": "反馈降级场景 → firstRun"
+    },
+    {
+      "scene": "waiting",
+      "expect": "v-status",
+      "actual": "v-status",
+      "ok": true,
+      "note": "P0-3 压平≡unreachable + 拍板⑪ 老用户系统调起状态页"
+    },
+    {
+      "scene": "daily",
+      "expect": "v-main",
+      "actual": "v-main",
+      "ok": true,
+      "note": "日常正常 → v-main 两态①"
+    },
+    {
+      "scene": "other",
+      "expect": "v-main",
+      "actual": "v-main",
+      "ok": true,
+      "note": "P0-6 线上他人(老用户) → 日常页(在线状态被 chkstatus 揭穿前一切正常)"
+    },
+    {
+      "scene": "ladder_back",
+      "expect": "v-main",
+      "actual": "v-main",
+      "ok": true,
+      "note": "阶梯回滚(老用户) → 日常页"
+    },
+    {
+      "scene": "ladder_fail",
+      "expect": "v-form",
+      "actual": "v-form",
+      "ok": true,
+      "note": "阶梯翻车(首装配置前) → v-form(因 mock 默认 configured=false)"
+    },
+    {
+      "scene": "beforeopen",
+      "expect": "v-status",
+      "actual": "v-status",
+      "ok": true,
+      "note": "锚前存入:configured+not_logged_in → 状态页 drop"
+    },
+    {
+      "scene": "diag_ok",
+      "expect": "v-main",
+      "actual": "v-main",
+      "ok": true,
+      "note": "diag 入口:configured+logged_in → 日常"
+    },
+    {
+      "scene": "diag_cred",
+      "expect": "v-status",
+      "actual": "v-status",
+      "ok": true,
+      "note": "diag 入口:configured+not_logged_in → 状态页 drop"
+    },
+    {
+      "scene": "diag_task",
+      "expect": "v-main",
+      "actual": "v-main",
+      "ok": true,
+      "note": "diag 入口:configured+logged_in+taskOk=false → 日常(横幅②在场)"
+    },
+    {
+      "scene": "diag_app",
+      "expect": "v-main",
+      "actual": "v-main",
+      "ok": true,
+      "note": "diag 入口:configured+logged_in → 日常"
+    },
+    {
+      "scene": "streak",
+      "expect": "v-status",
+      "actual": "v-status",
+      "ok": true,
+      "note": "日常重登连败:configured+wrong_password → 启动分诊 contra"
+    },
+    {
+      "scene": "unverified",
+      "expect": "v-status",
+      "actual": "v-status",
+      "ok": true,
+      "note": "未验证+今早失败 → 启动分诊 contra"
+    }
+  ],
+  "routes": [
+    {
+      "src": "v-main",
+      "from": "logged_in",
+      "to": "logged_in",
+      "expect": "v-main",
+      "actual": "v-main",
+      "ok": true,
+      "pre_view": "v-main",
+      "pre_state": {
+        "hubRaised": null,
+        "mood": null,
+        "net": "logged_in",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": null,
+        "mood": null,
+        "net": "logged_in",
+        "dirty": false
+      },
+      "form_pre": null,
+      "note": "MAIN_NET 原地重渲"
+    },
+    {
+      "src": "v-main",
+      "from": "unreachable",
+      "to": "unreachable",
+      "expect": "v-main",
+      "actual": "v-main",
+      "ok": true,
+      "pre_view": "v-main",
+      "pre_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "form_pre": null,
+      "note": "同问题去重拦下 → 就地重渲(P1-13 两态 + 横幅⑧)"
+    },
+    {
+      "src": "v-main",
+      "from": "unreachable",
+      "to": "logged_in",
+      "expect": "v-main",
+      "actual": "v-main",
+      "ok": true,
+      "pre_view": "v-main",
+      "pre_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": null,
+        "mood": "wait",
+        "net": "logged_in",
+        "dirty": false
+      },
+      "form_pre": null,
+      "note": "网恢复 → 清 hubRaised,横幅⑧随消,留页"
+    },
+    {
+      "src": "v-main",
+      "from": "unreachable",
+      "to": "not_logged_in",
+      "expect": "v-status",
+      "actual": "v-status",
+      "ok": true,
+      "pre_view": "v-main",
+      "pre_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": "drop",
+        "mood": "drop",
+        "net": "not_logged_in",
+        "dirty": false
+      },
+      "form_pre": null,
+      "note": "换问题(wait→drop)照弹 → 调起状态页"
+    },
+    {
+      "src": "v-guide",
+      "from": "unreachable",
+      "to": "unreachable",
+      "expect": "v-guide",
+      "actual": "v-guide",
+      "ok": true,
+      "pre_view": "v-guide",
+      "pre_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "form_pre": null,
+      "note": "等网落点:重复不可达留页"
+    },
+    {
+      "src": "v-guide",
+      "from": "unreachable",
+      "to": "logged_in",
+      "expect": "v-main",
+      "actual": "v-main",
+      "ok": true,
+      "pre_view": "v-guide",
+      "pre_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": null,
+        "mood": "wait",
+        "net": "logged_in",
+        "dirty": false
+      },
+      "form_pre": null,
+      "note": "guideDaily:550ms 后回日常"
+    },
+    {
+      "src": "v-guide",
+      "from": "unreachable",
+      "to": "not_logged_in",
+      "expect": "v-status",
+      "actual": "v-status",
+      "ok": true,
+      "pre_view": "v-guide",
+      "pre_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": "drop",
+        "mood": "drop",
+        "net": "not_logged_in",
+        "dirty": false
+      },
+      "form_pre": null,
+      "note": "guideReprobe → reProbe → configured → 状态页 drop(P0-7)"
+    },
+    {
+      "src": "v-form",
+      "from": "logged_in",
+      "to": "unreachable",
+      "expect": "v-status",
+      "actual": "v-status",
+      "ok": true,
+      "pre_view": "v-form",
+      "pre_state": {
+        "hubRaised": null,
+        "mood": null,
+        "net": "logged_in",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "form_pre": "clear",
+      "note": "空表单 + configured → HUB_WAIT 首次调起"
+    },
+    {
+      "src": "v-form",
+      "from": "unreachable",
+      "to": "unreachable",
+      "expect": "v-form",
+      "actual": "v-form",
+      "ok": true,
+      "pre_view": "v-form",
+      "pre_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "form_pre": "clear",
+      "note": "空表单但同问题已调起 → 去重拦下留页"
+    },
+    {
+      "src": "v-form",
+      "from": "logged_in",
+      "to": "unreachable",
+      "expect": "v-form",
+      "actual": "v-form",
+      "ok": true,
+      "pre_view": "v-form",
+      "pre_state": {
+        "hubRaised": null,
+        "mood": null,
+        "net": "logged_in",
+        "dirty": true
+      },
+      "post_state": {
+        "hubRaised": null,
+        "mood": null,
+        "net": "unreachable",
+        "dirty": true
+      },
+      "form_pre": "dirty",
+      "note": "A3 拍板④:已键入不被拽走"
+    },
+    {
+      "src": "v-form",
+      "from": "unreachable",
+      "to": "logged_in",
+      "expect": "v-form",
+      "actual": "v-form",
+      "ok": true,
+      "pre_view": "v-form",
+      "pre_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": null,
+        "mood": "wait",
+        "net": "logged_in",
+        "dirty": false
+      },
+      "form_pre": "clear",
+      "note": "FORM_NET:状态行就地刷新,留页"
+    },
+    {
+      "src": "v-status",
+      "from": "unreachable",
+      "to": "not_logged_in",
+      "expect": "v-status",
+      "actual": "v-status",
+      "ok": true,
+      "pre_view": "v-status",
+      "pre_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": "drop",
+        "mood": "drop",
+        "net": "not_logged_in",
+        "dirty": false
+      },
+      "form_pre": null,
+      "note": "statusNetMood:wait→drop 就地换境"
+    },
+    {
+      "src": "v-status",
+      "from": "not_logged_in",
+      "to": "logged_in",
+      "expect": "v-main",
+      "actual": "v-main",
+      "ok": true,
+      "pre_view": "v-status",
+      "pre_state": {
+        "hubRaised": "drop",
+        "mood": "drop",
+        "net": "not_logged_in",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": null,
+        "mood": null,
+        "net": "logged_in",
+        "dirty": false
+      },
+      "form_pre": null,
+      "note": "statusResolved:清旗回日常"
+    },
+    {
+      "src": "v-success",
+      "from": "logged_in",
+      "to": "unreachable",
+      "expect": "v-status",
+      "actual": "v-status",
+      "ok": true,
+      "pre_view": "v-success",
+      "pre_state": {
+        "hubRaised": null,
+        "mood": null,
+        "net": "logged_in",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "form_pre": null,
+      "note": "「其他」行:configured 断网 → 调起状态页(P0-7 含保存页)"
+    },
+    {
+      "src": "v-log",
+      "from": "logged_in",
+      "to": "unreachable",
+      "expect": "v-status",
+      "actual": "v-status",
+      "ok": true,
+      "pre_view": "v-log",
+      "pre_state": {
+        "hubRaised": null,
+        "mood": null,
+        "net": "logged_in",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "form_pre": null,
+      "note": "「其他」行:调起"
+    },
+    {
+      "src": "v-feedback",
+      "from": "logged_in",
+      "to": "unreachable",
+      "expect": "v-status",
+      "actual": "v-status",
+      "ok": true,
+      "pre_view": "v-feedback",
+      "pre_state": {
+        "hubRaised": null,
+        "mood": null,
+        "net": "logged_in",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "form_pre": null,
+      "note": "「其他」行:调起"
+    },
+    {
+      "src": "v-settings",
+      "from": "logged_in",
+      "to": "unreachable",
+      "expect": "v-status",
+      "actual": "v-status",
+      "ok": true,
+      "pre_view": "v-settings",
+      "pre_state": {
+        "hubRaised": null,
+        "mood": null,
+        "net": "logged_in",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "form_pre": null,
+      "note": "「其他」行:调起"
+    },
+    {
+      "src": "v-diag",
+      "from": "logged_in",
+      "to": "unreachable",
+      "expect": "v-status",
+      "actual": "v-status",
+      "ok": true,
+      "pre_view": "v-diag",
+      "pre_state": {
+        "hubRaised": null,
+        "mood": null,
+        "net": "logged_in",
+        "dirty": false
+      },
+      "post_state": {
+        "hubRaised": "wait",
+        "mood": "wait",
+        "net": "unreachable",
+        "dirty": false
+      },
+      "form_pre": null,
+      "note": "「其他」行:调起(体检在跑也照调)"
+    }
+  ],
+  "ac": {
+    "AC-1": {
+      "flash_text": "刚刚把网帮你接回来啦 ✓",
+      "appear_ms": 912,
+      "revert_ms": 4915,
+      "duration_ms": 4003,
+      "poll_span_ms": 3924,
+      "baseline_after": "网的事交给我,你放心忙~",
+      "mutations": [
+        {
+          "t": 0,
+          "text": "网的事交给我,你放心忙~"
+        },
+        {
+          "t": 911,
+          "text": "网的事交给我,你放心忙~"
+        },
+        {
+          "t": 912,
+          "text": "刚刚把网帮你接回来啦 ✓"
+        },
+        {
+          "t": 4915,
+          "text": "网的事交给我,你放心忙~"
+        }
+      ],
+      "baseline_eaten": false,
+      "ok": true,
+      "expect": "flash 挂满 4000ms(±,不被 renderMain/setAuto 基线回填吃掉)后自动回基线",
+      "note": "路径:daily + net not_logged_in → 日常页 quickLogin 真成功 → flashMainLede"
+    },
+    "AC-2": {
+      "login_calls_after_double_click": 1,
+      "ok": true,
+      "expect": "1",
+      "note": "NOT_CONFIGURED 场景双击 quickLogin,setBusy 防重(期望=1)"
+    }
+  }
+}
