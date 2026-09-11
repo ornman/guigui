@@ -48,6 +48,8 @@ Filename: "{app}\{#MyAppExeName}"; Description: "启动桂桂"; Flags: nowait po
 [UninstallRun]
 ; 计划任务无意义残留(exe 已删,任务只会报错),卸载必删;被安全软件拦则留着也无害
 Filename: "{sys}\schtasks.exe"; Parameters: "/delete /tn GuiGui /f"; Flags: runhidden; RunOnceId: "DelTaskMain"
+Filename: "{sys}\schtasks.exe"; Parameters: "/delete /tn GuiGui-Boot /f"; Flags: runhidden; RunOnceId: "DelTaskBoot"
+Filename: "{sys}\schtasks.exe"; Parameters: "/delete /tn GuiGui-Wake /f"; Flags: runhidden; RunOnceId: "DelTaskWake"
 Filename: "{sys}\schtasks.exe"; Parameters: "/delete /tn GuiGui-Patrol /f"; Flags: runhidden; RunOnceId: "DelTaskPatrol"
 
 [Code]
