@@ -154,13 +154,37 @@ def build_open_profile_xml(ssid: str) -> str:
     return _OPEN_PROFILE_TMPL.replace("{name}", escape(ssid))
 
 
+# 临时文件自有前缀 + 陈旧判定:delete=False 的临时文件在进程被终结时不进
+# finally,%TEMP% 残留(审计附录 A-2)。正常使用路径(_add_open_profile
+# 入口)顺带清本前缀的陈旧残留;只认自有前缀 + mtime 超龄(>1h,文件实际
+# 寿命仅秒级,在途新文件绝不误删),不加常驻线程、不做启动扫描。
+_TMP_PREFIX = "guigui-wlan-"
+_STALE_TMP_AGE_SEC = 3600
+
+
+def _sweep_stale_tmp() -> None:
+    """清 %TEMP% 里本前缀的陈旧残留;任何 OSError 逐文件吞掉(sweep 永不拦主流程)。"""
+    now = time.time()
+    try:
+        for p in Path(tempfile.gettempdir()).glob(_TMP_PREFIX + "*"):
+            try:
+                if now - p.stat().st_mtime > _STALE_TMP_AGE_SEC:
+                    p.unlink(missing_ok=True)
+            except OSError:
+                continue
+    except OSError:
+        pass
+
+
 def _add_open_profile(ssid: str) -> bool:
     """为开放网络写临时 profile(netsh add profile),返回是否成功。"""
+    _sweep_stale_tmp()
     xml = build_open_profile_xml(ssid)
     tmp: str | None = None
     try:
         with tempfile.NamedTemporaryFile(
-                "w", suffix=".xml", delete=False, encoding="utf-8") as f:
+                "w", prefix=_TMP_PREFIX, suffix=".xml",
+                delete=False, encoding="utf-8") as f:
             f.write(xml)
             tmp = f.name
         r = _run(["wlan", "add", "profile", f"filename={tmp}", "user=all"])

@@ -160,6 +160,32 @@ def test_remove_task_treats_missing_as_success(fake):
     assert scheduler.remove_task("GuiGui") is True
 
 
+def test_create_task_sweeps_stale_own_prefix_only(fake, tmp_path, monkeypatch):
+    """临时文件残留清理(附录 A-2):入口 sweep 只清自有前缀 + 超龄文件;
+    他人文件 / 在途新文件不动;自己的临时文件用完即 finally 删净。"""
+    import os
+    import tempfile as _tf
+    import time as _time
+
+    monkeypatch.setattr(_tf, "gettempdir", lambda: str(tmp_path))
+    old = _time.time() - scheduler._STALE_TMP_AGE_SEC * 2
+
+    stale = tmp_path / (scheduler._TMP_PREFIX + "crash.xml")   # 崩溃残留(超龄)
+    stale.write_text("x", encoding="utf-16")
+    os.utime(stale, (old, old))
+    fresh = tmp_path / (scheduler._TMP_PREFIX + "inflight.xml")  # 在途(新)→ 不动
+    fresh.write_text("x", encoding="utf-16")
+    alien = tmp_path / "other-tmp.xml"                           # 非本前缀 → 不动
+    alien.write_text("x", encoding="utf-16")
+    os.utime(alien, (old, old))
+
+    assert scheduler.create_task("GuiGui", "<Task/>") is True
+    assert not stale.exists()
+    assert fresh.exists() and alien.exists()
+    # 本前缀只剩在途文件 — create_task 自己的临时文件已 finally 删净
+    assert list(tmp_path.glob(scheduler._TMP_PREFIX + "*.xml")) == [fresh]
+
+
 def test_is_task_current_rev_match(fake):
     cfg = {"tasks_rev": 4}
     fake.xml_to_return["GuiGui"] = "…<Description>GuiGui v2 automation rev=4</Description>…"

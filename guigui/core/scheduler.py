@@ -19,6 +19,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -235,6 +236,27 @@ def build_patrol_task_xml(cfg: dict, rev: int, now=None) -> str:
 
 # ── schtasks CRUD(COM 主通道 + schtasks 兜底,ADR-0001)──
 
+# 临时文件自有前缀 + 陈旧判定:delete=False 的临时文件在进程被终结时不进
+# finally,%TEMP% 残留(审计附录 A-2)。正常使用路径(create_task 入口)顺带
+# 清本前缀的陈旧残留;只认自有前缀 + mtime 超龄(>1h,文件实际寿命仅秒级,
+# 在途新文件属并发进程所有,绝不误删),不加常驻线程、不做启动扫描。
+_TMP_PREFIX = "guigui-task-"
+_STALE_TMP_AGE_SEC = 3600
+
+
+def _sweep_stale_tmp() -> None:
+    """清 %TEMP% 里本前缀的陈旧残留;任何 OSError 逐文件吞掉(sweep 永不拦主流程)。"""
+    now = time.time()
+    try:
+        for p in Path(tempfile.gettempdir()).glob(_TMP_PREFIX + "*"):
+            try:
+                if now - p.stat().st_mtime > _STALE_TMP_AGE_SEC:
+                    p.unlink(missing_ok=True)
+            except OSError:
+                continue
+    except OSError:
+        pass
+
 
 def _run(args: list[str], timeout: int = 30) -> subprocess.CompletedProcess:
     # CREATE_NO_WINDOW:GUI 是无窗口进程,不加会为每个 schtasks 弹一个终端
@@ -377,6 +399,7 @@ def _fmt_com_time(dt_obj) -> str | None:
 
 def create_task(task_name: str, xml: str) -> bool:
     """用 XML 注册/覆盖任务(幂等)。"""
+    _sweep_stale_tmp()
     try:
         _com_register(_com_folder(), task_name, xml)
         log.info("scheduler: 任务已注册(COM) %s", task_name)
@@ -388,7 +411,8 @@ def create_task(task_name: str, xml: str) -> bool:
         # Task Scheduler 规范格式是 UTF-16(带 BOM);声明与文件编码必须一致,
         # 否则 schtasks 报「无法切换编码」(联调实测)
         with tempfile.NamedTemporaryFile(
-                "w", suffix=".xml", delete=False, encoding="utf-16") as f:
+                "w", prefix=_TMP_PREFIX, suffix=".xml",
+                delete=False, encoding="utf-16") as f:
             f.write(xml)
             tmp = f.name
         r = _run(["/create", "/tn", task_name, "/xml", tmp, "/f"])

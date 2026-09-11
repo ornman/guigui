@@ -163,3 +163,29 @@ def test_open_profile_xml_plain_ssid_unchanged():
     """普通 SSID 不受转义影响,两处 {name} 都落位。"""
     xml = wifictl.build_open_profile_xml("Campus-WiFi")
     assert xml.count("<name>Campus-WiFi</name>") == 2
+
+
+def test_add_open_profile_sweeps_stale_own_prefix_only(monkeypatch, tmp_path):
+    """临时文件残留清理(附录 A-2):入口 sweep 只清自有前缀 + 超龄文件;
+    他人文件 / 在途新文件不动;自己的临时文件用完即 finally 删净。"""
+    import os
+    import time
+
+    monkeypatch.setattr(wifictl.tempfile, "gettempdir", lambda: str(tmp_path))
+    old = time.time() - wifictl._STALE_TMP_AGE_SEC * 2
+
+    stale = tmp_path / (wifictl._TMP_PREFIX + "crash.xml")   # 崩溃残留(超龄)
+    stale.write_text("x")
+    os.utime(stale, (old, old))
+    fresh = tmp_path / (wifictl._TMP_PREFIX + "inflight.xml")  # 在途(新)→ 不动
+    fresh.write_text("x")
+    alien = tmp_path / "other-tmp.xml"                         # 非本前缀 → 不动
+    alien.write_text("x")
+    os.utime(alien, (old, old))
+
+    monkeypatch.setattr(wifictl, "_run", lambda args, timeout=15: _cp("ok"))
+    assert wifictl._add_open_profile("Campus-WiFi") is True
+    assert not stale.exists()
+    assert fresh.exists() and alien.exists()
+    # 本前缀只剩在途文件 — 自己的临时文件已 finally 删净
+    assert list(tmp_path.glob(wifictl._TMP_PREFIX + "*.xml")) == [fresh]
