@@ -5,7 +5,32 @@ from pathlib import Path
 
 import pytest
 
+from guigui.core import notify as _notify_mod
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+
+# 真身留档:test_notify 里要真测 send 的用例经 _real_notify_send 恢复(它们自带 subprocess mock)
+_REAL_NOTIFY_SEND = _notify_mod.send
+
+
+@pytest.fixture(autouse=True)
+def _toast_never_fires(monkeypatch):
+    """安全网(2026-09-11 实锤教训):测试进程绝不真弹 Windows toast —
+    1.6.0 把「成功也发/连不上也发」接进 ensure.settle 后,夹具只 mock 了旧的
+    直发类(task_blocked/linger),settle 路径的 notify.send 裸奔,每轮 pytest
+    在用户屏幕真弹一串通知。toast 唯一漏斗是 notify.send,在此全量换成 no-op
+    记录器;用例自己 monkeypatch send/subprocess 的,后打补丁自然覆盖本网。"""
+    fired = []
+    monkeypatch.setattr(_notify_mod, "send",
+                        lambda *a, **k: fired.append((a, k)))
+    yield fired
+
+
+@pytest.fixture
+def real_notify_send(monkeypatch):
+    """恢复真 notify.send(test_notify 的 send 系用例用;自带 subprocess mock)。"""
+    monkeypatch.setattr(_notify_mod, "send", _REAL_NOTIFY_SEND)
+    yield _REAL_NOTIFY_SEND
 
 
 @pytest.fixture(autouse=True)

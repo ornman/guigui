@@ -107,7 +107,7 @@ def test_xml_escape():
     assert any(tok for tok in out.split(";") if tok.startswith("&#x5DF2"))  # 「已」高位转义
 
 
-def test_send_embeds_protocol_launch(monkeypatch):
+def test_send_embeds_protocol_launch(monkeypatch, real_notify_send):
     captured = {}
 
     def fake_run(args, **kw):
@@ -123,7 +123,7 @@ def test_send_embeds_protocol_launch(monkeypatch):
     assert "ToastGeneric" in ps
 
 
-def test_send_degrades_without_protocol(monkeypatch):
+def test_send_degrades_without_protocol(monkeypatch, real_notify_send):
     """P2-8:协议未注册成 → 降级纯展示,toast 不设 activationType/launch,
     不承诺一个点了没反应的动作;文案原样可达。"""
     captured = {}
@@ -188,7 +188,7 @@ def test_direct_helpers_cooldown_same_kind(monkeypatch):
     assert len(sent) == 2
 
 
-def test_send_swallows_errors(monkeypatch):
+def test_send_swallows_errors(monkeypatch, real_notify_send):
     def boom(*a, **kw):
         raise RuntimeError("powershell gone")
     monkeypatch.setattr(notify.subprocess, "run", boom)
