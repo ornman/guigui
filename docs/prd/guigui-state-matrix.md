@@ -142,7 +142,7 @@
 | 2026-09-11 | (本提交) | 第三批 P1-16/P1-17 成功页矩阵 + 任务①②生命周期:okpg2 定稿(不可达语境标题「保存配置成功,今天/明早 HH:MM 见」时间动态 + 「回排查页」唯一出口、高级设置出口收掉对齐白板;锚前/降级变体不动);彩带口径收口(=用户在场的验证通过,无人值守成功不弹彩带——实测 GUI 在场任务成功停 v-main);submitLadder 不可达分支补 taskStatus 只读复询分流拦截页(任务①建成失败落点,信封不带 task_ok 故复询;查询失败按建成放行);任务②侧零结构改动(明早任务跑=FileWatcher 翻译的 net:state/log:appended 走既有 ROUTE/横幅管线,登录失败不进拦截页——实测);mock 加 `_setTaskOk`/`_runMorningTask` 驱动钩子;画廊 v-success 卡 8 帧(新增拦截变体+重建放行)+ S5/S10 文案跟进 + S11 新故事;本表 §0/§1/§3 #13 同步 |
 | 2026-09-11 | (本提交) | 第三批 P1-15 故障带自愈四链(契约纪律分层):**日志链** — 启动巡检日志维度分诊(firstRun configured∧logged_in 拉 recentResult,今早 fail → contra 状态页,P1-10 contra/P1-14「进入检测」自此接通真实入口;silent/throttled 不分诊;②③两路已由网态调起接管);**任务链** — rebuildTask 后端 3 轮重试环(api.py,信封 ok=false 即 3 败,pytest +2=281 全绿)+ 前端拦截页/横幅② 3 败反馈出口(S.rebuildFails 共用计数、renderBanners 正式渲染、点击反馈出口即复位计数复原重建入口);**程序/库链** — 契约 1.6.0 缺口列单待拍板(§0 巡检注含 🔔 J 章表逐行对账);mock `_setTaskOk` 加 sticky;实测 10 组全绿(分诊正负样本/两入口 3 败/反馈出口复原/成功清零/blocked 回归);画廊 contra 帧改 unverified 真开机 + v-main unverified 两帧适配 + 3 败帧 + S8 补第 4 步 + S12 分诊故事(十七→十八);本表 §0/§1/§3 #14 同步 |
 
-## 5. 执行约定(新对话零上下文可续)
+## 5. 执行约定(零上下文可续:新对话或 subagent 接力同规,2026-09-11 拍板)
 
 - 测试基准:仓库根 `python -m pytest guigui/tests -q`(当前 281 全绿);前端语法 `node -e "new Function(提取的 script)"`。
 - 契约变更走 `docs/tech/guigui-bridge-api-v1.md` 版本号,前端 mock(`static/dev/mock.js`)与后端(`guigui/app/api.py`)同场景逐字一致。
