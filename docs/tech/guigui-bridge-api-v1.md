@@ -182,18 +182,16 @@ cred_verified 不置假,拒绝现场四件入日志 data 与诊断包 server 区
 - 最小化=真最小化;关闭=退出 GUI(自动化不受影响,胶囊悬案以后端方案 §三.10 为准)。
 - 拖拽不走方法:titlebar 挂 `pywebview-drag` 类,由壳处理。
 
-### 2.12 feedback() — 【1.3.0 起废弃,保留一个版本周期】
+### 2.12 ~~feedback()~~ — 【1.3.0 起废弃,1.6.0 删除】
 
-> 反馈已重构为真通道(PRD `docs/prd/guigui-feedback-system.md`):复制诊断只是链路级次动作,主通道见 §2.15–2.17。本方法不再被前端调用;实现侧由新 diagnostics 的 `render(collect())` 派生,返回形状不变。
+> **2026-09-11 删除**(`2a6203c`):后端 `api.feedback` + mock `feedback()` + 契约本文档整段一并移除;前端零调用方(画廊+runner+index.html 全仓库 grep 0 引用);保留期已过(1.3.0→1.5.0 共两个版本周期);主通道见 §2.15–2.17。
 
-时延承诺:≤6s(含一次实时网络探测;设置页入口「遇见问题?点击反馈」)。
+~~> 反馈已重构为真通道(PRD `docs/prd/guigui-feedback-system.md`):复制诊断只是链路级次动作,主通道见 §2.15–2.17。本方法不再被前端调用;实现侧由新 diagnostics 的 `render(collect())` 派生,返回形状不变。~~
+
+~~时延承诺:≤6s(含一次实时网络探测;设置页入口「遇见问题?点击反馈」)。~~
 
 ```jsonc
-{ "text": "桂桂 v2.0.0 诊断信息\n…" }
-// 多行纯文本,已打码:学号 前4…后4,密码永不包含。
-// 段落:版本/时间/系统 · 网络(实时探测)· 配置摘要(全部开关)· 凭据状态
-//       · 自动化任务注册状态 · 最近 3 天日志。
-// 前端负责展示 + 一键复制到剪贴板(复制动作在前端,后端只产文本)。
+// 已删除
 ```
 
 ### 2.15 feedbackSend({kind, what, contact}) — 发送反馈(1.3.0 新增,真通道主入口)
@@ -317,6 +315,7 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
 | 1.4.2 | 2026-09-07 | 补登记票(零行为变化):§2.3 `reason` 枚举 + §3 `login:progress` 补登 `throttled`/`waitsec` — 1.4.0 随 QA P1-6 实装于后端与 mock,当时漏改本文;本次随前端适配(节流按「稍后再试」中性渲染)一并入册 | 前端已接(fb0723c;?dev=1&scene=throttled 可验)— **生效** |
 | 1.4.3 | 2026-09-07 | §2.2 撤销「首装表单 chkstatus 旁注确认提示」强制(1.4.1 引入)— 用户拍板:这行文字没必要,按零摩擦原则移除;`source` 三态语义保留(后端/mock 零变化),误抓由登录被拒(wrong_account 文案)自纠 | 前端已接(旁注已移除,e95beb8;mock 无需改,`other` 场景仍验信封)— **生效** |
 | 1.5.0 | 2026-09-08 | 验证器落地(计划 `docs/plans/ui-routing-rework-2026-09-08.md` P1):新增 §2.18 `diagnose()`(五步信封 + `exit` 枚举;第 3 步含真登副作用,**仅用户显式进 v-diag 触发**,启动静默体检不碰);§3 新增事件 `diag:progress`;§2.3 补「呈现映射」说明(`verified:false` → 保存配置终态页,信封零变化);方法 18 个 | 后端已实现(api.diagnose + 11 测);mock 同步(diagnose + `diag_ok/diag_cred/diag_task/diag_app` 四场景,与后端逐字一致);前端已接(v-diag 页 + 横幅③/设置「立即体检」两入口 + 登录页带结论预填)— **生效** |
+| **1.6.0** | **2026-09-11** | **删除 §2.12 `feedback()`**(1.3.0 起废弃,保留期已过两个版本周期):后端 `api.feedback` + mock `feedback()` + 契约本文档整段一并移除(`2a6203c`);前端零调用方(画廊+runner+index.html 全仓库 grep 0 引用);同步清死代码(setAllBots 死函数 / S.hasPwd 死字段 / app-overrides 死 id / .tb-* 三段 CSS / mock _setRej 死钩子 + forcedRej 分支);前端 mock 老用户场景补 `pwd='secret'`(`9267692`,防 login({}) 假报 NOT_CONFIGURED);**剩余 1.6.0 缺口待用户拍板**(库链/程序链/通知语义/完整冷却/P1-11 深链,见计划 `docs/plans/ui-interaction-rework-2026-09-09.md` §G341-346);方法 17→16 | **生效**(本批先落地清死代码 + 删 feedback);1.6.0 余项待拍板 |
 
 ## 6. 集成待办(联调问题记这里)
 
