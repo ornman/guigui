@@ -195,6 +195,46 @@ def test_send_swallows_errors(monkeypatch, real_notify_send):
     notify.send("t", "m")  # 不抛即通过
 
 
+# ── 双通道(ADR-0002:主 WinRT / 兜底 powershell)──────────
+
+
+def test_send_prefers_winrt_channel(monkeypatch, real_notify_send):
+    """主通道优先:_send_winrt 吃到完整模板并返回 True → powershell 零调用。"""
+    seen = []
+    monkeypatch.setattr(notify, "_send_winrt",
+                        lambda xml: seen.append(xml) or True)
+
+    def boom(*a, **kw):
+        raise AssertionError("powershell 兜底不该被调")
+    monkeypatch.setattr(notify.subprocess, "run", boom)
+    notify.send("已连上", "网络回来了", launch=notify.LAUNCH_STATUS)
+    assert len(seen) == 1
+    assert "ToastGeneric" in seen[0]
+    assert "已连上" not in seen[0] and "&#x5DF2;" in seen[0]   # 实体转义后才入模板
+
+
+def test_send_winrt_failure_falls_back_to_powershell(monkeypatch, real_notify_send):
+    """主通道失败 → powershell 兜底被调(S4 解耦:自救指引发送不依赖单点)。"""
+    captured = {}
+
+    def fake_run(args, **kw):
+        captured["ps"] = args[-1]
+        return types.SimpleNamespace(returncode=0)
+    monkeypatch.setattr(notify, "_send_winrt", lambda xml: False)
+    monkeypatch.setattr(notify.subprocess, "run", fake_run)
+    monkeypatch.setattr(notify, "protocol_registered", lambda: True)
+    notify.send("t", "m")
+    assert "LoadXml" in captured["ps"]
+
+
+def test_send_winrt_swallows_and_returns_false(monkeypatch):
+    """主通道任何异常(投影加载失败等)→ 只记日志返回 False,不抛。"""
+    def boom():
+        raise RuntimeError("no clr / winrt unavailable")
+    monkeypatch.setattr(notify, "_winrt_new_doc", boom)
+    assert notify._send_winrt("<toast/>") is False
+
+
 # ── 协议注册(fake winreg)──────────────────────────────
 
 

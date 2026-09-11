@@ -41,6 +41,16 @@ def _com_channel_off(monkeypatch):
     yield
 
 
+@pytest.fixture(autouse=True)
+def _winrt_toast_off(monkeypatch):
+    """安全网(ADR-0002 双通道落地后):notify 的 WinRT 主通道在测试里默认关闭 —
+    real_notify_send 恢复真 send 的用例只 mock 了 powershell 路径的 subprocess,
+    WinRT 若放行会在用户屏幕真弹 toast。主通道用例自己 monkeypatch _send_winrt
+    (后打补丁自然覆盖本网)。"""
+    monkeypatch.setattr(_notify_mod, "_send_winrt", lambda xml: False)
+    yield
+
+
 @pytest.fixture
 def real_notify_send(monkeypatch):
     """恢复真 notify.send(test_notify 的 send 系用例用;自带 subprocess mock)。"""

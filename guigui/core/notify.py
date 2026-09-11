@@ -1,7 +1,13 @@
-"""通知 — Windows Toast(PowerShell WinRT)+ guigui:// 协议激活 + 决策纯函数。
+"""通知 — Windows Toast(WinRT 进程内直调主通道 + powershell 兜底)+ guigui:// 协议激活 + 决策纯函数。
 
-- 通道移植 v1 src/notify.py(ShellExperienceHost AppId,零依赖生产验证);
-  升级:toast 带 activationType=protocol,点击按路由唤起 GUI(技术方案 §9)。
+- 通道 ADR-0002(2026-09-11):主通道 pythonnet 早绑定直调 WinRT
+  ToastNotificationManager(spike 实测通:Type.GetType(..., ContentType=
+  WindowsRuntime) 加载投影类型;InvokeMember 迟绑定不可用 — WinRT 无
+  IDispatch,必须早绑定点调用),powershell 降为兜底 — 通知主链不再 spawn
+  子进程,自救指引(task_blocked)与 powershell 单点解耦。
+- v1 落地形态是 powershell 激活同一套 WinRT API(ShellExperienceHost
+  AppId,零依赖生产验证);升级:toast 带 activationType=protocol,点击按
+  路由唤起 GUI(技术方案 §9)。
 - decide_notify 是纯函数:1.6.0 通知矩阵(用户拍板 2026-09-11 重写)—
   任务成功=发(默认开、设置可关)/ 凭据类失败=发带原因 / 连不上=也发(纯诊断)/
   维护页连续≥3拍=发 / 锚前一切失败永不通知 / 节流、库降级=静默;
@@ -53,30 +59,99 @@ def _xml_escape(text: str) -> str:
     return "".join(f"&#x{ord(c):X};" if ord(c) > 127 else c for c in text)
 
 
-def send(title: str, message: str, launch: str = LAUNCH_MAIN) -> None:
-    """发 Toast;超时/失败只记日志,永不抛异常(v1 行为)。
+# WinRT 目标 API 从 v1 起就是它(powershell 里激活的也是这套);AppId 维持现值
+_APP_ID = "Microsoft.Windows.ShellExperienceHost_cw5n1h2txyewy!App"
 
-    guigui:// 未注册成时降级纯展示(QA P2-8):不设 activationType/launch,
-    不让 toast 承诺一个点了没反应的动作 — 用户仍可自己打开桂桂。"""
-    t, m, lc = _xml_escape(title), _xml_escape(message), _xml_escape(launch)
+# 投影类型/静态方法缓存(首条通知加载后复用;加载失败不缓存,下次通知重试)
+_WINRT_CACHE: dict = {}
+
+
+def _winrt_mgr_create_notifier():
+    """拿 CreateToastNotifier(String) 的 MethodInfo;失败抛异常(调用方降级)。
+
+    Type.GetType 的 ", ContentType=WindowsRuntime" 后缀走 .NET 4.5+ 的 WinRT
+    投影(spike 2026-09-11 实测通);投影静态方法是真 .NET 方法,MethodInfo
+    .Invoke 可用 — InvokeMember 迟绑定不行(WinRT 对象无 IDispatch)。
+    """
+    if "create" not in _WINRT_CACHE:
+        import clr                                     # noqa: F401 — pythonnet 随 pywebview 在运行时内
+        from System import Type
+        mgr_t = Type.GetType("Windows.UI.Notifications.ToastNotificationManager,"
+                             " Windows.UI.Notifications, ContentType=WindowsRuntime")
+        if mgr_t is None:
+            raise RuntimeError("WinRT ToastNotificationManager 投影加载失败")
+        mi = [m for m in mgr_t.GetMethods()
+              if m.Name == "CreateToastNotifier" and m.GetParameters().Length == 1]
+        _WINRT_CACHE["create"] = mi[0] if mi else None
+    mi = _WINRT_CACHE["create"]
+    if mi is None:
+        raise RuntimeError("CreateToastNotifier(String) 未找到")
+    return mi
+
+
+def _winrt_new_doc():
+    """XmlDocument 实例(投影类型构造);失败抛异常。"""
+    import clr                                         # noqa: F401
+    from System import Activator, Type
+    xml_t = Type.GetType("Windows.Data.Xml.Dom.XmlDocument,"
+                         " Windows.Data.Xml.Dom, ContentType=WindowsRuntime")
+    if xml_t is None:
+        raise RuntimeError("WinRT XmlDocument 投影加载失败")
+    return Activator.CreateInstance(xml_t)
+
+
+def _winrt_new_toast(doc):
+    """ToastNotification 实例(ctor 吃 XmlDocument);失败抛异常。"""
+    import clr                                         # noqa: F401
+    from System import Activator, Type
+    toast_t = Type.GetType("Windows.UI.Notifications.ToastNotification,"
+                           " Windows.UI.Notifications, ContentType=WindowsRuntime")
+    if toast_t is None:
+        raise RuntimeError("WinRT ToastNotification 投影加载失败")
+    return Activator.CreateInstance(toast_t, doc)
+
+
+def _toast_xml(t: str, m: str, lc: str) -> str:
+    """Toast 模板拼装(双通道共用)。guigui:// 未注册成时降级纯展示(QA P2-8):
+    不设 activationType/launch,不让 toast 承诺一个点了没反应的动作。"""
     if protocol_registered():
         toast_open = f'<toast activationType="protocol" launch="{lc}" duration="long">'
     else:
         toast_open = '<toast duration="long">'
+    return (f"{toast_open}<visual><binding template=\"ToastGeneric\">"
+            f"<text>{t}</text><text>{m}</text>"
+            "</binding></visual></toast>")
+
+
+def _send_winrt(xml: str) -> bool:
+    """主通道:pythonnet 进程内直调 WinRT;失败只记日志返回 False(降级 powershell)。
+
+    早绑定点调用(LoadXml / Show),绝不 InvokeMember 迟绑定 — WinRT 无
+    IDispatch。System.String → HSTRING 由 .NET 投影层自动封送。"""
+    try:
+        doc = _winrt_new_doc()
+        doc.LoadXml(xml)                               # pythonnet 早绑定
+        toast = _winrt_new_toast(doc)
+        notifier = _winrt_mgr_create_notifier().Invoke(None, [_APP_ID])
+        notifier.Show(toast)                            # pythonnet 早绑定
+        return True
+    except Exception as e:
+        log.info("notify: WinRT 主通道失败,降级 powershell: %s", e)
+        return False
+
+
+def _send_powershell(xml: str) -> None:
+    """兜底通道:v1 生产验证过的 powershell WinRT 激活;超时/失败只记日志。"""
     ps = (
         "[Windows.UI.Notifications.ToastNotificationManager,"
         " Windows.UI.Notifications, ContentType=WindowsRuntime]|Out-Null;"
         "[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom,"
         " ContentType=WindowsRuntime]|Out-Null;"
-        f"$t=\'{toast_open}"
-        "<visual><binding template=\"ToastGeneric\">"
-        f"<text>{t}</text><text>{m}</text>"
-        '</binding></visual></toast>\';'
-        "$x=New-Object Windows.Data.Xml.Dom.XmlDocument;"
-        "$x.LoadXml($t);"
+        f"$x=New-Object Windows.Data.Xml.Dom.XmlDocument;"
+        f"$x.LoadXml('{xml}');"                          # xml 已实体转义,无裸单引号
         "$toast=[Windows.UI.Notifications.ToastNotification]::new($x);"
         '[Windows.UI.Notifications.ToastNotificationManager]'
-        '::CreateToastNotifier("Microsoft.Windows.ShellExperienceHost_cw5n1h2txyewy!App")'
+        f'::CreateToastNotifier("{_APP_ID}")'
         ".Show($toast)"
     )
     try:
@@ -89,6 +164,16 @@ def send(title: str, message: str, launch: str = LAUNCH_MAIN) -> None:
             log.warning("notify: 发送失败(rc=%d): %s", r.returncode, r.stderr.strip()[:120])
     except Exception as e:
         log.warning("notify: 发送异常: %s", e)
+
+
+def send(title: str, message: str, launch: str = LAUNCH_MAIN) -> None:
+    """发 Toast;永不抛异常(v1 行为)。主通道 WinRT 进程内直调(ADR-0002),
+    失败降级 powershell — 自救指引可用性与 powershell 单点解耦(S4)。"""
+    t, m, lc = _xml_escape(title), _xml_escape(message), _xml_escape(launch)
+    xml = _toast_xml(t, m, lc)
+    if _send_winrt(xml):
+        return
+    _send_powershell(xml)
 
 
 # ── 去重决策(纯函数,AC-04)──────────────────────────────
