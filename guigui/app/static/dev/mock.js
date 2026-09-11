@@ -76,22 +76,28 @@ const S={
 };
 if(SCENE==='out'){S.net.state='not_logged_in'}
 if(SCENE==='down'){S.net.state='unreachable';S.net.ssid='iphone17 pro max'}
-if(SCENE==='waiting'){S.configured=true;S.net.state='waiting'}
-if(SCENE==='daily'){S.configured=true;S.verified=true}
+/* 2026-09-11 修正(F 章动态验收):configured=true 的场景必须同时有 S.pwd —
+   「已配置」在后端语义上就是库里存着凭据,pwd:null + configured:true 是不可能的组合。
+   漏设的 waiting/daily/other/ladder_back/unverified 五个老用户场景,一旦网态落到
+   not_logged_in(掉线/断网恢复),主页「立即重新登录」与状态页快登走的 login({})
+   会返回 NOT_CONFIGURED 被弹去 v-form —— 真机不存在的假路径,曾把 AC-1 的
+   flash 验收整条压成 0ms(quickLogin 根本没走到成功分支)。 */
+if(SCENE==='waiting'){S.configured=true;S.net.state='waiting';S.pwd='secret'}
+if(SCENE==='daily'){S.configured=true;S.verified=true;S.pwd='secret'}
 if(SCENE==='rejected'){S.net.state='not_logged_in'}
 if(SCENE==='bind'){S.net.state='not_logged_in'}
 if(SCENE==='limit'){S.net.state='not_logged_in'}
 if(SCENE==='throttled'){S.net.state='not_logged_in'}
 if(SCENE==='blocked'){S.net.state='not_logged_in';S.taskOk=false}
-if(SCENE==='other'){S.configured=true;S.verified=true}
-if(SCENE==='ladder_back'){S.configured=true;S.verified=true}
+if(SCENE==='other'){S.configured=true;S.verified=true;S.pwd='secret'}
+if(SCENE==='ladder_back'){S.configured=true;S.verified=true;S.pwd='secret'}
 if(SCENE==='beforeopen'){S.net.state='not_logged_in';S.configured=true;S.verified=false;S.pwd='secret'}
 if(SCENE==='diag_ok'){S.configured=true;S.verified=true;S.pwd='secret'}
 if(SCENE==='diag_cred'){S.net.state='not_logged_in';S.configured=true;S.verified=false;S.pwd='secret'}
 if(SCENE==='diag_task'){S.configured=true;S.verified=true;S.pwd='secret';S.taskOk=false}
 if(SCENE==='diag_app'){S.configured=true;S.verified=true;S.pwd='secret'}
 if(SCENE==='streak'){S.net.state='not_logged_in';S.configured=true;S.verified=true;S.pwd='secret'}
-if(SCENE==='unverified'){S.configured=true;S.verified=false;
+if(SCENE==='unverified'){S.configured=true;S.verified=false;S.pwd='secret';
   S.last={when:'今早',time:'07:00',tries:3,outcome:'fail'};
   S.logs[0].entries=[{ts:'07:00:01',level:'fail',text:'登录被拒:密码不对,改一下再试'}]}
 
