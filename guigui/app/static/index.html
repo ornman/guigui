@@ -401,6 +401,10 @@ button.banner{background:oklch(58% 0.15 295 / 0.07);border:1px solid oklch(58% 0
 .sw.on::after{background:oklch(100% 0 0)}
 .sw.on{background:var(--accent)}
 .sw.on::after{transform:translateX(16px)}
+/* A6:开关改 button 后重置浏览器默认样式(边框/内距/字体/颜色);背景必须显式回写
+   #EBEEF4 —— button.sw 特异性压过 .sw,写 transparent 轨道会消失;.sw.on 特异性更高,
+   开态紫轨道不受影响;轨道圆点走 ::after 伪元素,button 上照常;宽度/圆角仍由 .sw 提供 */
+button.sw{background:#EBEEF4;border:0;padding:0;font:inherit;color:inherit;cursor:pointer}
 
 .tiny-label{font-family:Inter,"PingFang SC",sans-serif;font-size:10.5px;font-weight:600;
   letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin:18px 0 6px}
@@ -677,28 +681,28 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
 
       <div class="tiny-label">补登录</div>
       <div class="row"><div><div class="t">开机时补登录</div></div>
-        <div class="sw on" data-cfg="boot_login" onclick="toggleCfg(this)"></div></div>
+        <button type="button" class="sw on" data-cfg="boot_login" onclick="toggleCfg(this)"></button></div>
       <div class="row"><div><div class="t">睡眠唤醒补登录</div></div>
-        <div class="sw" data-cfg="wake_login" onclick="toggleCfg(this)"></div></div>
+        <button type="button" class="sw" data-cfg="wake_login" onclick="toggleCfg(this)"></button></div>
 
       <div class="tiny-label">保底机制</div>
       <div class="row"><div><div class="t">WiFi 兜底</div><div class="d">认证服务器连不上时,自动切到下面选的网络</div></div>
-        <div class="sw" id="sw-fallback" onclick="toggleFallback()"></div></div>
+        <button type="button" class="sw" id="sw-fallback" onclick="toggleFallback()"></button></div>
       <div id="fallback-pick" style="display:none;padding:6px 0 2px"></div>
       <div class="row"><div><div class="t">白天巡逻</div><div class="d">意外断网时,悄悄重连</div></div>
-        <div class="sw" data-cfg="patrol_enabled" onclick="toggleCfg(this)"></div></div>
+        <button type="button" class="sw" data-cfg="patrol_enabled" onclick="toggleCfg(this)"></button></div>
       <div class="row"><div><div class="t">假期静默</div><div class="d">连续 2 天连不上(放假回家了?),自动降为每天 1 次、不打扰</div></div>
-        <div class="sw on" data-cfg="vacation_silence" onclick="toggleCfg(this)"></div></div>
+        <button type="button" class="sw on" data-cfg="vacation_silence" onclick="toggleCfg(this)"></button></div>
 
       <div class="tiny-label">提醒</div>
       <div class="row"><div><div class="t">弹通知</div><div class="d">只在断网恢复、登录失败时说</div></div>
-        <div class="sw on" data-cfg="notifications" onclick="toggleCfg(this)"></div></div>
+        <button type="button" class="sw on" data-cfg="notifications" onclick="toggleCfg(this)"></button></div>
 
       <div class="tiny-label">系统</div>
       <div class="row"><div><div class="t">立即体检</div><div class="d">网络、密码、任务、程序,从头到尾查一遍</div></div>
         <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openDetail('v-diag')">去体检</button></div>
       <div class="row"><div><div class="t">显示桂桂</div></div>
-        <div class="sw on" id="sw-gui" onclick="toggleGui(this)"></div></div>
+        <button type="button" class="sw on" id="sw-gui" onclick="toggleGui(this)"></button></div>
 
       <div class="row"><div><div class="t">反馈</div><div class="d">问题或建议都说给桂桂听,一键直达开发者</div></div>
         <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openDetail('v-feedback')">反馈</button></div>
@@ -771,6 +775,10 @@ const MAIN_LOG_KEEP=5;
 /* A8 动画时序单源:视图转场 250ms 唯一源 — JS 定时常量 + 注入 CSS 变量,
    改一处,JS(show)/CSS(fadein/fadeout)/画廊摆拍铁律(emit 延后 VIEW_MS)三处随动 */
 const VIEW_MS=250;
+/* P1-6 体检过期阈值:体检完成超过该时长后网态再变化,旧结果才判过期灰化 —
+   阈值含义 = 防抖窗口,刚体检完的短窗内网态翻转不抖动重跑提示;
+   net:state 处的 stale 判定(markDiagStale 触发条件)唯一取值点 */
+const DIAG_STALE_MS=30000;
 document.documentElement.style.setProperty('--view-ms',VIEW_MS+'ms');
 const origin={};   /* 详情视图来路:返回必回原处 */
 /* P2-3 store 收口:13 个散全局(mainState/configured/hasPwd/lastNet/curCfg/taskBlocked/
@@ -796,7 +804,8 @@ const S={
   statusMood:null,statusInfo:null,/* P1-10 状态页心境(wait/drop/contra/sad)+ sad 的 {reason,message} */
   probeTimer:null,probeCount:0,   /* P1-8 探测定时器句柄(单链)+ 可观测拍数 */
   vt2Busy:false,                  /* P1-14 vt2 自动验证进行中(防叠发) */
-  rebuildFails:0                  /* P1-15 任务重建连败计数(拦截页+横幅②共用):成功清零,≥3 → 反馈出口 */
+  rebuildFails:0,                 /* P1-15 任务重建连败计数(拦截页+横幅②共用):成功清零,≥3 → 反馈出口 */
+  formPrefill:null                /* A3 基准:identify 自动预填的学号(formMode 清零/预填时记)— formDirty 据此区分「预填」与「用户键入」,密码永不预填(契约 §0) */
 };
 function formatTriggerTime(h,m){return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}
 function renderTriggerTime(){
@@ -1624,10 +1633,10 @@ GG.on('net:state',e=>{
     if(currentView()==='v-main')renderBannersRefresh()}
   routeNet(e);
   autoVerifyOnRecover(prevNetState,e.state);   /* P1-14 vt2:网恢复∧未验证库 → 自动跑 🔑 */
-  /* P1-6:网从不可达→可达 且 在 v-diag 页 且 体检已完成 > 30s → 旧结果过期灰化 */
+  /* P1-6:网从不可达→可达 且 在 v-diag 页 且 体检完成已超 DIAG_STALE_MS(30s) → 旧结果过期灰化 */
   if(prevNetState==='unreachable'&&(e.state==='not_logged_in'||e.state==='logged_in')&&
      currentView()==='v-diag'&&S.diagState&&S.diagState.done&&S.lastDiagAt&&
-     (Date.now()-S.lastDiagAt)>30000)
+     (Date.now()-S.lastDiagAt)>DIAG_STALE_MS)
     markDiagStale();
 });
 /* P1-14 vt2(白板 unvdb→vt2→🔑,拍板⑫):网恢复(不可达→可达)∧ 库中凭据未验证 →
@@ -1842,6 +1851,7 @@ function renderWifiList(box,networks,opts){
    说认证服务器而不说 SSID — 热点场景 SSID 是噪声)/ save(v-guide ③ 保存配置) */
 function formMode(ctx){
   S.formCtx=ctx;
+  S.formPrefill={sid:'',pwd:''};   /* A3 修正:预填基准清零 — 进入表单时的既有内容一律先视作用户键入(豁免维度保守);identify 预填发生时再记基准 */
   const h1=$('form-title'),lede=$('form-lede');
   if(ctx==='firstRun'){
     h1.className='g';h1.style.fontSize='';h1.textContent=greetText()+'。';
@@ -1854,9 +1864,15 @@ function formMode(ctx){
   }
   $('form-btn').textContent=ctx==='firstRun'?'开启每日自动登录':(ctx==='save'?'保存配置':'立即登录');
 }
-/* A3(拍板④):表单已键入内容 = 学号(trim,与提交同口径)或密码(原文)任一非空 —
-   net:state 打断豁免维度:填表中不被系统事件拽去排查页(ROUTE v-form 行 when 引用) */
-function formDirty(){return !!($('f-sid').value.trim()||$('f-pwd').value)}
+/* A3(拍板④)修正:「用户真键入」才豁免 — 密码框非空,或学号与预填基准不同
+   (改过/手动清空都算动过)。identify 自动预填不算键入(S.formPrefill 记基准):
+   configured 用户从状态页/横幅①进空表单时,unreachable/not_logged_in 仍按矩阵 §2
+   调起状态页,「v-form 空表单 → 调起」那格恢复可达。net:state 打断豁免维度:
+   填表中不被系统事件拽去排查页(ROUTE v-form 行 when 引用) */
+function formDirty(){
+  const base=S.formPrefill||{sid:'',pwd:''};
+  return !!($('f-pwd').value||$('f-sid').value.trim()!==base.sid)
+}
 /* 表单页状态行(唯一实现):login/save 只报连通性(NET_TXT.up/down);
    firstRun 报已连/掉线 danger 如实说,恢复回基线(学号识别 ✓ 由 fillLanding
    异步补,这里不抢)。net:state 停留期间实时刷新(场景:填一半切网) */
@@ -1881,7 +1897,7 @@ async function fillLoginLanding(){
   formMode(origin['v-form']==='v-guide'?'save':'login');
   syncFormStatus();
   const id=await GG.api.identify();
-  if(id.ok&&id.data.uid&&!$('f-sid').value){$('f-sid').value=id.data.uid}
+  if(id.ok&&id.data.uid&&!$('f-sid').value){$('f-sid').value=id.data.uid;S.formPrefill.sid=id.data.uid}   /* 预填发生即记基准:预填本身不算「已键入」 */
   const c=await GG.api.getConfig();   /* 运营商下拉按已存选择回填 */
   if(c.ok&&c.data.operator)setOperatorPick(c.data.operator);
 }
@@ -1894,7 +1910,8 @@ async function fillLanding(){
     $('form-status').textContent=(net.ssid||'校园网')+' · 已连上';
     const id=await GG.api.identify();
     if(id.ok&&id.data.uid){
-      const f=$('f-sid');if(!f.value)f.value=id.data.uid;
+      const f=$('f-sid');
+      if(!f.value){f.value=id.data.uid;S.formPrefill.sid=id.data.uid}   /* 预填即记基准(A3 修正) */
       $('form-status').textContent=(net.ssid||'校园网')+' · 已连上 · 学号已识别 ✓';
     }
   }else{fillLoginLanding()}

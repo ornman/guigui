@@ -15,6 +15,7 @@
 > 2026-09-11 第三批续四(P1-15):故障带自愈四链分层落地 — §0 加巡检五维消费
 > 与 🔔 对账/契约缺口注、§1 v-boot/v-main/v-status 行补分诊与 3 败、§3 #14、§4 记录。
 > 2026-09-11 收尾批 P0-6 mock 对齐后端「线上他人」已存凭据路径:`login({})` 无 password + `logged_in` 先 chkstatus,他人 → 注销+真登(不再误返 already);自己/chkstatus 不可得 → already(行为不变);画廊 v-main 卡新增「重登·线上他人」验收帧;后端 0 改动、契约 1.5.0 0 改动;§0 already 行注、§3 #1/#4 链路注、§4 记录。
+> 2026-09-11 走查五小修(fix/walkthrough-5):§2 表尾补「同问题去重拦下 → 留原视图」口径行(附 F-②a 路由格 18/18 全绿注)、§2 v-form 格改「用户真键入(含仅预填不算)」口径、§4 记录、§5 测试计数 281→279 同步(2a6203c 清 feedback 死代码后)。
 > 活的形式见 `guigui/app/static/dev/state-gallery.html`(陈列矩阵 + 场景流程 + 网络切换器)。
 
 ## 0. 两轴状态模型
@@ -92,13 +93,14 @@
 | v-boot(未配置) | 550ms 后跳 v-guide(show 直转,仪式单行道不记来路) | 留页不动(仪式等 firstRun 的 probe 分流,事件不抢路由) | 同左 |
 | v-guide | 留在排查页(未配置用户的断网落点;configured 用户被 `hubRaise` 拦住不会到这页) | mainState=ok → goDaily(550ms) | reProbe 重探(550ms)→ probe:not_logged_in → configured ? 状态页 : v-form(login) |
 | v-main | `hubRaise('wait')` 调起;去重拦下(已弹过同问题)→ 就地重渲(P1-13 两态:标题不换,「网络」行+横幅⑧如实) | ok 重渲 + 清 hubRaised(横幅⑧ 随消) | `hubRaise('drop')` 调起;拦下 → 就地重渲(同左两态口径) |
-| v-form(2026-09-10 P2-1 合一) | **已键入(A3 formDirty)留页**:状态行就地转 danger、提交照常;空表单:configured → 调起状态页,未配置 → 直跳 v-guide(数据保留,回来还在) | 状态行实时刷新 + mainState 记对(返回主页不混搭) | 已键入留页同左;空表单:configured → 调起(drop),未配置 → 留页(等提交路径) |
+| v-form(2026-09-10 P2-1 合一) | **用户真键入(A3 formDirty)留页**:状态行就地转 danger、提交照常;空表单(含仅 identify 预填学号 —— 预填不算键入,2026-09-11 修正):configured → 调起状态页,未配置 → 直跳 v-guide(数据保留,回来还在) | 状态行实时刷新 + mainState 记对(返回主页不混搭) | 已键入留页同左;空表单(含仅预填):configured → 调起(drop),未配置 → 留页(等提交路径) |
 | v-status | 在页迁移 `statusNetMood`:wait↔drop 就地换境(不重调起) | `statusResolved`:清旗回日常(全部正常) | 在页迁移同左 |
 | 其他(v-success / v-diag / v-settings / v-log / v-feedback) | configured → 调起状态页;未配置 → 跳 v-guide(openDetail 记来路) | 记 lastNet,视图不动(返回时如实) | configured → 调起(drop);未配置 → 留页 |
 
 > waiting 不单列:P0-3 拍板⑤起事件入口即压平为 unreachable,逐格行为一致(画廊切换器「未就绪 waiting」可验)。
 > 代码侧 `ROUTE` 表在 `index.html`(`ROUTE`/`routeNet`,cell 词汇 goto/via/delay/then/render/when+else,when 链多级兜底);新增网态或视图 = 改表一行;「其他」行是默认行,新增详情视图自动继承。
 > **hub 调起去重(P1-8)**:`hubRaise(kind)` 三道闸 —— 未配置不调起;`S.hubRaised` 同问题只弹一次(换问题照弹,v-guide 等网中不被 wait 抢);v-form 已键入豁免(A3)。调起被拦 ≠ 丢事件:主页就地重渲,横幅⑧(`hubRaised` 在场即显示)保留手动入口。
+> **同问题去重拦下 → 留原视图(2026-09-11 走查补口径)**:hubRaise 去重拦下(同问题已调起过、`S.hubRaised` 未清)→ 留原视图就地重渲(v-main 刷「网络」行+横幅;其余视图留页,返回时按 lastNet 如实呈现),横幅⑧ 保留手动入口 —— 动态验收 F-②a 路由格 18/18 全绿(含 v-form 空表单调起格与去重拦下格),证据 `dev/f-final/results.json`。
 > **探测常驻(P1-8)**:`startProbeLoop` 每 5s 只读 probe(不触发登录),网态有变才发 net:state;`S.probeCount` 可观测。巡检「网」维度读探测结果(轮询不再各问各的)。
 > **vt2 未验证库自动验证(P1-14,拍板⑫)**:`autoVerifyOnRecover(prev,next)` 挂在 net:state 处理器尾 — 迁移为「不可达→可达」∧ configured ∧ `recentResult().verified===false`(现拉真源)时自动跑 🔑(`statusQuickLogin(null,true)`);这是唯一保留的自动验证动作,已验证库的网恢复只调起状态页不自动登(P0-7);`S.vt2Busy` 防叠发;失败不在状态页时只横幅①,不调起打扰。
 
@@ -146,10 +148,11 @@
 | 2026-09-11 | 9267692 | F 章动态验收侧修 mock 数据不自洽:5 个老用户场景(waiting/daily/other/ladder_back/unverified)`configured=true` 却 `pwd=null`,后端语义下不可能的组合;漏设下掉线后主页快登/状态页快登走 `login({})` 假报 NOT_CONFIGURED 弹去 v-form,真机不存在该路径;补 `S.pwd='secret'` 后 AC-1 flash 实测挂载 4003ms 通过;契约 0 改、画廊 0 改 |
 | 2026-09-11 | 6665ca9 | F 章动态验收 runner 落盘:`dev/f-final-runner.py` + 证据 `dev/f-final/`(results.json + 失败帧截图);**F-②** mock 21 scene 全场景回归全绿(头注 21 场景全覆盖,矩阵 §3 #1-#14 全链路);**F-②a** net:state 路由格走查 18/18 全绿(四态 × 主要视图,含 v-form A3 formDirty 豁免格、空表单去重格);**F-④ AC-1** flash ≥4s 实测挂载 4003ms 通过(MutationObserver 采样到 912ms 出现 → 4915ms 回基线);**F-④ AC-2** NOT_CONFIGURED 双击 quickLogin login 调用计数 = 1 通过;runner 方法学注释(每格重载 daily + 手动导航回源视图避免 hubRaised/origin 泄漏);后端 281 测仍全绿 |
 | 2026-09-11 | a705e22 | 收尾批 F 章走查修复 8 项纯执行:P1-7 拦截页标题口径「密码没问题,自动登录还差一步。」+ A6 banner button 化(CSS 重置 + 5 处 div→button)+ A6 SSID 键盘(role+tabindex+Enter/Space)+ A5 h1 焦点(9 视图 .v-title tabindex=-1,show() 末尾 focus)+ A4 Escape 关 dd+ P1-6 体检过期实现(markDiagStale + 30s 阈值 + 重跑按钮)+ 画廊 v-diag 卡新增验收帧 + 白板 DSL 8 节点注记(L1/L2/bigpage/quicklogin/autotest/beret/okpg2/dailypg)+ intercept 全文改写 |
+| 2026-09-11 | (本提交) | 走查五小修(fix/walkthrough-5 分支):**A6 收尾** — 设置页 7 个 `.sw` 自绘开关 div→button(Tab/Enter 可达;CSS `button.sw` 重置,轨道背景显式回写 #EBEEF4 防 button 化后透明);**P1-6 阈值提取** — 内联 30000 → 常量 `DIAG_STALE_MS`(行为零变化);**A3 formDirty 修正** — identify 自动预填学号不算「已键入」(`S.formPrefill` 基准,formMode 清零/预填时记;formDirty=密码非空‖学号≠基准),§2「v-form 空表单→调起状态页」格恢复可达,浏览器实测 9 组全绿(dev/wt5-verify.py);**§2 补「同问题去重拦下→留原视图」口径行 + F-②a 路由格 18/18 全绿注**(证据 dev/f-final/results.json);计划文档加「白板待推送清单」小节(16 已落 + 4 待 1.6.0 + intercept 全文改写,板推送待用户手动);后端 279 测全绿 |
 
 ## 5. 执行约定(零上下文可续:新对话或 subagent 接力同规,2026-09-11 拍板)
 
-- 测试基准:仓库根 `python -m pytest guigui/tests -q`(当前 281 全绿);前端语法 `node -e "new Function(提取的 script)"`。
+- 测试基准:仓库根 `python -m pytest guigui/tests -q`(当前 279 全绿;2a6203c 清 feedback() 死代码后由 281 降 2);前端语法 `node -e "new Function(提取的 script)"`。
 - 契约变更走 `docs/tech/guigui-bridge-api-v1.md` 版本号,前端 mock(`static/dev/mock.js`)与后端(`guigui/app/api.py`)同场景逐字一致。
 - 状态画廊:`guigui/app/static/dev/state-gallery.html`(仅 dev,打包排除 `static/dev/`;10 视图 × 全部状态帧 + 十八故事,须 http 打开;2026-09-10 P2-1 后 v-ok/v-login 并为 v-form,第三批加 v-status 卡);新增状态必须同步画廊帧,否则美术看不到。
 - 摆拍约定:走产品全局函数/事件入口(quickLogin/openDetail/guiguiEmit 等),let 变量(mainState/loginFailStreak)不可跨窗口直赋。
