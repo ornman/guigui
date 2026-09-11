@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 log = logging.getLogger(__name__)
 
@@ -145,9 +146,17 @@ _OPEN_PROFILE_TMPL = """<?xml version="1.0"?>
 """
 
 
+def build_open_profile_xml(ssid: str) -> str:
+    """开放网络 profile XML(纯函数,可单测)。SSID 经 XML 转义后入模板 —
+    两处 {name} 都是文本节点,escape(& < >)即文本语境所需(引号属属性语境,
+    本模板无属性插值);含 <>&"' 的畸形 SSID 不再能破坏 profile 结构
+    (审计附录 A-1)。"""
+    return _OPEN_PROFILE_TMPL.replace("{name}", escape(ssid))
+
+
 def _add_open_profile(ssid: str) -> bool:
     """为开放网络写临时 profile(netsh add profile),返回是否成功。"""
-    xml = _OPEN_PROFILE_TMPL.replace("{name}", ssid)
+    xml = build_open_profile_xml(ssid)
     tmp: str | None = None
     try:
         with tempfile.NamedTemporaryFile(

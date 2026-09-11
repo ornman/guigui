@@ -141,3 +141,25 @@ def test_connect_timeout_returns_false(monkeypatch):
     monkeypatch.setattr(wifictl, "_run", lambda args, timeout=15: _cp("ok"))
     monkeypatch.setattr(wifictl.time, "sleep", lambda s: None)
     assert wifictl.connect("Campus-WiFi", timeout=0) is False
+
+
+# ── 开放 profile XML 拼装(纯函数;审计附录 A-1 转义)──────
+
+
+def test_open_profile_xml_escapes_special_chars():
+    """SSID 含 <>&"' 时 profile 仍合法且 name 与 SSID 语义一致(附录 A-1)。"""
+    import xml.etree.ElementTree as ET
+
+    ssid = 'A<b>&"\'bomb'
+    xml = wifictl.build_open_profile_xml(ssid)
+    root = ET.fromstring(xml)                       # 非法 XML 会在此抛
+    ns = "{http://www.microsoft.com/networking/WLAN/profile/v1}"
+    names = [e.text for e in root.iter(f"{ns}name")]
+    assert names == [ssid, ssid]                    # profile 名与 SSID 名还原为原 SSID
+    assert "<bomb" not in xml and "'bomb" in xml    # 原文未裸入结构;引号在文本节点无需转义
+
+
+def test_open_profile_xml_plain_ssid_unchanged():
+    """普通 SSID 不受转义影响,两处 {name} 都落位。"""
+    xml = wifictl.build_open_profile_xml("Campus-WiFi")
+    assert xml.count("<name>Campus-WiFi</name>") == 2
