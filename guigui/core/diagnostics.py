@@ -21,7 +21,6 @@ import json
 import platform
 import re
 import socket
-import subprocess
 import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -29,13 +28,12 @@ from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 import guigui
-from . import config, crashlog, detect, logstore, paths, scheduler, wifictl
+from . import config, crashlog, detect, logstore, paths, scheduler, sysinfo, wifictl
 from .drcom import UA, mask_uid, scrub_uids
 
 LOG_DAYS = 7            # logs 区回看天数(PRD §4.1)
 LOG_DAY_CAP = 80        # 单日条数上限:超了保头保尾(决策记录 8)
 LOG_HEAD, LOG_TAIL = 20, 40
-SUBPROC_TIMEOUT = 8     # 单个采集子进程超时
 PROBE_TIMEOUT = 4       # 单个探测超时
 VERSION_URL = "https://guigui-guat.pages.dev/version.json"
 
@@ -55,14 +53,6 @@ def _scrub(value):
     if isinstance(value, dict):
         return {k: _scrub(v) for k, v in value.items()}
     return value
-
-
-def _run(cmd: list[str]) -> str:
-    """采集子进程:GBK 解码(中文 Windows 控制台),失败抛给采集器 in-band。"""
-    r = subprocess.run(cmd, capture_output=True, text=True, encoding="gbk",
-                       errors="replace", timeout=SUBPROC_TIMEOUT,
-                       creationflags=subprocess.CREATE_NO_WINDOW)
-    return r.stdout or ""
 
 
 def _region(errors: list, name: str, fn, *args):
@@ -104,89 +94,50 @@ def _env_clock_skew(cfg: dict) -> float | None:
     return round((server - dt.datetime.now(dt.timezone.utc)).total_seconds(), 1)
 
 
-_ADAPTER_TITLE = re.compile(
-    r"^(.*?)(?:适配器|adapter)\s+(.+?)\s*[:.:]?\s*$", re.IGNORECASE)
 _IPV4 = re.compile(r"\b(\d{1,3}(?:\.\d{1,3}){3})\b")
-# kind 分类关键词(描述行/标题行命中即归类;顺序:先专后泛)
+# kind 分类关键词(name+description 命中即归类;顺序:先专后泛)— 口径与旧
+# ipconfig 通道一致,ADR-0003 只换采集方式不动分类
 _KIND_RULES = [
-    (("tun",), ("tap", "tun", "clash", "wireguard", "openvpn", "vpn", "tailscale", "sing-box", "v2ray")),
-    (("vm",), ("virtualbox", "vmware", "hyper-v", "vethernet", "loopback", "bluetooth")),
-    (("wifi",), ("wireless", "wi-fi", "wifi", "wlan", "802.11", "无线")),
+    ("tun", ("tap", "tun", "clash", "wireguard", "openvpn", "vpn", "tailscale", "sing-box", "v2ray")),
+    ("vm", ("virtualbox", "vmware", "hyper-v", "vethernet", "loopback", "bluetooth")),
 ]
+_WIFI_RULES = ("wireless", "wi-fi", "wifi", "wlan", "802.11", "无线")
 
 
 def _env_adapters() -> list[dict]:
-    """全部网卡(含虚拟):ipconfig /all 解析;kind ∈ wifi/ethernet/tun/vm。"""
-    out = _run(["ipconfig", "/all"])
+    """全部网卡(含虚拟):进程内 NetworkInformation 枚举(ADR-0003,免
+    ipconfig /all 的 GBK 表头解析);kind ∈ wifi/ethernet/tun/vm。"""
     ssid = None
     try:
         ssid = wifictl.current_ssid()
     except Exception:
         pass
     adapters: list[dict] = []
-    cur_name = cur_desc = None
-    cur_ip = None
-    cur_down = False
-
-    def _flush():
-        if cur_name is None:
-            return
-        hay = f"{cur_name} {cur_desc or ''}".lower()
+    for ni in sysinfo.net_interfaces():
+        hay = f"{ni['name']} {ni['description']}".lower()
         kind = "ethernet"
         for want, kws in _KIND_RULES:
             if any(k in hay for k in kws):
-                kind = want[0]
+                kind = want
                 break
-        up = (not cur_down) and cur_ip is not None
-        entry = {"name": cur_name, "kind": kind, "ip": cur_ip, "up": up}
-        if kind == "wifi" and up and ssid:
+        if kind == "ethernet" and (ni["is_wireless"]
+                                   or any(k in hay for k in _WIFI_RULES)):
+            kind = "wifi"
+        entry = {"name": ni["name"], "kind": kind, "ip": ni["ipv4"],
+                 "up": ni["is_up"]}
+        if kind == "wifi" and ni["is_up"] and ssid:
             entry["ssid"] = ssid
         adapters.append(entry)
-
-    for raw in out.splitlines():
-        line = raw.strip()
-        m = _ADAPTER_TITLE.match(line)
-        if m:
-            _flush()
-            cur_name, cur_desc, cur_ip, cur_down = m.group(2).strip(), None, None, False
-            continue
-        if cur_name is None:
-            continue
-        low = line.lower()
-        if "description" in low or "描述" in low:
-            cur_desc = line.split(":", 1)[-1].split("。", 1)[-1].strip() or cur_desc
-        elif "media disconnected" in low or "媒体已断开" in low:
-            cur_down = True
-        elif "ipv4" in low:
-            ipm = _IPV4.search(line)
-            if ipm:
-                cur_ip = ipm.group(1)
-    _flush()
     return adapters
 
 
 def _env_dns() -> list[str]:
-    out = _run(["ipconfig", "/all"])
+    """DNS 服务器:进程内 NetworkInformation(ADR-0003);IPv4、去重、保序。"""
     servers: list[str] = []
-    in_dns = False
-    for raw in out.splitlines():
-        s = raw.strip()
-        if not s:
-            in_dns = False
-            continue
-        low = s.lower()
-        if "dns" in low:
-            in_dns = True
-            for ip in _IPV4.findall(s):
-                if ip not in servers and not ip.startswith("127."):
-                    servers.append(ip)
-            continue
-        # DNS 续行(单独一个 IP,无标签);别的行一旦有内容即结束续行
-        if in_dns and _IPV4.fullmatch(s):
-            if s not in servers and not s.startswith("127."):
+    for ni in sysinfo.net_interfaces():
+        for s in ni["dns"]:
+            if _IPV4.fullmatch(s) and not s.startswith("127.") and s not in servers:
                 servers.append(s)
-        else:
-            in_dns = False
     return servers
 
 
@@ -212,20 +163,31 @@ def _env_proxy() -> dict:
     return {"system": system, "env": env_flag}
 
 
-_AV_SIGNATURES = {          # 只报布尔,不列进程清单(PRD §4.1)
-    "huorong": ("hipsdaemon", "hipsmain", "usysdiag"),
-    "qihoo360": ("360tray", "360safe", "zhudongfangyu", "360safeplus"),
-    "defender": ("msmpeng", "msascuil"),
+# SecurityCenter2 displayName(厂商在安全中心自报名)→ 三家布尔;只报布尔,
+# 不列产品清单(PRD §4.1 口径延续)
+_AV_PRODUCT_RULES = {
+    "huorong": ("huorong", "火绒"),
+    "qihoo360": ("360",),
+    "defender": ("defender",),
 }
 
 
 def _env_av() -> dict:
-    out = _run(["tasklist", "/fo", "csv", "/nh"]).lower()
-    names = {row.split('","')[0].strip('"') for row in out.splitlines() if row.strip()}
-    found = {}
-    for av, sigs in _AV_SIGNATURES.items():
-        found[av] = any(any(sig in n for n in names) for sig in sigs)
-    return found
+    """杀软识别 — WMI root\\SecurityCenter2 AntiVirusProduct.displayName(ADR-0003:
+    撤 tasklist 进程名匹配 — 未签名程序枚举进程并匹配 AV 厂商名是教科书级侦察特征)。
+
+    SecurityCenter2 缺失/查询失败/无产品 → 空对象(宁缺勿侦察,不回退 tasklist);
+    有产品但都不认识 → 全 False(信息:装了未知杀软)。"""
+    try:
+        rows = sysinfo.wmi_rows("SELECT displayName FROM AntiVirusProduct",
+                                scope=r"root\SecurityCenter2")
+    except Exception:
+        return {}
+    if not rows:
+        return {}
+    names = [str(r.get("displayName") or "").lower() for r in rows]
+    return {av: any(any(k in n for n in names) for k in kws)
+            for av, kws in _AV_PRODUCT_RULES.items()}
 
 
 _WEBVIEW2_KEY = (r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients"
@@ -386,32 +348,33 @@ def _collect_net(cfg: dict) -> dict:
 
 
 def _route_iface(host: str, cfg: dict) -> str | None:
-    """最精确匹配路由的本地出口 IP → 反查网卡名(route print)。"""
+    """最长前缀匹配路由 → 出口网卡名(WMI Win32_IP4RouteTable,ADR-0003:
+    免 route print 文本解析;InterfaceIndex 直接反查网卡名,不再绕 IP 二次匹配)。"""
     try:
         ip = socket.inet_aton(host)
     except OSError:
         return None
     target = int.from_bytes(ip, "big")
-    best_prefix, best_iface = -1, None
-    for line in _run(["route", "print", "-4"]).splitlines():
-        tok = line.split()
-        if len(tok) < 5 or not tok[0][0].isdigit():
-            continue
+    best_prefix, best_idx = -1, None
+    for row in sysinfo.wmi_rows(
+            "SELECT Destination, Mask, InterfaceIndex FROM Win32_IP4RouteTable"):
         try:
-            dest = int.from_bytes(socket.inet_aton(tok[0]), "big")
-            mask = int.from_bytes(socket.inet_aton(tok[1]), "big")
-            iface_ip = tok[3]
-        except OSError:
+            dest = int.from_bytes(socket.inet_aton(str(row["Destination"])), "big")
+            mask = int.from_bytes(socket.inet_aton(str(row["Mask"])), "big")
+            idx = int(row["InterfaceIndex"])
+        except (OSError, TypeError, ValueError):
             continue
         prefix = bin(mask).count("1")
-        if mask and (dest & mask) == (target & mask) and prefix > best_prefix:
-            best_prefix, best_iface = prefix, iface_ip
-    if best_iface is None:
+        # mask=0(默认路由)也参与:prefix 0 是兜底命中(旧 route print 通道
+        # 因 `if mask` 守卫从未匹配过 0/0,属通道重写修正)
+        if (dest & mask) == (target & mask) and prefix > best_prefix:
+            best_prefix, best_idx = prefix, idx
+    if best_idx is None:
         return None
-    for a in _env_adapters():
-        if a.get("ip") == best_iface:
-            return a["name"]
-    return best_iface
+    for ni in sysinfo.net_interfaces():
+        if ni["index"] == best_idx:
+            return ni["name"]
+    return str(best_idx)
 
 
 # ── server 区(problem scope)──────────────────

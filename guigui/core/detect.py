@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import logging
 import re
-import subprocess
 import time
 from urllib.request import Request, urlopen
 
 from . import config as config_mod
-from . import wifictl
+from . import sysinfo, wifictl
 from .drcom import UA
 
 log = logging.getLogger(__name__)
@@ -35,21 +34,15 @@ def _base_url(cfg: dict | None = None) -> str:
 
 
 def _default_route_exists() -> bool:
-    """route print -4 中是否存在默认路由(0.0.0.0/0)。"""
+    """WMI Win32_IP4RouteTable 是否存在默认路由(0.0.0.0/0;ADR-0003 进程内化,
+    免 route print 文本解析);探测失败不拦路,交给 HTTP 判定。"""
     try:
-        r = subprocess.run(
-            ["route", "print", "-4"], capture_output=True, text=True,
-            encoding="gbk", errors="replace", timeout=10,
-            creationflags=subprocess.CREATE_NO_WINDOW,  # 不弹终端窗口
-        )
+        rows = sysinfo.wmi_rows(
+            "SELECT Destination FROM Win32_IP4RouteTable WHERE Destination='0.0.0.0'")
     except Exception as e:
         log.warning("detect: route 查询失败: %s", e)
-        return True  # 探测失败不拦路,交给 HTTP 判定
-    for line in r.stdout.splitlines():
-        tok = line.split()
-        if len(tok) >= 3 and tok[0] == "0.0.0.0" and tok[1] == "0.0.0.0":
-            return True
-    return False
+        return True
+    return len(rows) > 0
 
 
 def any_network_up() -> bool:

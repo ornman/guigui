@@ -71,23 +71,22 @@ def test_any_network_up_via_route(monkeypatch):
     assert not detect.any_network_up()
 
 
-def test_default_route_parse(monkeypatch):
-    table = (
-        "===========================================================================\n"
-        "活动路由:\n"
-        " 0.0.0.0          0.0.0.0    192.168.1.1   192.168.1.10     35\n"
-        "===========================================================================\n"
-    )
-    class R:
-        returncode = 0
-        stdout = table
-        stderr = ""
-    monkeypatch.setattr(detect.subprocess, "run", lambda *a, **k: R())
+def test_default_route_exists_wmi(monkeypatch):
+    """ADR-0003:默认路由判定走 WMI(进程内),非空即存在。"""
+    monkeypatch.setattr(detect.sysinfo, "wmi_rows",
+                        lambda wql, scope=None: [{"Destination": "0.0.0.0"}])
     assert detect._default_route_exists()
-    empty = ("活动路由:\n" "===========================================================================\n")
-    monkeypatch.setattr(detect.subprocess, "run",
-                        lambda *a, **k: type("R", (), {"returncode": 0, "stdout": empty, "stderr": ""})())
+    monkeypatch.setattr(detect.sysinfo, "wmi_rows",
+                        lambda wql, scope=None: [])
     assert not detect._default_route_exists()
+
+
+def test_default_route_probe_failure_not_blocking(monkeypatch):
+    """探测失败不拦路(WMI 挂了 → 当有默认路由,交 HTTP 判定)。"""
+    def boom(wql, scope=None):
+        raise RuntimeError("wmi down")
+    monkeypatch.setattr(detect.sysinfo, "wmi_rows", boom)
+    assert detect._default_route_exists() is True
 
 
 def test_wait_for_gate_polls_until_reachable(monkeypatch):

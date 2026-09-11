@@ -36,6 +36,10 @@ a = Analysis(
         "webview.platforms.edgechromium",   # WebView2 后端
         "keyring.backends.Windows",         # 凭据管理器后端
     ],
+    # 注:core/sysinfo.py 的 clr.AddReference("System.Management") 与 WinRT 投影
+    # (ADR-0001/0002/0003)都是运行时解析 — System.Management 是 .NET Framework
+    # GAC 程序集,WinRT winmd 走系统投影;两者均非 Python 模块,不进 hiddenimports
+    # (加了只会得到 modulegraph 假警告);pythonnet 本体已随 pywebview 打包。
     excludes=["tkinter", "pytest", "pywebview.tests"],
     noarchive=False,
 )

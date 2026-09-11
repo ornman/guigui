@@ -1,7 +1,8 @@
 """diagnostics:collect/render — 七区结构 / 瘦身规则 / 打码红线 / 采集失败 in-band。
 
 测试走模块接口 collect(kind)/render(bundle),不测内部采集器(PRD §7.1);
-子进程/网络类 seam(_run、探测函数)全部注入固定应答。
+进程内采集 seam(sysinfo.net_interfaces / sysinfo.wmi_rows / scheduler 查询)
+与网络探测函数全部注入固定应答。
 """
 
 import json
@@ -10,76 +11,47 @@ import pytest
 
 from guigui.core import diagnostics, drcom, logstore
 
-IPC_OUT = """
-Windows IP 配置
-
-无线局域网适配器 WLAN:
-
-   连接特定的 DNS 后缀 . . . . . . . :
-   描述. . . . . . . . . . . . . . . : Intel(R) Wi-Fi 6 AX201 160MHz
-   DHCP 已启用 . . . . . . . . . . . : 是
-   IPv4 地址 . . . . . . . . . . . . : 10.20.30.40(首选)
-   DNS 服务器 . . . . . . . . . . . . : 192.168.1.1
-                                       10.1.2.9
-
-以太网适配器 以太网:
-
-   描述. . . . . . . . . . . . . . . : Realtek PCIe GbE Family Controller
-   IPv4 地址 . . . . . . . . . . . . : 172.16.0.1(首选)
-
-隧道适配器 Clash:
-
-   描述. . . . . . . . . . . . . . . : Clash Virtual Adapter(TUN 模式)
-   IPv4 地址 . . . . . . . . . . . . : 198.18.0.1(首选)
-
-以太网适配器 蓝牙网络连接:
-
-   媒体状态 . . . . . . . . . . . . . : 媒体已断开连接
-"""
-
-TASKLIST_OUT = '''
-"hipsdaemon.exe","1234","Services","0","9,240 K"
-"msmpeng.exe","5678","Services","0","300,120 K"
-"explorer.exe","9012","Console","1","60,000 K"
-'''
+# sysinfo.net_interfaces 桩应答(ADR-0003:网卡/DNS 进程内采集)
+NI = [
+    {"name": "WLAN", "description": "Intel(R) Wi-Fi 6 AX201 160MHz",
+     "type_id": 71, "is_wireless": True, "is_up": True,
+     "ipv4": "10.20.30.40", "dns": ["192.168.1.1", "10.1.2.9"], "index": 4},
+    {"name": "以太网", "description": "Realtek PCIe GbE Family Controller",
+     "type_id": 6, "is_wireless": False, "is_up": True,
+     "ipv4": "172.16.0.1", "dns": [], "index": 20},
+    {"name": "Clash", "description": "Clash Virtual Adapter(TUN 模式)",
+     "type_id": 53, "is_wireless": False, "is_up": True,
+     "ipv4": "198.18.0.1", "dns": [], "index": 18},
+    {"name": "蓝牙网络连接", "description": "Bluetooth Device (Personal Area Network)",
+     "type_id": 6, "is_wireless": False, "is_up": False,
+     "ipv4": None, "dns": [], "index": 21},
+]
 
 TASKINFO = {   # scheduler.task_runtime_info 桩返回值(COM 通道,ADR-0001 后)
     "GuiGui": {"last_run": "09-07 07:00:03", "last_result": "0x0"},
     "GuiGui-Patrol": {"last_run": "09-07 07:15:00", "last_result": "0x1"},
 }
 
-ROUTE_OUT = """
-===========================================================================
-接口列表
-  11...00 11 22 33 44 55 ......Intel(R) Wi-Fi 6 AX201
-  18...aa bb cc dd ee ff ......Realtek PCIe GbE
-===========================================================================
-IPv4 路由表
-===========================================================================
-活动路由:
-网络目标        网络掩码          网关       接口   跃点数
-          0.0.0.0          0.0.0.0     172.16.0.1   172.16.0.1     25
-          10.1.2.3  255.255.255.255         在链上    172.16.0.1     21
-===========================================================================
-"""
+
+def _av_rows():
+    return [{"displayName": "火绒安全软件"}, {"displayName": "Windows Defender"}]
+
+
+def fake_wmi(wql, scope=None):
+    if "AntiVirusProduct" in wql:
+        return _av_rows()
+    return []
 
 
 @pytest.fixture
 def canned(monkeypatch):
-    """固定应答:子进程文本 / SSID / 任务 XML / 探测函数。"""
+    """固定应答:进程内采集 / SSID / 任务查询 / 探测函数。"""
     from guigui.core import config
 
-    def fake_run(cmd):
-        key = " ".join(cmd[:2])
-        if key == "ipconfig /all":
-            return IPC_OUT
-        if key == "tasklist /fo":
-            return TASKLIST_OUT
-        if key == "route print":
-            return ROUTE_OUT
-        return ""
     config.save(dict(config.DEFAULTS, uid="2025000000001"))
-    monkeypatch.setattr(diagnostics, "_run", fake_run)
+    monkeypatch.setattr(diagnostics.sysinfo, "net_interfaces",
+                        lambda: [dict(n) for n in NI])
+    monkeypatch.setattr(diagnostics.sysinfo, "wmi_rows", fake_wmi)
     monkeypatch.setattr(diagnostics.wifictl, "current_ssid",
                         lambda: "Campus-WiFi")
     monkeypatch.setattr(diagnostics.scheduler, "query_xml",
@@ -209,6 +181,57 @@ def test_self_tasks_com_down_keeps_registered(canned, monkeypatch):
     assert tasks["GuiGui"]["registered"] is True        # query_xml 桩仍在岗
     assert tasks["GuiGui"]["last_run"] is None
     assert tasks["GuiGui"]["last_result"] is None
+
+
+# ── ADR-0003:SecurityCenter2 / 路由反查(进程内采集)─────
+
+
+def test_env_av_displayname_variants(monkeypatch):
+    """displayName 变体(中英文产品名)→ 三家布尔;信封键不变。"""
+    rows = [{"displayName": "Huorong Internet Security"},
+            {"displayName": "360 Total Security"},
+            {"displayName": "Windows Defender"}]
+    monkeypatch.setattr(diagnostics.sysinfo, "wmi_rows",
+                        lambda wql, scope=None: list(rows))
+    av = diagnostics._env_av()
+    assert av == {"huorong": True, "qihoo360": True, "defender": True}
+
+
+def test_env_av_unknown_product_all_false(monkeypatch):
+    """装了未知杀软:全 False(有信息,不是空对象)。"""
+    monkeypatch.setattr(diagnostics.sysinfo, "wmi_rows",
+                        lambda wql, scope=None: [{"displayName": "SomeVendor AV"}])
+    assert diagnostics._env_av() == {"huorong": False, "qihoo360": False,
+                                     "defender": False}
+
+
+def test_env_av_missing_or_empty_no_tasklist(monkeypatch):
+    """SecurityCenter2 缺失/为空 → 空对象,宁缺勿侦察(绝不回退 tasklist)。"""
+    def boom(wql, scope=None):
+        raise RuntimeError("服务器 SKU 无 SecurityCenter2")
+    monkeypatch.setattr(diagnostics.sysinfo, "wmi_rows", boom)
+    assert diagnostics._env_av() == {}
+    monkeypatch.setattr(diagnostics.sysinfo, "wmi_rows",
+                        lambda wql, scope=None: [])
+    assert diagnostics._env_av() == {}
+
+
+def test_route_iface_longest_prefix(monkeypatch):
+    """最长前缀匹配 + InterfaceIndex 直查网卡名(ADR-0003:不绕 IP 二次匹配)。"""
+    routes = [
+        {"Destination": "0.0.0.0", "Mask": "0.0.0.0", "InterfaceIndex": 20},
+        {"Destination": "10.1.2.3", "Mask": "255.255.255.255", "InterfaceIndex": 4},
+    ]
+    monkeypatch.setattr(diagnostics.sysinfo, "wmi_rows",
+                        lambda wql, scope=None: list(routes))
+    monkeypatch.setattr(diagnostics.sysinfo, "net_interfaces",
+                        lambda: [dict(n) for n in NI])
+    assert diagnostics._route_iface("10.1.2.3", {}) == "WLAN"    # /32 命中
+    assert diagnostics._route_iface("8.8.8.8", {}) == "以太网"   # 默认路由兜住
+    # 索引对不上网卡(拔了/换了)→ 退化为索引字符串,不抛
+    routes.append({"Destination": "172.16.0.0", "Mask": "255.255.0.0",
+                   "InterfaceIndex": 99})
+    assert diagnostics._route_iface("172.16.9.9", {}) == "99"
 
 
 # ── server / crashes 区(S3)─────────────────────
