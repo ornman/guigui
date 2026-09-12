@@ -557,7 +557,10 @@ class GuiGuiApi:
     # ── 2.13 taskStatus / rebuildTask(1.2.0 新增)──
 
     def taskStatus(self) -> dict:
-        """定时任务在岗状态(AC-17,设置页「定时任务」行数据源)。"""
+        """定时任务在岗状态(AC-17,设置页「定时任务」行数据源)。
+
+        1.7.0(ADR-0006):信封可选带 degraded — 已停试降级的任务名列表
+        (连续 3 次建立失败,不再自动重试;缺席/空 = 无降级)。"""
         try:
             cfg = config.load()
             if not cfg.get("master", True):
@@ -567,7 +570,11 @@ class GuiGuiApi:
                 scheduler.TASK_MAIN, cfg, require_logon=bool(cfg.get("boot_login")))
             if ok_flag and cfg.get("patrol_enabled"):
                 ok_flag = scheduler.is_task_current(scheduler.TASK_PATROL, cfg)
-            return _ok({"ok": ok_flag})
+            data = {"ok": ok_flag}
+            degraded = selfheal.degraded_tasks()
+            if degraded:
+                data["degraded"] = degraded
+            return _ok(data)
         except Exception:
             log.exception("api.taskStatus")
             return _err(INTERNAL, "任务状态查不出来,再试一次")
@@ -579,11 +586,14 @@ class GuiGuiApi:
         补试,最多 3 轮 reconcile(每轮本身是 schtasks 调用、秒级粒度,轮间
         不另睡);仍 misaligned → ok=false,即「3 败」— 前端拦截页/横幅②
         以此切换反馈出口(白板 re3)。信封 ok = 对齐后 is_task_current 判定,
-        即「重建成功·回巡检复查」的复查结论,调用方不必再复询。"""
+        即「重建成功·回巡检复查」的复查结论,调用方不必再复询。
+        ADR-0006(1.7.0):先清零连败账本 — rebuild 是降级停试的唯一恢复
+        入口,用户点击 = 无条件全量重试。"""
         try:
             cfg = config.load()
             if cfg.get("master", True) and not _configured(cfg):
                 return _err(NOT_CONFIGURED, "还没完成首次开启,先去开启每日自动登录")
+            selfheal.clear_fail_streaks()
             changed = False
             misaligned = False
             for _attempt in range(3):

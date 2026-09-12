@@ -1,6 +1,6 @@
-"""selfheal:应建/应删/rev 失配重建/巡逻联动(mock scheduler)。"""
+"""selfheal:应建/应删/rev 失配重建/巡逻联动/停试退避(mock scheduler)。"""
 
-from guigui.core import selfheal
+from guigui.core import ensure, selfheal
 
 
 class FakeScheduler:
@@ -8,6 +8,8 @@ class FakeScheduler:
         self.tasks: dict[str, str] = {}     # name → xml
         self.rev = 0
         self.block_logon_trigger = False    # 模拟安全软件拦「登录触发」任务
+        self.block_all = False              # 模拟安全软件拦全部建单(ADR-0006 停试用)
+        self.create_calls = 0               # 建单调用计数(停试后应停止增长)
 
     def is_task_current(self, name, cfg, require_logon=False):
         xml = self.tasks.get(name)
@@ -21,8 +23,9 @@ class FakeScheduler:
         return self.tasks.get(name)
 
     def create_task(self, name, xml):
-        if self.block_logon_trigger and "<LogonTrigger>" in xml:
+        if self.block_all or (self.block_logon_trigger and "<LogonTrigger>" in xml):
             return False
+        self.create_calls += 1
         self.tasks[name] = xml
         return True
 
@@ -148,3 +151,71 @@ def test_degraded_task_upgrades_after_unblock(monkeypatch):
     changed, _ = selfheal.reconcile(_cfg())               # rev 未变仍要重建
     assert changed is True
     assert "<LogonTrigger>" in fake.tasks["GuiGui-Boot"]  # 已升级回完整版
+
+
+# ── ADR-0006 停试退避(2026-09-12 拍板:阈值 3)──────────────
+
+
+def test_three_consecutive_failures_stop_retry(monkeypatch):
+    """ADR-0006:同任务连续 3 次建立失败 → 停试降级,后续 reconcile 零建单。"""
+    fake = FakeScheduler()
+    fake.block_all = True
+    _wire(monkeypatch, fake)
+    cfg = _cfg(boot_login=False, wake_login=True)         # 意图 = 主任务 + 唤醒
+    for i in (1, 2):
+        assert selfheal.reconcile(cfg) == (False, True)
+        assert ensure.load_state()["task_fail_streak"]["GuiGui"] == i
+    selfheal.reconcile(cfg)                               # 第 3 败:达阈值
+    streaks = ensure.load_state()["task_fail_streak"]
+    assert streaks["GuiGui"] == 3 and streaks["GuiGui-Wake"] == 3
+    assert selfheal.degraded_tasks() == ["GuiGui", "GuiGui-Wake"]
+    n = fake.create_calls
+    changed, misaligned = selfheal.reconcile(cfg)         # 第 4 次:停试,零建单
+    assert (changed, misaligned) == (False, True)
+    assert fake.create_calls == n                         # 没再向杀软交建单
+    assert selfheal.degraded_tasks() == ["GuiGui", "GuiGui-Wake"]
+
+
+def test_rebuild_clears_streak_and_recovers(monkeypatch):
+    """恢复入口 = 用户动作:clear_fail_streaks 清零后全量重试即建成、账本归空。"""
+    fake = FakeScheduler()
+    fake.block_all = True
+    _wire(monkeypatch, fake)
+    cfg = _cfg(boot_login=False, wake_login=False)        # 只主任务
+    for _ in range(3):
+        selfheal.reconcile(cfg)
+    assert selfheal.degraded_tasks() == ["GuiGui"]
+    selfheal.clear_fail_streaks()                         # rebuildTask 先做的清零
+    assert selfheal.degraded_tasks() == []
+    fake.block_all = False                                # 杀软放行
+    assert selfheal.reconcile(cfg) == (True, False)
+    assert "GuiGui" in fake.tasks
+    assert ensure.load_state()["task_fail_streak"] == {}
+
+
+def test_task_current_clears_streak(monkeypatch):
+    """任务在岗(外部恢复/他人修好)= 连败清零,不冤枉持续拦。"""
+    fake = FakeScheduler()
+    fake.block_all = True
+    _wire(monkeypatch, fake)
+    cfg = _cfg(boot_login=False, wake_login=False)
+    selfheal.reconcile(cfg)                               # 1 败
+    assert ensure.load_state()["task_fail_streak"] == {"GuiGui": 1}
+    fake.block_all = False
+    fake.tasks["GuiGui"] = f'<Task rev={cfg["tasks_rev"]}><Command>x</Command></Task>'
+    assert selfheal.reconcile(cfg) == (False, False)      # 在岗:零改动零失配
+    assert ensure.load_state()["task_fail_streak"] == {}
+
+
+def test_old_state_without_streak_key_is_safe(monkeypatch):
+    """旧 ensure_state(无 task_fail_streak 键)→ reconcile 照常工作不炸(向后兼容)。"""
+    import json
+
+    from guigui.core import paths
+    fake = FakeScheduler()
+    _wire(monkeypatch, fake)
+    p = paths.state_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"last_net_state": "up"}), encoding="utf-8")
+    assert selfheal.reconcile(_cfg()) == (True, False)
+    assert ensure.load_state()["task_fail_streak"] == {}

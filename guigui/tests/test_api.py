@@ -670,6 +670,26 @@ def test_task_status_ok_and_blocked(ctx):
     assert ctx.api.taskStatus()["data"]["ok"] is False
 
 
+def test_task_status_carries_degraded_list(ctx, monkeypatch):
+    """1.7.0(ADR-0006):taskStatus 信封可选带 degraded — 停试降级的任务名列表。"""
+    monkeypatch.setattr(api_mod.selfheal, "degraded_tasks",
+                        lambda: ["GuiGui-Wake"])
+    data = ctx.api.taskStatus()["data"]
+    assert data["ok"] is True and data["degraded"] == ["GuiGui-Wake"]
+
+
+def test_rebuild_task_clears_fail_streaks(ctx, monkeypatch):
+    """ADR-0006:rebuild = 停试降级唯一恢复入口 — 清零连败账本后才全量重试。"""
+    cleared = []
+    monkeypatch.setattr(api_mod.selfheal, "clear_fail_streaks",
+                        lambda: cleared.append(1))
+    ctx.reconcile_ret = (True, False)
+    out = ctx.api.rebuildTask()
+    assert out["ok"] is True and out["data"]["ok"] is True
+    assert cleared == [1]                          # 清零先于重试环
+    assert ctx.reconciled == [True]
+
+
 def test_task_status_master_off_is_not_blocked(ctx):
     config.save(dict(config.DEFAULTS, uid="2025000000001", master=False))
     data = ctx.api.taskStatus()["data"]

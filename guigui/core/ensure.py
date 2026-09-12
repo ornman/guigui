@@ -53,6 +53,7 @@ def _default_state() -> dict:
         "cred_verified": False,          # 凭证是否经服务器真验证(仅 error2 置假,§7.3)
         "task_lost_notify_date": None,   # 定时任务失联通知每日闸(QA P1-5)
         "notify_sent": {},               # 通知冷却账本(1.6.0):kind → {date, ts}
+        "task_fail_streak": {},          # 任务建立连败账本(ADR-0006,1.7.0):名 → 次数;≥3 停试
     }
 
 
