@@ -370,6 +370,12 @@ const PANELS=[
     E(W,'sw-fallback').classList.add('on');
     const p=E(W,'fallback-pick');p.style.display='block';
     W.renderWifiList(p,WIFI_FAKE,{pick:true,selected:'Campus-WiFi'})}},
+  {label:'任务降级行(ADR-0006 停试·需重建)',scene:'daily',setup:W=>{
+    /* 真路径:_setTaskDegraded 摆 mock 账本 → openDetail 触发 loadSettings →
+       taskStatus 带 degraded → 降级行渲染(「拦截→降级」链;重建恢复 =
+       行内「重建」按钮走 rebuildTask 清零,1.7.0) */
+    W.GGMock._setTaskDegraded('GuiGui-Wake');
+    W.openDetail('v-settings')}},
 ]},
 {view:'v-feedback',name:'反馈',frames:[
   {label:'问题(带诊断)',scene:'daily',setup:W=>W.openDetail('v-feedback')},

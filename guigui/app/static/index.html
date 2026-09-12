@@ -691,14 +691,18 @@ html.in-app .window{box-shadow:inset 0 1px 0 oklch(100% 0 0 / 0.8),inset 0 -1px 
       <div id="fallback-pick" style="display:none;padding:6px 0 2px"></div>
       <div class="row"><div><div class="t">白天巡逻</div><div class="d">意外断网时,悄悄重连</div></div>
         <button type="button" class="sw" data-cfg="patrol_enabled" onclick="toggleCfg(this)"></button></div>
-      <div class="row"><div><div class="t">假期静默</div><div class="d">连续 2 天连不上(放假回家了?),自动降为每天 1 次、不打扰</div></div>
-        <button type="button" class="sw on" data-cfg="vacation_silence" onclick="toggleCfg(this)"></button></div>
+      <div class="row"><div><div class="t">假期静默</div><div class="d">开了就不弹失败提醒;连续 3 天连不上时也会自动静默</div></div>
+        <button type="button" class="sw" data-cfg="vacation_silence" onclick="toggleCfg(this)"></button></div>
 
       <div class="tiny-label">提醒</div>
-      <div class="row"><div><div class="t">弹通知</div><div class="d">只在断网恢复、登录失败时说</div></div>
+      <div class="row"><div><div class="t">弹通知</div><div class="d">成功、失败和连不上时说一声,每天每类最多 1 条</div></div>
         <button type="button" class="sw on" data-cfg="notifications" onclick="toggleCfg(this)"></button></div>
 
       <div class="tiny-label">系统</div>
+      <!-- ADR-0006(1.7.0)停试降级行:仅 degraded 非空时显示(2026-09-08 删掉的常驻
+           「定时任务被拦」行不复活 — 被拦归主页横幅②;本行只讲「停试」这一新状态) -->
+      <div class="row" id="task-degraded-row" style="display:none"><div><div class="t" id="task-degraded-t"></div><div class="d">多次没建成,自动重试先停了;点「重建」再试一次</div></div>
+        <button class="go" type="button" id="task-degraded-btn" onclick="rebuildDegraded(this)">重建</button></div>
       <div class="row"><div><div class="t">立即体检</div><div class="d">网络、密码、任务、程序,从头到尾查一遍</div></div>
         <button class="link" style="margin-top:0;font-size:12.5px;white-space:nowrap" onclick="openDetail('v-diag')">去体检</button></div>
       <div class="row"><div><div class="t">显示桂桂</div></div>
@@ -2014,6 +2018,28 @@ async function loadSettings(){
     const s=await GG.api.scanWifi();
     if(s.ok)renderWifiList($('fallback-pick'),s.data.networks,{pick:true,selected:S.curCfg.wifi_fallback_ssid});
   }
+  refreshTaskDegraded();
+}
+/* ADR-0006 停试降级(1.7.0):设置页「定时任务」降级行 — 后端同任务连续 3 次
+   建立失败已停自动重试,唯一恢复入口 = 用户点重建(rebuildTask 清零+全量重试);
+   文案最朴素直述,拟稿待 H 表场景化过目 */
+const TASK_LABELS={'GuiGui':'每日自动登录','GuiGui-Boot':'开机补登录',
+  'GuiGui-Wake':'睡眠唤醒补登录','GuiGui-Patrol':'白天巡逻'};
+function renderTaskDegraded(list){
+  const row=$('task-degraded-row');
+  if(!list||!list.length){row.style.display='none';return}
+  $('task-degraded-t').textContent=list.map(t=>TASK_LABELS[t]||t).join('、')+'暂不可用';
+  row.style.display='';
+}
+async function refreshTaskDegraded(){
+  const r=await GG.api.taskStatus();
+  if(r.ok)renderTaskDegraded(r.data.degraded||[]);
+}
+async function rebuildDegraded(btn){
+  setBusy(btn,true,'重建中…');
+  const r=await GG.api.rebuildTask();
+  setBusy(btn,false);
+  if(r.ok)refreshTaskDegraded();   /* 重建后重查:修好行隐,仍降级如实留 */
 }
 function toggleCfg(el){el.classList.toggle('on');GG.api.saveConfig({[el.dataset.cfg]:el.classList.contains('on')})}
 /* 反馈:真通道(契约 §2.15–2.17,1.3.0)— 分类单选 → 发送;诊断自动采集;
