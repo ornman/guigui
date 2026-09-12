@@ -23,7 +23,7 @@ P0 收口后:批A/B 即为纯执行,按 ADR/计划自动接力。(**批A/批B �
 2. **批B · ADR-0006 实施 + 程序链收口** ✅ **已执行收口(2026-09-12)**:连败 **3 次**停试(ensure_state 新键 task_fail_streak 持久化,向后兼容)+ taskStatus 信封 degraded + rebuildTask 清零全量重试(ed4adb4);设置页降级行(拟稿待 H 表过目)+ 开关文案对齐 + 画廊帧(d8f5e5d);白板 progfail/proggrep + 计划 G 章标「2026-09-12 拍板:不做」(05d7c4b);ADR-0006 已接受、README 索引同步;pytest 333 全绿。
 3. **批C · 库链实施**(等 ADR-0007 过目):按 ADR-0007 实施清单,DPAPI 备份 + 静默 failover + 状态页可见。
 4. **批D · 开源与分发(2026-09-12 晚终裁:不申请签名,社区无签名方案,见 ADR-0005 回填补记)**:**Phase 1 工作区脱敏 ✅**(2026-09-12,commit 690c51e/9c1592b/070e984/90b99e6 + a7a9eb0 室友学号);**Phase 2 历史清洗 ✅**(用户拍「甲」;git filter-repo 重写 388 commit,验证 = 树哈希逐字节一致 + 七模式 -S 零命中 + 326 绿;备份 `../auto-login-pre-filter-backup.bundle` 含敏感历史**永不发布、用户确认后删**);**GitHub 公开仓 ✅ https://github.com/ornman/guigui**(gh 建仓 + master 全量推送;建仓前账密确认为测试值、改密提醒作废);**测试凭据纪律**:真实测试账密只进本地 config(gitignore)/凭据管理器,永不入仓。剩余:首个 Release(批A/B 已合入,安装器重出后传 Releases + SHA-256)→ 杀软误报申诉三件套(Microsoft/火绒/360,随首 Release 后做)。
-5. **安装器实机验收**(用户 5 分钟,在家可做):`guigui/Output/guigui-setup-2.0.0.exe` 装→开→卸,四任务全删;顺带收掉 package-fix-plan Task 7 旧清单。
+5. **安装器实机验收** ✅ **已完成(2026-09-12 深夜,主会话亲测,Release 同一安装包)**:完整回路 = 静默装(%LOCALAPPDATA%\Programs\GuiGui + 注册表 2.0.0 ✓)→ GUI 冒烟(拉起 12s/~120MB 正常)→ 造 GuiGui-Boot/Wake/Patrol 三靶任务 → 静默卸(**四任务全删 ✓ 含 ADR-0004 两条新删行正面验证;目录/注册表清净 ✓;用户数据 config/state/日志完整保留 ✓**)→ 重装 + GUI 启动对齐 → **主任务自动重建且指向正式安装目录**(原任务曾指向 dist 开发版,现已升级为安装版,明早 6:30 窗口在岗)。未覆盖(如实):AppMutex 关闭提示(GUI 未运行时触发不到)、DelUserData=yes 凭据全删路径(破坏性,需牺牲环境);package-fix-plan Task 7 旧清单 6 项中 4 项已被本回路覆盖,余 2 项即上述。
 6. **真机三件**(需在校环境):锚点窗口期实测(06:50 前后)、bind 解绑补测、返校日实跑(boot 拍豁免链)。
 7. **H 表场景化呈报准备**:按「触发条件→谁看到→画面→拟稿」五段式转写 + 对照既有拍板筛冲突,并入 A6 `.sw` 范围与 P1-6 阈值两小件;呈用户过目。
 
