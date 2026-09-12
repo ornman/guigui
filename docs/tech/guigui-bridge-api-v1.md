@@ -1,4 +1,4 @@
-# 桂桂 v2 · JS↔Python 桥接契约 v1.6.0
+# 桂桂 v2 · JS↔Python 桥接契约 v1.7.0
 
 > **地位**:前后端通信协议的**唯一权威**(《guigui-work-split.md》§一.2)。后端 bridge 实现以此为准;`static/dev/mock.js` 是它的可执行规范(仅开发)。
 > **绑定**:命名空间 `window.guigui.*`。pywebview 经 `js_api` 暴露,实现侧自行决定 camelCase 方法名或 snake_case+映射(契约只锁 JS 侧名字)。
@@ -275,17 +275,23 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
   detail 如实「多半被拦」,不装确定。
 - 多故障并存的退出优先级:net_down > login > task_blocked > app_fault > ok。
 
-### 2.13 taskStatus() — 定时任务在岗状态(1.2.0 新增,AC-17)
+### 2.13 taskStatus() — 定时任务在岗状态(1.2.0 新增,AC-17;1.7.0 扩 degraded)
 
 ```jsonc
 { "ok": true }                 // ok=false = 被拦/丢失(设置页「点此重建」)
 // { "ok": true, "note": "off" } = 总开关关着,任务本就不存在,不算被拦
+// 1.7.0(ADR-0006 停试退避,可选键,缺席/空 = 无降级):
+// { "ok": true, "degraded": ["GuiGui-Wake"] } = 已停试降级的任务名列表
+//   (该任务连续 3 次 reconcile 建立失败,已停止自动重试;恢复 = rebuildTask
+//   用户点击,前端设置页据实渲染「睡眠唤醒补登录暂不可用(需重建)」类文案)
 ```
 
-### 2.14 rebuildTask() — 一键重建定时任务(1.2.0 新增;仅用户点击触发)
+### 2.14 rebuildTask() — 一键重建定时任务(1.2.0 新增;仅用户点击触发;1.7.0 清零降级)
 
 后端按当前配置跑一次对齐(幂等),返回 `{ "ok": <是否达成>, "changed": <是否发生改动> }`,
 并推 `schedule:changed`(带 `task_ok`)。**绝不后台静默重建**(PRD 8.5.2)。
+1.7.0(ADR-0006):本方法是停试降级的**唯一恢复入口** — 调用即先清零连败账本
+(`task_fail_streak`),随后无条件全量重试(单轮内未达成补试,最多 3 轮 reconcile)。
 
 ## 3. 事件推送(后端 → 前端)
 
@@ -307,7 +313,7 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
 
 | 事件 | 发/不发 | 文案方向 / 深链落点 |
 |---|---|---|
-| 任务成功(当日首次收工) | **发**(默认开、设置可关) | 「自动登录成功 ✓」→ `guigui://v-status` |
+| 任务成功(当日首次收工) | **发**(默认开、设置可关) | 「今早自动登录成功 ✓」→ `guigui://v-status`(H 表拟稿原文,1.7.0 对齐) |
 | 任务失败·凭据类(被拒) | **发,带原因**(拒绝四态文案单一来源) | 「自动登录没成功」→ `guigui://v-form` |
 | 任务失败·连不上(不可达/等门超时) | **也发(纯诊断)** — 1.6.0 起不再静默 | 「连不上校园网」→ `guigui://v-status` |
 | 维护页连续 ≥3 拍 | 发(质量闸延续) | → `guigui://v-status` |
@@ -346,7 +352,8 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
 | 1.4.2 | 2026-09-07 | 补登记票(零行为变化):§2.3 `reason` 枚举 + §3 `login:progress` 补登 `throttled`/`waitsec` — 1.4.0 随 QA P1-6 实装于后端与 mock,当时漏改本文;本次随前端适配(节流按「稍后再试」中性渲染)一并入册 | 前端已接(fb0723c;?dev=1&scene=throttled 可验)— **生效** |
 | 1.4.3 | 2026-09-07 | §2.2 撤销「首装表单 chkstatus 旁注确认提示」强制(1.4.1 引入)— 用户拍板:这行文字没必要,按零摩擦原则移除;`source` 三态语义保留(后端/mock 零变化),误抓由登录被拒(wrong_account 文案)自纠 | 前端已接(旁注已移除,e95beb8;mock 无需改,`other` 场景仍验信封)— **生效** |
 | 1.5.0 | 2026-09-08 | 验证器落地(计划 `docs/plans/ui-routing-rework-2026-09-08.md` P1):新增 §2.18 `diagnose()`(五步信封 + `exit` 枚举;第 3 步含真登副作用,**仅用户显式进 v-diag 触发**,启动静默体检不碰);§3 新增事件 `diag:progress`;§2.3 补「呈现映射」说明(`verified:false` → 保存配置终态页,信封零变化);方法 18 个 | 后端已实现(api.diagnose + 11 测);mock 同步(diagnose + `diag_ok/diag_cred/diag_task/diag_app` 四场景,与后端逐字一致);前端已接(v-diag 页 + 横幅③/设置「立即体检」两入口 + 登录页带结论预填)— **生效** |
-| **1.6.0** | **2026-09-11** | 四案落地(用户拍板 2026-09-11,同批先行的清死代码+删 `feedback()` 见 `2a6203c`/`418323f`):① **§2.10 recentResult 响应新增 `vault_state` 四态**(ok/rebuilding/degraded/failed)— 库维可见性唯一信封出口,程序维走 §2.18 diagnose 第 5 步(不新增 inspect();前端只透传不弹横幅);② **vault 库链真做**:备份库 JSON(`%LOCALAPPDATA%\GuiGui\vault_backup.json`,uid+密码,与 advapi32 降级层同口径不混淆 — 依赖用户目录 ACL,注释说明安全边界)+ 损坏自动重建 ×3(轮间不 sleep)+ 3 败降级切备份库(登录照常,vault_state=degraded,**不发通知**;备份也坏 = failed,走日志+诊断可见);③ **§3.1 通知语义重写**:任务成功=发(默认开、设置可关)/ 凭据类失败=发带原因 / **连不上=也发(纯诊断)** / 拦截=发要求加白 / 库降级=不发 / 网断等网、探测循环、节流、自愈进行中、矛盾态、纯状态变化=静默;**假期模式 = 连续 3 天连不上 10.1.2.3 自动进入**(进入后所有通知静默,任务照跑日志照记)、**探测恢复可达自动退出**,与既有 `vacation_silence` 手动开关任一生效即静默(手动语义收紧为立即静默失败类,默认 true→false,已存配置不动);**冷却:同类 30 分钟合并 + 每类每天 ≤1**;④ **§4 深链注入扩 `open_route`**(v-form/v-status/v-success/v-feedback),通知落点新增 `guigui://v-*` 协议路由 + `--open-route` 启动参数;**方法数不变(16)** | 后端已实现(vault 库链 + notify 矩阵/假期/冷却 + ensure 状态机 + 壳层透传,303 测全绿);mock 同步(vault_state + `_setVault`/`_setVacation`/`?launch` 注入);前端已接(applyLaunch 对象形 open_route + S 透传,通知零前端改动)— **生效** |
+| 1.6.0 | 2026-09-11 | 四案落地(用户拍板 2026-09-11,同批先行的清死代码+删 `feedback()` 见 `2a6203c`/`418323f`):① **§2.10 recentResult 响应新增 `vault_state` 四态**(ok/rebuilding/degraded/failed)— 库维可见性唯一信封出口,程序维走 §2.18 diagnose 第 5 步(不新增 inspect();前端只透传不弹横幅);② **vault 库链真做**:备份库 JSON(`%LOCALAPPDATA%\GuiGui\vault_backup.json`,uid+密码,与 advapi32 降级层同口径不混淆 — 依赖用户目录 ACL,注释说明安全边界)+ 损坏自动重建 ×3(轮间不 sleep)+ 3 败降级切备份库(登录照常,vault_state=degraded,**不发通知**;备份也坏 = failed,走日志+诊断可见);③ **§3.1 通知语义重写**:任务成功=发(默认开、设置可关)/ 凭据类失败=发带原因 / **连不上=也发(纯诊断)** / 拦截=发要求加白 / 库降级=不发 / 网断等网、探测循环、节流、自愈进行中、矛盾态、纯状态变化=静默;**假期模式 = 连续 3 天连不上 10.1.2.3 自动进入**(进入后所有通知静默,任务照跑日志照记)、**探测恢复可达自动退出**,与既有 `vacation_silence` 手动开关任一生效即静默(手动语义收紧为立即静默失败类,默认 true→false,已存配置不动);**冷却:同类 30 分钟合并 + 每类每天 ≤1**;④ **§4 深链注入扩 `open_route`**(v-form/v-status/v-success/v-feedback),通知落点新增 `guigui://v-*` 协议路由 + `--open-route` 启动参数;**方法数不变(16)** | 后端已实现(vault 库链 + notify 矩阵/假期/冷却 + ensure 状态机 + 壳层透传,303 测全绿);mock 同步(vault_state + `_setVault`/`_setVacation`/`?launch` 注入);前端已接(applyLaunch 对象形 open_route + S 透传,通知零前端改动)— **生效** |
+| **1.7.0** | **2026-09-12** | 批A+批B(用户 2026-09-12 拍板:通知语义确认/深链加/停试阈值 3/程序链砍):① **§2.13 taskStatus 信封可选扩 `degraded`** — 停试降级的任务名列表(ADR-0006:同一任务连续 3 次 reconcile 建立失败 → 停试,不再随 saveConfig/启动自动重试;连败账本 `task_fail_streak` 持久化进 ensure_state,向后兼容);② **§2.14 rebuildTask 扩清零语义** — 停试降级的唯一恢复入口,调用即清零连败账本并无条件全量重试;③ **§3.1 任务成功文案对齐 H 表拟稿原文**「今早自动登录成功 ✓」(2026-09-12 拍板沿用;1.6.0 已落的通知矩阵/假期/冷却/open_route 正文不变,仅此文案行对齐);**方法数不变(16)** | 后端已实现(selfheal 停试退避 + api.taskStatus/rebuildTask,+6 测 333 全绿);mock 同步(taskStatus degraded + rebuildTask 清零 + `_setTaskDegraded` 驱动钩子);前端已接(设置页「定时任务」降级行,拟稿待 H 表场景化过目)— **生效** |
 
 ## 6. 集成待办(联调问题记这里)
 

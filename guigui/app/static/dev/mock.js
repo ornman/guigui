@@ -38,6 +38,9 @@
    sticky=true 时 rebuildTask 修不好 — P1-15 重建 3 败→反馈出口的摆拍,模拟杀软
    持续拦截;不还原,复位传 true 或重载场景);
    _runMorningTask('ok'|'fail') 模拟明早任务真跑(P1-17 任务②三结局摆拍);
+   _setTaskDegraded('GuiGui-Wake'|['GuiGui-Wake',…]) 强置停试降级列表(1.7.0 —
+   ADR-0006「拦截→降级→重建恢复」链摆拍:taskStatus 带 degraded、设置页降级行
+   随动;rebuildTask 非sticky时清空恢复);传空清除;
    _setVault('ok'|'rebuilding'|'degraded'|'failed') 强改凭据库健康态(1.6.0 —
    recentResult.vault_state 随动;通知静默是后端行为,mock 只管信封);
    _setVacation(on) 强置假期模式标记(1.6.0 — 通知全静默属后端,mock 仅记状态供走查)
@@ -62,6 +65,7 @@ const UID='2025000000001',UID_MASK='2025…7209',OTHER_UID='2025000000002',SERVE
 
 const S={
   configured:false,pwd:null,verified:false,taskOk:true,
+  taskDegraded:[],                /* 1.7.0 停试降级任务名列表(ADR-0006;_setTaskDegraded 可摆拍) */
   vault:'ok',                    /* 1.6.0 凭据库健康四态(契约 §2.10;_setVault 可摆拍) */
   vacation:false,                /* 1.6.0 假期模式标记(_setVacation 可强置;通知静默属后端) */
   net:{state:'logged_in',ssid:'Campus-WiFi',server:SERVER},
@@ -258,7 +262,12 @@ window.GGMock={
     return OK({days:S.logs.slice(0,n)});
   },
   async recentResult(){await delay(50);return OK({...S.last,verified:S.verified,vault_state:S.vault})},
-  async taskStatus(){await delay(80);return S.cfg.master?OK({ok:S.taskOk}):OK({ok:true,note:'off'})},
+  async taskStatus(){
+    /* 1.7.0(ADR-0006):degraded 可选键 — 停试降级的任务名列表(缺席/空 = 无降级) */
+    await delay(80);
+    if(!S.cfg.master)return OK({ok:true,note:'off'});
+    return OK(S.taskDegraded.length?{ok:S.taskOk,degraded:S.taskDegraded}:{ok:S.taskOk});
+  },
   /* ── 2.18 diagnose(1.5.0 验证器):五步与后端逐字一致(diag_* 四场景);
      与 _setNet 联动:当前网态真改第 1-3 步走向 ── */
   async diagnose(){
@@ -330,9 +339,12 @@ window.GGMock={
   },
   async rebuildTask(){
     /* 对齐后端 P1-15 重试环语义:一次点击内部补试,常规拦一下就能建成(600ms);
-       sticky(杀软持续拦)= 3 轮全败,信封 ok=false → 前端 3 败反馈出口 */
+       sticky(杀软持续拦)= 3 轮全败,信封 ok=false → 前端 3 败反馈出口;
+       1.7.0(ADR-0006):rebuild = 停试降级唯一恢复入口 — 先清零连败账本并无条件
+       全量重试;非 sticky 时降级列表随本轮建成一并清空,sticky 时 3 轮全败
+       重新降级(模拟持续被拦) */
     await delay(600);
-    if(!S.taskSticky)S.taskOk=true;
+    if(!S.taskSticky){S.taskOk=true;S.taskDegraded=[]}
     emit('schedule:changed',{master:S.cfg.master,trigger_time:S.cfg.trigger_time,task_ok:S.taskOk});
     return OK({ok:S.taskOk,changed:!S.taskSticky});
   },
@@ -384,6 +396,15 @@ window.GGMock={
     S.taskOk=!!ok;
     S.taskSticky=!!sticky;
     return OK({taskOk:S.taskOk,sticky:S.taskSticky});
+  },
+  async _setTaskDegraded(list){
+    /* dev 驱动钩子(1.7.0 ADR-0006 停试退避摆拍):强置 taskStatus 的 degraded
+       列表(逗号串或数组;空 = 清除)。停试/恢复的自动重试逻辑全在后端,mock
+       只摆信封与设置页降级行;「拦截→降级」=_setTaskOk(false) 后接本钩子,
+       「重建恢复」=rebuildTask(非 sticky) */
+    const arr=Array.isArray(list)?list:String(list||'').split(',');
+    S.taskDegraded=arr.map(x=>String(x).trim()).filter(Boolean);
+    return OK({degraded:S.taskDegraded});
   },
   async _setVault(state){
     /* dev 驱动钩子(1.6.0 库链摆拍):强改凭据库健康态 — recentResult 的
