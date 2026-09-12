@@ -16,6 +16,7 @@
 > 与 🔔 对账/契约缺口注、§1 v-boot/v-main/v-status 行补分诊与 3 败、§3 #14、§4 记录。
 > 2026-09-11 收尾批 P0-6 mock 对齐后端「线上他人」已存凭据路径:`login({})` 无 password + `logged_in` 先 chkstatus,他人 → 注销+真登(不再误返 already);自己/chkstatus 不可得 → already(行为不变);画廊 v-main 卡新增「重登·线上他人」验收帧;后端 0 改动、契约 1.5.0 0 改动;§0 already 行注、§3 #1/#4 链路注、§4 记录。
 > 2026-09-11 走查五小修(fix/walkthrough-5):§2 表尾补「同问题去重拦下 → 留原视图」口径行(附 F-②a 路由格 18/18 全绿注)、§2 v-form 格改「用户真键入(含仅预填不算)」口径、§4 记录、§5 测试计数 281→279 同步(2a6203c 清 feedback 死代码后)。
+> 2026-09-12 批A/批B 同步(roadmap,用户拍板 2026-09-12):§0 🔔 J 章对账注按拍板更新(成功默认开/连不上纯诊断/完整冷却已兑现;库降级不发;程序链不做)、§1 v-settings 补停试降级行、§3 补 #15、§4 两行记录、§5 计数 333。
 > 活的形式见 `guigui/app/static/dev/state-gallery.html`(陈列矩阵 + 场景流程 + 网络切换器)。
 
 ## 0. 两轴状态模型
@@ -57,8 +58,8 @@
 > - **网** = 📡 探测结果(P1-8 常驻,巡检「网」维度不另查);
 > - **任务** = taskStatus(启动静默体检)/ schedule:changed / rebuildTask — 重建链闭环(白板 intercept2→re3):后端 rebuildTask 单次点击内自带 3 轮 reconcile 重试环(信封 ok=false 即一轮 3 败);前端拦截页+横幅②共用计数 `S.rebuildFails`,三连败换反馈出口(附诊断包),**点击反馈出口即复位计数复原重建入口**(加白杀软后的再试通路不断,再 3 败反馈入口再现);重建成功信封 ok = reconcile 内 is_task_current 判定,即「回巡检复查」的结论,前端不另复询;
 > - **日志** = recentResult 启动分诊(白板 logskip→diag 三路):configured ∧ 当下 logged_in ∧ 今早 outcome=fail → contra 状态页(「进入检测」=🔑);②没登录→drop / ③网不通→wait 已由网态调起接管(P0-7/P1-8);silent(假期静默有意不打扰)与 throttled(中性,任务下拍自会重试)不分诊;recentResult 查询失败宁可漏报;
-> - **程序 / 库** = **契约 1.6.0 缺口,单独拍板**(G 章既有条目):两维无只读信封方法(程序侧现仅 diagnose 第 5 步/crashlog 显式体检可查;库侧 vault 的 keyring→advapi32 两层降级是既有行为,无备份库 JSON/降级状态可见性)。库链(备份库 JSON/自动重建×3/降级+🔔)与程序链「自动修复(自校验还原)」整体挂起 — 打包形态下 exe 损坏进程不起,现有 BRIDGE_MISSING 仪式页(P1-9 重试)+ crashlog 入诊断包即现实解。
-> - **🔔 J 章表逐行对账(P1-15 验收)**:已兑现 = 任务最终失败·凭据类(FAILED 每日≤1)/拦截要求加白(task_blocked,保存/开关/重建路径)/任务失联(task_lost,ensure 静默自检每日≤1);缺口(随 1.6.0 拍板)= 库降级通知、程序修复失败附重装指引、例行任务成功默认开、任务失败·连不上纯诊断(后两项涉 ensure/notify 语义重写,且「连不上也发」与假期静默拍板有冲突,需用户裁决);通知冷却(同类 30 分钟合并/每类每天≤1)现为「每日≤1」粒度,完整冷却是 1.6.0 范围。
+> - **程序 / 库**(2026-09-12 批B 更新):**库链已随 1.6.0(8c62fcb)落地** — 备份库 JSON + 损坏自动重建×3 + 3 败降级切备份(登录照常,vault_state 四态经 §2.10 可见,**不弹通知**);ADR-0007(DPAPI 加密 + failover 回写)是后续加固,草案待用户过目后转批C。**程序链 2026-09-12 拍板:不做**(exe 损坏进程不起,自修复不成立;现实解 = BRIDGE_MISSING 仪式页 P1-9 重试 + crashlog 入诊断包 + 重装指引)。
+> - **🔔 J 章表逐行对账(2026-09-12 批A 更新,拍板已齐)**:已兑现 = 任务最终失败·凭据类(fail_cred 带原因,每日≤1)/ 拦截要求加白(task_blocked,保存/开关/重建路径)/ 任务失联(task_lost,每日≤1)/ **例行任务成功默认开**(「今早自动登录成功 ✓」,受 `notifications` 总开关管辖,每日≤1)/ **任务失败·连不上纯诊断**(fail_net,非假期每日≤1)/ **完整冷却**(同类 30 分钟合并 + 每类每天≤1,账本 notify_sent 随 ensure state 持久化)/ **假期模式全静默**(自动 3 天判定或 vacation_silence 手动,任一生效;恢复可达自动退出)— 前四项随 1.6.0(8c62fcb)落地,2026-09-12 拍板确认;**拍板裁示两行**:库降级 = **不发通知**(2026-09-11,可见性走 §2.10 vault_state + diagnose 第 5 步)、程序修复失败 = **不做**(2026-09-12 程序链砍,现实解 = BRIDGE_MISSING 仪式页重试 + 重装指引)— J 章表「凭证库降级→发通知」「程序自动修复失败→附重装指引」两行已被拍板推翻,以本注记与契约 §3.1 为准。
 
 ### 验证阶梯(提交密码时线上已有人)
 
@@ -82,7 +83,7 @@
 | v-guide | 不可达落地(琥珀加强状态条:danger+⚠+脉冲;greet 布局 + bot 哭脸) / 重新检测 busy(真调 probe,通了自动分流) / 日常开机落地(可返回,主页 down 态保留) / ③ 保存配置路径(P0-7 改口径:先保存配置,连上后一键就登);事件自动跳:恢复 not_logged_in → reProbe → configured ? 状态页 : v-form(login),他设备登好 → v-main |
 | v-main | **两态(2026-09-11 P1-13,拍板⑪)**:①全部正常(问候语标题+基线 lede,无横幅)②带横幅(状态页/故障页返回自带);out/down 大字分支链已删(标题恒问候语,网络事实由「网络」行呈现 = netText 三态由 📡 探测喂;`#main-status` 状态条与 st-warn/st-down 随删);按钮恒「立即重新登录」(断网时 login→NET_UNREACHABLE→v-guide 诚实路由);bot 心境只认总开关(on=idle/off=sleep,动作 flash 临时覆盖);总开关关=桂桂睡觉(auto-desc「已关 · 想让我开工随时说」;`S.master` 镜像);横幅语义定稿(白板图例口径):**①未验证/验证失败提醒**(P0-5 条件,点击→📄 v-form)/ **②拦截态·master 开关联动**(关=任务停用+拦截解除,横幅即时隐退——toggleAuto 即刷+taskStatus 关=ok 双保险;开=点击就地重建 busy,后端单轮内自带 3 轮重试;连败计数 `S.rebuildFails`≥3 → 横幅换「重建 3 次没成 — 带上诊断包反馈」(P1-15,白板 re3;点击=复位计数+跳反馈页,返回后横幅回「点此重建」— 加白杀软后的再试通路不断))/ **③反馈相关**(再登连败 ≥2 → v-diag;文案拟稿)/ **⑧网态问题中枢入口**(hubRaised 在场即显,等网/未登录两文案,点击进 v-status;logged_in 自动消失);重登中 busy / 成功就地 flash / stored 如实;再登被拒 → 跳改密页预填;「今早没登上」横幅已删(最近结果行已显示) |
 | v-log | 正常历史 / 含失败日 / 假期静默日 |
-| v-settings | 默认(系统区含「立即体检」→ v-diag) / WiFi 兜底展开;「定时任务被拦」行已删(归主页横幅②) |
+| v-settings | 默认(系统区含「立即体检」→ v-diag) / WiFi 兜底展开;「定时任务被拦」行已删(归主页横幅②);**停试降级行(1.7.0/ADR-0006,2026-09-12 批B)**:taskStatus 带 `degraded` 时条件显示「{任务}暂不可用」+「重建」按钮(rebuildTask 清零连败并无条件全量重试,唯一恢复入口;文案拟稿待 H 表场景化过目);假期静默/弹通知两行描述按 2026-09-12 通知语义对齐(拟稿) |
 | v-feedback | 问题 / 建议 / 校验错误 / 发送中 / pending 行;两终态(复用 v-success 舞台):收到 / 没发出去(草稿回填重发 + 等待自动补发) |
 
 ## 2. net:state 事件路由表(2026-09-10 第三批重写:configured 用户带网态问题 → 系统调起状态页;未配置走旧路 v-guide;代码侧 `ROUTE`/`routeNet` 表驱动,与本表逐格对应)
@@ -127,6 +128,7 @@
 | 12 | 🔑 检验三入口(2026-09-11 新,P1-14) | 矛盾态「进入检测」=同一 🔑(已登录→对账不触发登录,未登录→真登)/ vt2:网恢复 ∧ 未验证库 → 自动验证(唯一自动动作;成功回日常横幅①消,already 静默不翻 verified,被拒→状态页在场转 sad、否则横幅①)/ 已验证库网恢复不自动(streak 开机即状态页,快登键等手动) | S10 / S9 / 画廊 v-status 卡 |
 | 13 | 任务①②链三结局(2026-09-11 新,P1-17) | **建成+登上**:断网存配置(任务①建成→okpg2)→ 网恢复 vt2 自动登 → 日常全部正常 / **建成+登录失败**:明早任务跑(GUI 在场)→ 日志落「登录被拒」+ 网态翻未登录 → 系统调起状态页·蓝变红递快登(🅛 五态分流复用);任务仍在岗 **不进拦截页**、横幅②不亮 / **建成失败**:杀软拦 → 拦截页(断网语境经 taskStatus 复询分流);加白重建成功 → okpg2+「任务已修好」;🔔 通知(成功默认开/拦截要求加白/失败带原因)全在后端 ensure/notify 侧 | S11 / S10 / 画廊 v-success 卡 |
 | 14 | 巡检分诊+任务链 3 败(2026-09-11 新,P1-15) | **日志维度分诊**:今早明确失败 ∧ 当下全好 → 开机直落 contra 状态页(「进入检测」=🔑 对账收场回日常,verified 不翻横幅①留);silent/throttled 不分诊;负样本 daily/streak 开机照常 / **任务链 3 败**:后端 rebuildTask 单轮 3 次重试环;拦截页/横幅②三连败换反馈出口(附诊断包),点击复位计数复原重建入口;程序/库两维 = 契约 1.6.0 缺口(见 §0 巡检注) | S12 / S8 第 4 步 / 画廊 v-status contra 帧 + v-main 3 败帧 |
+| 15 | 停试降级 → 重建恢复(2026-09-12 新,批B/ADR-0006,阈值拍定 3) | 后端:同任务连续 3 次 reconcile 建立失败 → 停试(跳过重建、记 degraded,账本 `task_fail_streak` 持久化进 ensure state,向后兼容),不再随 saveConfig/GUI 启动自动重试;建成/在岗/意图满足即清零;taskStatus 信封可选带 `degraded` 任务名列表(1.7.0);设置页降级行如实显示「{任务}暂不可用」;用户点「重建」→ rebuildTask 先清零再无条件全量重试(3 轮环),修好行隐、仍降级如实留 / mock:`_setTaskDegraded` 摆「拦截→降级」,_setTaskOk(false,sticky) 摆持续拦,rebuildTask 清空恢复 | 画廊 v-settings 降级帧(2026-09-12 新) |
 
 ## 4. 修复记录
 
@@ -149,11 +151,13 @@
 | 2026-09-11 | 6665ca9 | F 章动态验收 runner 落盘:`dev/f-final-runner.py` + 证据 `dev/f-final/`(results.json + 失败帧截图);**F-②** mock 21 scene 全场景回归全绿(头注 21 场景全覆盖,矩阵 §3 #1-#14 全链路);**F-②a** net:state 路由格走查 18/18 全绿(四态 × 主要视图,含 v-form A3 formDirty 豁免格、空表单去重格);**F-④ AC-1** flash ≥4s 实测挂载 4003ms 通过(MutationObserver 采样到 912ms 出现 → 4915ms 回基线);**F-④ AC-2** NOT_CONFIGURED 双击 quickLogin login 调用计数 = 1 通过;runner 方法学注释(每格重载 daily + 手动导航回源视图避免 hubRaised/origin 泄漏);后端 281 测仍全绿 |
 | 2026-09-11 | a705e22 | 收尾批 F 章走查修复 8 项纯执行:P1-7 拦截页标题口径「密码没问题,自动登录还差一步。」+ A6 banner button 化(CSS 重置 + 5 处 div→button)+ A6 SSID 键盘(role+tabindex+Enter/Space)+ A5 h1 焦点(9 视图 .v-title tabindex=-1,show() 末尾 focus)+ A4 Escape 关 dd+ P1-6 体检过期实现(markDiagStale + 30s 阈值 + 重跑按钮)+ 画廊 v-diag 卡新增验收帧 + 白板 DSL 8 节点注记(L1/L2/bigpage/quicklogin/autotest/beret/okpg2/dailypg)+ intercept 全文改写 |
 | 2026-09-11 | (本提交) | 走查五小修(fix/walkthrough-5 分支):**A6 收尾** — 设置页 7 个 `.sw` 自绘开关 div→button(Tab/Enter 可达;CSS `button.sw` 重置,轨道背景显式回写 #EBEEF4 防 button 化后透明);**P1-6 阈值提取** — 内联 30000 → 常量 `DIAG_STALE_MS`(行为零变化);**A3 formDirty 修正** — identify 自动预填学号不算「已键入」(`S.formPrefill` 基准,formMode 清零/预填时记;formDirty=密码非空‖学号≠基准),§2「v-form 空表单→调起状态页」格恢复可达,浏览器实测 9 组全绿(dev/wt5-verify.py);**§2 补「同问题去重拦下→留原视图」口径行 + F-②a 路由格 18/18 全绿注**(证据 dev/f-final/results.json);计划文档加「白板待推送清单」小节(16 已落 + 4 待 1.6.0 + intercept 全文改写,板推送待用户手动);后端 279 测全绿 |
+| 2026-09-12 | 0e80417/431f6bc/df79184 | **批A 通知语义+契约 1.7.0**:成功通知标题对齐 H 拟稿原文「今早自动登录成功 ✓」+ notifications 总开关关单测(成功/连不上双路径静默);契约 bump v1.6.0→v1.7.0(§2.13 degraded / §2.14 清零 / §3.1 文案 / §5 登记)+ mock 同步;PRD §4.5 重写 + §4.6/§5/§7/AC-04/10/17 按 2026-09-12 拍板修订;本表 §0 🔔 对账注/程序库注同步。通知矩阵其余语义(连不上纯诊断/假期静默/30min 冷却/成功默认开)已随 1.6.0(8c62fcb)落地,拍板确认 |
+| 2026-09-12 | ed4adb4/d8f5e5d | **批B ADR-0006 停试退避(阈值拍定 3)**:selfheal._align 连败计数持久化(ensure_state 新键 task_fail_streak,向后兼容),3 败停试跳过重建、建成/在岗清零;api.taskStatus 可选带 degraded、rebuildTask 先清零再 3 轮全量重试(+6 测);设置页降级行(条件显示+重建按钮)+ 假期静默/弹通知开关文案对齐 + 画廊 v-settings 降级帧;程序链 2026-09-12 拍板砍(白板 progfail/proggrep 注记不做);ADR-0006 状态已接受 |
 
 ## 5. 执行约定(零上下文可续:新对话或 subagent 接力同规,2026-09-11 拍板)
 
-- 测试基准:仓库根 `python -m pytest guigui/tests -q`(当前 279 全绿;2a6203c 清 feedback() 死代码后由 281 降 2);前端语法 `node -e "new Function(提取的 script)"`。
-- 契约变更走 `docs/tech/guigui-bridge-api-v1.md` 版本号,前端 mock(`static/dev/mock.js`)与后端(`guigui/app/api.py`)同场景逐字一致。
+- 测试基准:仓库根 `.venv-guigui/Scripts/python.exe -m pytest guigui/tests -q`(全绿计数以 SPEC §3 质量基线为正本,2026-09-12 批A/B 后 333);前端语法 `node -e "new Function(提取的 script)"`。
+- 契约变更走 `docs/tech/guigui-bridge-api-v1.md` 版本号(当前 1.7.0),前端 mock(`static/dev/mock.js`)与后端(`guigui/app/api.py`)同场景逐字一致。
 - 状态画廊:`guigui/app/static/dev/state-gallery.html`(仅 dev,打包排除 `static/dev/`;10 视图 × 全部状态帧 + 十八故事,须 http 打开;2026-09-10 P2-1 后 v-ok/v-login 并为 v-form,第三批加 v-status 卡);新增状态必须同步画廊帧,否则美术看不到。
 - 摆拍约定:走产品全局函数/事件入口(quickLogin/openDetail/guiguiEmit 等),let 变量(mainState/loginFailStreak)不可跨窗口直赋。
 - 不顺手修:画廊/矩阵之外的风格问题单独开任务,别混提交。
