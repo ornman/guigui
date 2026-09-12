@@ -40,6 +40,7 @@ legacy-v1/docs/screenshots/
 # local tooling artifacts
 .coverage
 .zcode/
+.mimosa/
 
 # guigui 打包产物
 .venv-guigui/
