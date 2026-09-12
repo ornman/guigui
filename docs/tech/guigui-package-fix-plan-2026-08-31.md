@@ -1,5 +1,7 @@
 # 桂桂打包产物审计修复 Implementation Plan
 
+> 注:2026-09-12 开源脱敏,文中实测个人值已替换为同格式假值。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 修复 2026-08-31 打包产物审计的 P1×1 + P2×3 + 顺手 P3×2(报告见 `docs/tech/guigui-package-audit-2026-08-31.md`)。
