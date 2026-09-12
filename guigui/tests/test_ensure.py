@@ -121,7 +121,7 @@ def test_settle_writes_three_rows_and_state(monkeypatch):
     assert state["last_net_state"] == "up"
     assert state["last_result"]["outcome"] == "ok"
     # 1.6.0:任务成功 = 发(默认开),落点状态页深链
-    assert h.sent == [("自动登录成功 ✓", "guigui://v-status")]
+    assert h.sent == [("今早自动登录成功 ✓", "guigui://v-status")]
 
 
 def test_settle_idempotent_same_day(monkeypatch):
@@ -129,6 +129,20 @@ def test_settle_idempotent_same_day(monkeypatch):
     h.run()
     h.run()                                  # 同日第二拍:秒退
     assert len(h.today_entries()) == 3
+
+
+def test_notifications_master_switch_suppresses_all(monkeypatch):
+    """2026-09-12 拍板:config.notifications 总开关关 → 一切通知静默
+    (成功默认开,但同样受总开关管辖;日志/状态照记)。"""
+    h = Harness(monkeypatch, cfg_over={"notifications": False})
+    h.run()                                  # 当日首次成功:本会发,开关关 → 不发
+    assert h.sent == []
+    assert ensure.load_state()["last_settle_date"] == "2026-08-31"
+    h2 = Harness(monkeypatch, cfg_over={"notifications": False},
+                 probe_seq=[{"state": "unreachable"}])
+    h2.run()                                 # 连不上纯诊断:开关关 → 不发
+    assert h2.sent == []
+    assert h2.today_entries()[-1]["text"] == "连不上校园网"
 
 
 def test_early_success_uses_open_door_line(monkeypatch):
@@ -286,7 +300,7 @@ def test_silence_recovers_next_day(monkeypatch):
     state = ensure.load_state()
     assert state["silent"] is False and state["unreachable_streak"] == 0
     assert state["vacation_auto"] is False
-    assert h.sent[-1] == ("自动登录成功 ✓", "guigui://v-status")
+    assert h.sent[-1] == ("今早自动登录成功 ✓", "guigui://v-status")
 
 
 def test_silent_same_day_beat_probes_nothing(monkeypatch):
@@ -392,7 +406,7 @@ def test_settle_other_uid_recorded_not_disturbing(monkeypatch):
     assert state["last_result"]["tries"] == 1
     assert state["cred_verified"] is True           # 换回自己的 = 真验证过
     # 1.6.0:任务成功 = 发(换会话成功也是收工成功)
-    assert h.sent == [("自动登录成功 ✓", "guigui://v-status")]
+    assert h.sent == [("今早自动登录成功 ✓", "guigui://v-status")]
 
 
 def test_settle_other_uid_rejected_reports_honestly(monkeypatch):
@@ -471,7 +485,7 @@ def test_task_in_place_silent_zero_overhead(monkeypatch):
     state = ensure.load_state()
     assert state.get("task_lost_notify_date") is None
     # 1.6.0:收工成功通知照发(任务结果类);自检本身不产生新条目
-    assert h.sent == [("自动登录成功 ✓", "guigui://v-status")]
+    assert h.sent == [("今早自动登录成功 ✓", "guigui://v-status")]
 
 
 def test_task_missing_records_and_notifies_once(monkeypatch):

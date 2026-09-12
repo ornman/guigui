@@ -214,7 +214,9 @@ def _apply_notify(cfg: dict, state: dict, *, connected: bool,
     if not (kind and cfg.get("notifications", True)):
         return
     if kind == notify.SUCCESS:
-        notify.send("自动登录成功 ✓", "今天的网已经登好",
+        # 标题 = H 表拟稿原文「今早自动登录成功 ✓」(2026-09-12 拍板沿用,
+        # 拟稿整体仍待 H 表场景化过目)
+        notify.send("今早自动登录成功 ✓", "今天的网已经登好",
                     notify.LAUNCH_STATUS)
     elif kind == notify.FAILED:
         notify.send("自动登录没成功",
