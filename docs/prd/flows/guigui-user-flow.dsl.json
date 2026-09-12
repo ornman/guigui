@@ -1446,7 +1446,7 @@
         {
          "type": "rect",
          "id": "progfail",
-         "text": "程序:损坏/被隔离(待1.6.0拍板)",
+         "text": "程序:损坏/被隔离(2026-09-12拍板:不做)",
          "width": 135,
          "height": 42,
          "fillColor": "#FEE2E2",
@@ -1459,7 +1459,7 @@
         {
          "type": "rect",
          "id": "proggrep",
-         "text": "自动修复(自校验还原·待1.6.0拍板)",
+         "text": "自动修复(2026-09-12拍板:不做)",
          "width": 160,
          "height": 42,
          "fillColor": "#DBEAFE",
