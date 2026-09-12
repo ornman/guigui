@@ -286,7 +286,7 @@ def test_server_last_verdict_from_log_data(canned, monkeypatch):
                     data={"rej": "limit_users", "body_head": "Oppp error: Limit Users Err",
                           "server_view_ip": "172.16.0.1",
                           "mac_hint": ["00aa00bb00cc", "00dd00ee00ff"],
-                          "aolno": 6152, "ubind": "mac1='',ty1=0", "tries": 2, "http": 200})
+                          "aolno": 9999, "ubind": "mac1='',ty1=0", "tries": 2, "http": 200})
     bundle = diagnostics.collect(["problem"])
     verdict = bundle["server"]["last_verdict"]
     assert verdict["rej"] == "limit_users"

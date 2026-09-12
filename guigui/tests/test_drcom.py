@@ -241,7 +241,7 @@ def test_login_ex_limit_users_carries_payload(monkeypatch):
     assert r.msg == "Oppp error: Limit Users Err"
     assert r.payload["ss5"] == "172.16.0.1"
     assert r.payload["ss1"] == "00aa00bb00cc" and r.payload["ss4"] == "00dd00ee00ff"
-    assert r.payload["aolno"] == 6152 and "mac1=" in r.payload["ubind"]
+    assert r.payload["aolno"] == 9999 and "mac1=" in r.payload["ubind"]
 
 
 def test_login_ex_success_and_unreachable_shapes(monkeypatch):

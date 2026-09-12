@@ -350,7 +350,7 @@ env/self 两 scope 恒带,net/server/logs/summary/crashes 仅含 problem 时携�
 
 ## 6. 集成待办(联调问题记这里)
 
-- **学号打码示例说明(后端记,已随 1.0.1 登记)**:打码规则=前4…后4,对真实学号 2025000000001 得 `2025…0001`;PRD/契约示例里的 `2025…7209` 是手打示意串、非规则推得。前端如做正则校验请以规则为准。
+- **学号打码示例说明(后端记,已随 1.0.1 登记)**:打码规则=前4…后4,对示例学号 2025000000001 得 `2025…0001`;PRD/契约示例里的 `2025…7209` 是手打示意串、非规则推得。前端如做正则校验请以规则为准。
 - **`recentResult` tries=0 文案** → 前端已修复(2026-08-31):`tries===0` 映射「(时间) 已经在线 ✓」。
 - **`recentResult` when 与行标题** → 前端已修复(2026-08-31):行标题改用 `when`(id=main-last-t),缺省「昨晚」。
 - **窗口圆角配方(DWM 优先,2026-09-06 更新)**:Win11 起首选 `DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND`(系统 8px 抗锯齿圆角,随尺寸/DPI 自适应,keeper/事件跟踪全免;spike_mica.py 实机验证);`SetWindowRgn` 8px 裁剪(`CORNER_CSS_PX=8`,rgn=`ClientSize+1`)降为 Win10 兜底 —— DWM 属性调用失败时才启用(rgn + Resize/LocationChanged 跟踪 + 1.5s keeper 重贴)。两路共同点不变:①`shadow=False`(DWM 阴影 hack 在圆角外铺白边);②`background_color='#e9e7f2'` 兜弧线亚像素缝隙;③in-app 卡片弧 9px 盖过窗角 8px。**前端自绘标题行保留,无需拆除**——原生窗口中间态(75682e8)已回退。另:真玻璃(Mica 材质 + WebView2 透明)spike 已探明壳层可行、卡在 pywebview 6.2.1 的 WebView2 背景不透明(transparent=True 未生效,环带刷白),证据与配方存 `guigui/spike_mica.py`,要做真玻璃时从那里续。

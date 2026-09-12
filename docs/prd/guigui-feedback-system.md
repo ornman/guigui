@@ -167,7 +167,7 @@
       "msga": "Oppp error: Limit Users Err",     // 服务器原话
       "server_view_ip": "172.16.0.1",        // ss5:服务器看到的来源 IP
       "mac_hint": ["00aa00bb00cc", "00dd00ee00ff"],  // ss1/ss4:MAC 指纹
-      "aolno": 6152,                 // 在线编号
+      "aolno": 9999,                 // 在线编号
       "ubind": "mac1='',ty1=0,mac2='',ty2=0,mac3='',ty3=0,mac4='',ty4=0,mac5='',ty5=0"
     },                               //   ↑ MAC 绑定策略原文
     "errors": []
@@ -417,7 +417,7 @@ deletion test:删掉它,发送/重试/幂等/退避/队列复杂度会在 api.py
     "msga": "Oppp error: Limit Users Err",
     "server_view_ip": "172.16.0.1",          // ss5:服务器看到的来源 IP
     "mac_hint": ["00aa00bb00cc", "00dd00ee00ff"],// ss1/ss4
-    "aolno": 6152, "ubind": "mac1='',ty1=0,…" } }
+    "aolno": 9999, "ubind": "mac1='',ty1=0,…" } }
 ```
 
 ## 9. 容灾矩阵(验收自检表)

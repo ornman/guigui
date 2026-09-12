@@ -419,7 +419,7 @@ def test_online_identity_unknown_settles_without_blocking(monkeypatch):
 _LIMIT_PAYLOAD = {
     "result": 0, "uid": "2025000000001",
     "ss5": "172.16.0.1", "ss1": "00aa00bb00cc", "ss4": "00dd00ee00ff",
-    "aolno": 6152, "ubind": "mac1='',ty1=0",
+    "aolno": 9999, "ubind": "mac1='',ty1=0",
     "msga": "Oppp error: Limit Users Err",
 }
 
@@ -442,7 +442,7 @@ def test_limit_users_full_chain(monkeypatch):
     assert d["body_head"] == "Oppp error: Limit Users Err"
     assert d["server_view_ip"] == "172.16.0.1"
     assert d["mac_hint"] == ["00aa00bb00cc", "00dd00ee00ff"]
-    assert d["aolno"] == 6152 and "mac1=" in d["ubind"]
+    assert d["aolno"] == 9999 and "mac1=" in d["ubind"]
     assert d["http"] == 200 and d["tries"] >= 1
     assert "upass" not in str(d) and "2025000000001" not in str(d)  # 红线
 
