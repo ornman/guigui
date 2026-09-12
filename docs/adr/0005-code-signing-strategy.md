@@ -61,3 +61,15 @@
 4. SignPath 免费档**保留为后续可选**(仓库已公开,申请门槛已具备,若误报申诉不胜其烦再启用)。
 
 已完成:开源前置审计(A 档 5 项全清,含 git 历史清洗 filter-repo)→ **仓库已公开并推送** https://github.com/ornman/guigui(master)。首个 Release 待批A/B 合入并重出安装器后发布(发布物与 master 一致)。
+
+---
+
+## 追记 2(2026-09-12 深夜):用户改拍「做 SignPath」,启动申请链
+
+用户在无签名方案上线 v2.0.0 后改拍:**启动 SignPath 开源免费档**(ADR 回填补记的无签名方案继续有效,签名获批后升级)。
+
+**门槛对账(signpath.org/terms.html 实查)**:公开仓库 ✓ / 非 PUA ✓ / 提供卸载 ✓ / 无专有组件 ✓(vendor 资产各自带证)/ **OSI 许可证 ← 已补:MIT(用户拍板,LICENSE 落盘)** / 活跃维护 ✓ / 已发布 ✓(v2.0.0 Release)/ 下载页有功能说明 ✓(Release notes)/ 隐私政策 ← README 已补隐私节 / **代码签名政策节(含 SignPath 鸣谢 + 团队角色)→ 获批时补** / MFA(GitHub 账号需开两步验证)→ 用户自查。
+
+**SignPath 免费档的已知代价**:证书发布者显示为「SignPath Foundation」(非桂桂);每次发版需人工批准签名;二进制须可验证由仓库源码构建 ⇒ **获批后需配 GitHub Actions 构建**(PyInstaller + Inno in CI,顺带补上 CI 门禁缺口,好事)。
+
+**流程分工**:用户 5 分钟 = signpath.io 注册(GitHub 登录)+ 提交开源申请(字段见申请包);agent = 获批后配 CI 构建 + SignPath 集成 + 代码签名政策节 + 发版流程切换。审核为人工裁量,周期以天计。
