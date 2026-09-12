@@ -6,11 +6,14 @@ T4: formDirty 修正 —
   4b: 填密码 → unreachable → 留 v-form(豁免仍工作)
   4c: 首装空表单(无预填)键入学号 → unreachable → 留页(用户真键入豁免)
 """
-import json, sys, io
+import json, os, sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 from playwright.sync_api import sync_playwright
 
-CHROME = r"C:\Users\ASUS\AppData\Local\ms-playwright\ms-playwright\chromium-1223\chrome-win64\chrome.exe"
+# chromium 路径环境推导(%LOCALAPPDATA% 不在则按用户主目录推),不落本机绝对路径;
+# 推导失败时 launch 处回退 p.chromium.executable_path(playwright 自带解析)
+CHROME = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~/AppData/Local")),
+                      "ms-playwright", "ms-playwright", "chromium-1223", "chrome-win64", "chrome.exe")
 BASE = "http://127.0.0.1:8767/index.html?dev=1&scene="
 results = []
 
@@ -19,7 +22,8 @@ def check(name, ok, detail=""):
     print(("PASS " if ok else "FAIL ") + name + (" | " + detail if detail else ""))
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(executable_path=CHROME, headless=True)
+    exe = CHROME if os.path.exists(CHROME) else p.chromium.executable_path
+    browser = p.chromium.launch(executable_path=exe, headless=True)
 
     # ── T1:设置页开关 button 化 + Tab/Enter ──────────────────────────
     pg = browser.new_page()

@@ -23,13 +23,16 @@ F 章动态验收 runner(2026-09-11)
      状态页 : v-form」不符;初版「通过」是采样窗口(900ms)短于
      550ms 延时 + mock probe 650~1100ms 的假绿。修正:期望 v-status,采样窗放宽。
 """
-import json, sys, time
+import json, os, sys, time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 BASE = "http://127.0.0.1:8765/index.html"
 DEV = "?dev=1"
-CHROMIUM = r"C:\Users\ASUS\AppData\Local\ms-playwright\ms-playwright\chromium-1223\chrome-win64\chrome.exe"
+# chromium 路径环境推导(%LOCALAPPDATA% 不在则按用户主目录推),不落本机绝对路径;
+# 推导失败时 launch 处回退 p.chromium.executable_path(playwright 自带解析)
+CHROMIUM = str(Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+               / "ms-playwright" / "ms-playwright" / "chromium-1223" / "chrome-win64" / "chrome.exe")
 EVIDENCE = Path("dev/f-final")
 EVIDENCE.mkdir(parents=True, exist_ok=True)
 
@@ -143,7 +146,8 @@ def enter_view(page, view):
 def main():
     print(">>> F 章动态验收开始", flush=True)
     with sync_playwright() as p:
-        browser = p.chromium.launch(executable_path=CHROMIUM, headless=True)
+        exe = CHROMIUM if Path(CHROMIUM).exists() else p.chromium.executable_path
+        browser = p.chromium.launch(executable_path=exe, headless=True)
         ctx = browser.new_context(viewport={"width":1280,"height":820})
         page = ctx.new_page()
 

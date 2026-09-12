@@ -58,7 +58,7 @@
 
 ## 设计品味(Design Taste)
 
-桂桂营销页阶段已装五条前端 skill(Source: `Leonxlnx/taste-skill`,落地于 `C:\Users\ASUS\.agents\skills\`):
+桂桂营销页阶段已装五条前端 skill(Source: `Leonxlnx/taste-skill`,落地于 `~/.agents/skills/`):
 
 - `gpt-taste` — AIDA + GSAP ScrollTrigger + 巨间距 + bento
 - `imagegen-frontend-web` — 每 section 一独立横图,共用调色板
@@ -86,7 +86,7 @@
 
 ## 图表工具(archify)
 
-`archify`(MIT,Source: `tt-a1i/archify`)已装于 `C:\Users\ASUS\.agents\skills\archify`(2026-09-06 安装;本机 git 代理 127.0.0.1:7890 失效时 GitHub 直连不通,经 `gh-proxy.com` 镜像 clone)。
+`archify`(MIT,Source: `tt-a1i/archify`)已装于 `~/.agents/skills/archify`(2026-09-06 安装;本机 git 代理 127.0.0.1:7890 失效时 GitHub 直连不通,经 `gh-proxy.com` 镜像 clone)。
 
 **用法**:写类型化 JSON(workflow v2 / lifecycle / architecture / sequence / dataflow,schema 在 `skills/archify/schemas/`)→ `node bin/archify.mjs validate <type> <json> --quality showcase --json` 迭代到 0 诊断 → `deliver <type> <json> <html> --quality showcase`(产物=自包含交互 HTML,冻结规格并记 SHA-256 收据)。桂桂业务流程图源在 `docs/prd/flows/*.json`(2026-09-06 三张全 showcase)。
 
